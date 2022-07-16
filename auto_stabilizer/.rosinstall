@@ -1,0 +1,10 @@
+- git:
+    uri: https://github.com/kindsenior/hrpsys-base
+    local-name: hrpsys
+- git:
+    uri: https://github.com/start-jsk/rtmros_common
+    local-name: rtm-ros-robotics/rtmros_common
+- git:
+    uri: https://github.com/Naoki-Hiraoka/rtmbuild2
+    local-name: rtmbuild2
+

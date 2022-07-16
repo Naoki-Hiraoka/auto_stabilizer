@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>auto_stabilizer</name>
+  <version>0.0.0</version>
+  <description>The auto_stabilizer package</description>
+
+  <maintainer email="hiraoka@jsk.imi.i.u-tokyuo.ac.jp">Naoki-Hiraoka</maintainer>
+
+  <license>BSD</license>
+
+  <author email="hiraoka@jsk.imi.i.u-tokyo.ac.jp">Naoki-Hiraoka</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <depend>qpoases_vendor</depend>
+  <depend>rtmbuild2</depend>w
+  <depend>hrpsys_ros_bridge</depend>
+
+</package>
