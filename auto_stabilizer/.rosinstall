@@ -9,5 +9,4 @@
     local-name: rtmbuild2
 - git:
     uri: https://github.com/choreonoid/choreonoid
-    local-name: choreonoid
-
+    local-name: choreonoid # release-1.8
