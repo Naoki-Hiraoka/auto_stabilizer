@@ -13,7 +13,8 @@
   <buildtool_depend>catkin</buildtool_depend>
 
   <depend>qpoases_vendor</depend>
-  <depend>rtmbuild2</depend>w
+  <depend>rtmbuild2</depend>
+  <depend>choreonoid</depend>
   <depend>hrpsys_ros_bridge</depend>
 
 </package>

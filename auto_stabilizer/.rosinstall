@@ -7,4 +7,7 @@
 - git:
     uri: https://github.com/Naoki-Hiraoka/rtmbuild2
     local-name: rtmbuild2
+- git:
+    uri: https://github.com/choreonoid/choreonoid
+    local-name: choreonoid
 
