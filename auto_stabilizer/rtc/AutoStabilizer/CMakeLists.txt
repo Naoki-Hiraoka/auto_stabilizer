@@ -11,7 +11,6 @@ find_package(catkin REQUIRED COMPONENTS
   #prioritized_inverse_kinematics_solver
   #cpp_filters
   #ik_constraint_joint_limit_table
-  #collision_checker_msgs
 
   )
 find_package(choreonoid REQUIRED)
@@ -40,3 +39,13 @@ add_dependencies(AutoStabilizer RTMBUILD2_${PROJECT_NAME}_genrpc) # wait for rtm
 
 add_executable(AutoStabilizerComp AutoStabilizerComp.cpp)
 target_link_libraries(AutoStabilizerComp AutoStabilizer)
+
+install(TARGETS AutoStabilizer
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
+)
+
+install(TARGETS AutoStabilizer
+  LIBRARY DESTINATION ${PROJECT_SOURCE_DIR}/lib
+)

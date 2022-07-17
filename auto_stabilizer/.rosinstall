@@ -1,6 +1,10 @@
 - git:
     uri: https://github.com/kindsenior/hrpsys-base
     local-name: hrpsys
+    version: current-torque-control
+- git:
+    uri: https://github.com/kindsenior/openhrp3
+    local-name: openhrp3
 - git:
     uri: https://github.com/start-jsk/rtmros_common
     local-name: rtm-ros-robotics/rtmros_common

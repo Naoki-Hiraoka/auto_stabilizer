@@ -30,34 +30,32 @@ AutoStabilizer::AutoStabilizer(RTC::Manager* manager) : RTC::DataFlowComponentBa
 
 RTC::ReturnCode_t AutoStabilizer::onInitialize(){
 
-  addInPort("qRefIn", this->ports_.m_qRefIn_);// from sh
-  addInPort("basePosRefIn", this->ports_.m_basePosRefIn_);
-  addInPort("baseRpyRefIn", this->ports_.m_baseRpyRefIn_);
-  addOutPort("qComOut", this->ports_.m_qComOut_);
-  addOutPort("basePosComOut", this->ports_.m_basePosComOut_);
-  addOutPort("baseRpyComOut", this->ports_.m_baseRpyComOut_);
-  addOutPort("basePoseComOut", this->ports_.m_basePoseComOut_);
-  addOutPort("baseTformComOut", this->ports_.m_baseTformComOut_);
+  this->addInPort("qRefIn", this->ports_.m_qRefIn_);// from sh
+  this->addInPort("basePosRefIn", this->ports_.m_basePosRefIn_);
+  this->addInPort("baseRpyRefIn", this->ports_.m_baseRpyRefIn_);
+  this->addOutPort("qComOut", this->ports_.m_qComOut_);
+  this->addOutPort("basePosComOut", this->ports_.m_basePosComOut_);
+  this->addOutPort("baseRpyComOut", this->ports_.m_baseRpyComOut_);
+  this->addOutPort("basePoseComOut", this->ports_.m_basePoseComOut_);
+  this->addOutPort("baseTformComOut", this->ports_.m_baseTformComOut_);
   this->ports_.m_AutoStabilizerServicePort_.registerProvider("service0", "AutoStabilizerService", this->ports_.m_service0_);
-  addPort(this->ports_.m_AutoStabilizerServicePort_);
+  this->addPort(this->ports_.m_AutoStabilizerServicePort_);
 
   this->loop_ = 0;
 
   cnoid::BodyLoader bodyLoader;
-  std::string fileName;
-  if(this->getProperties().hasKey("model")) fileName = std::string(this->getProperties()["model"]);
-  else fileName = std::string(this->m_pManager->getConfig()["model"]); // 引数 -o で与えたプロパティを捕捉
-  std::cerr << "[" << this->m_profile.instance_name << "] model: " << fileName <<std::endl;
+  std::string fileName; this->getProperty("model", fileName);
+  if (fileName.find("file://") == 0) fileName.erase(0, strlen("file://"));
   cnoid::BodyPtr robot = bodyLoader.load(fileName);
   if(!robot){
-    std::cerr << "\x1b[31m[" << m_profile.instance_name << "] " << "failed to load model[" << fileName << "]" << "\x1b[39m" << std::endl;
+    std::cerr << "\x1b[31m[" << this->m_profile.instance_name << "] " << "failed to load model[" << fileName << "]" << "\x1b[39m" << std::endl;
     return RTC::RTC_ERROR;
   }
   this->m_robot_ref_ = robot;
   this->m_robot_com_ = robot->clone();
 
-  if(!this->m_robot_com_->rootLink()->isFixedJoint()) this->useJoints_.push_back(this->m_robot_com_->rootLink());
-  for(int i=0;i<this->m_robot_com_->numJoints();i++) this->useJoints_.push_back(this->m_robot_com_->joint(i));
+  // if(!this->m_robot_com_->rootLink()->isFixedJoint()) this->useJoints_.push_back(this->m_robot_com_->rootLink());
+  // for(int i=0;i<this->m_robot_com_->numJoints();i++) this->useJoints_.push_back(this->m_robot_com_->joint(i));
 
   // this->outputOffsetInterpolators_.rootpInterpolator_= std::make_shared<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >(cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::HOFFARBIB);
   // this->outputOffsetInterpolators_.rootRInterpolator_= std::make_shared<cpp_filters::TwoPointInterpolatorSO3 >(cnoid::Matrix3::Identity(),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::HOFFARBIB);
@@ -102,17 +100,29 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
 
   std::string instance_name = std::string(this->m_profile.instance_name);
   double dt = 1.0 / this->get_context(ec_id)->get_rate();
-
   this->loop_++;
+
+  if (this->ports_.m_qRefIn_.isNew()){
+    this->ports_.m_qRefIn_.read();
+    this->ports_.m_qCom_.tm = this->ports_.m_qRef_.tm;
+    this->ports_.m_qCom_.data.length(this->ports_.m_qRef_.data.length());
+    for(int i=0;i<this->ports_.m_qCom_.data.length();i++){
+      this->ports_.m_qCom_.data[i] = this->ports_.m_qRef_.data[i];
+    }
+    this->ports_.m_qComOut_.write();
+  }
+
   return RTC::RTC_OK;
 }
 
 RTC::ReturnCode_t AutoStabilizer::onActivated(RTC::UniqueId ec_id){
   std::cerr << "[" << m_profile.instance_name << "] "<< "onActivated(" << ec_id << ")" << std::endl;
+  // 各種処理を初期化する TODO
   return RTC::RTC_OK;
 }
 RTC::ReturnCode_t AutoStabilizer::onDeactivated(RTC::UniqueId ec_id){
   std::cerr << "[" << m_profile.instance_name << "] "<< "onDeactivated(" << ec_id << ")" << std::endl;
+  // 各種処理を初期化する TODO
   return RTC::RTC_OK;
 }
 RTC::ReturnCode_t AutoStabilizer::onFinalize(){ return RTC::RTC_OK; }
@@ -182,6 +192,19 @@ void AutoStabilizer::startStabilizer(void){
 void AutoStabilizer::stopStabilizer(void){
   return;
 }
+
+bool AutoStabilizer::getProperty(const std::string& key, std::string& ret) {
+  if (this->getProperties().hasKey(key.c_str())) {
+    ret = std::string(this->getProperties()[key.c_str()]);
+  } else if (this->m_pManager->getConfig().hasKey(key.c_str())) { // 引数 -o で与えたプロパティを捕捉
+    ret = std::string(this->m_pManager->getConfig()[key.c_str()]);
+  } else {
+    return false;
+  }
+  std::cerr << "[" << this->m_profile.instance_name << "] " << key << ": " << ret <<std::endl;
+  return true;
+}
+
 
 extern "C"{
     void AutoStabilizerInit(RTC::Manager* manager) {

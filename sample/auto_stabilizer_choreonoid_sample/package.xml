@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>auto_stabilizer_choreonoid_sample</name>
+  <version>0.0.0</version>
+  <description>The auto_stabilizer_choreonoid_sample package</description>
+
+  <maintainer email="hiraoka@jsk.imi.i.u-tokyo.ac.jp">Naoki-Hiraoka</maintainer>
+
+  <license>BSD</license>
+
+  <author email="hiraoka@jsk.imi.i.u-tokyo.ac.jp">Naoki-Hiraoka</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <depend>auto_stabilizer</depend>
+  <depend>hrpsys_choreonoid_tutorials</depend>
+</package>

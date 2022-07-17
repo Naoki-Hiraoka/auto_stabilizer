@@ -132,6 +132,9 @@ public:
   void stopStabilizer(void);
 
 protected:
+  bool getProperty(const std::string& key, std::string& ret);
+
+protected:
   std::mutex mutex_;
 
   unsigned int debugLevel_;

@@ -1,0 +1,39 @@
+<launch>
+
+  <!-- robot dependant settings -->
+  <env name="CHOREONOID_ROBOT" value="JAXON_RED" /> <!-- for JAXONCustomizer -->
+
+  <arg name="CONF_FILE" value="$(find hrpsys_choreonoid_tutorials)/models/JAXON_JVRC.conf"/>
+  <arg name="URDF_FILE" value="$(find hrpsys_choreonoid_tutorials)/models/JAXON_JVRC.urdf"/>
+  <arg name="MODEL_FILE" value="$(find jvrc_models)/JAXON_JVRC/JAXON_JVRCmain_hrpsys.wrl" />
+  <arg name="PROJECT_FILE" default="$(find hrpsys_choreonoid_tutorials)/config/JAXON_RED_RH_FLAT.cnoid"/>
+
+  <!-- hrpsys -->
+  <arg name="hrpsys_load_path" value="$(find hrpsys)/lib"/>
+  <arg name="auto_stabilizer_load_path" value="$(find auto_stabilizer)/../../lib"/>
+  <include file="$(find hrpsys_choreonoid)/launch/startup_choreonoid.launch" >
+    <!-- robot dependant settings -->
+    <arg name="SIMULATOR_NAME" value="JAXON_RED(Robot)0" />
+    <arg name="PROJECT_FILE"   value="$(arg PROJECT_FILE)" />
+    <arg name="MODEL_FILE"     value="$(arg MODEL_FILE)" />
+    <arg name="CONF_FILE"      value="$(arg CONF_FILE)"/>
+    <arg name="HRPSYS_PY_PKG"  value="auto_stabilizer_choreonoid_sample"/>
+    <arg name="HRPSYS_PY_NAME" value="jaxon_jvrc_setup.py"/>
+    <arg name="hrpsys_load_path" default="$(arg auto_stabilizer_load_path),$(arg hrpsys_load_path)"/>
+    <arg name="hrpsys_opt_rtc_config_args" value='-o "example.AutoStabilizer.config_file:$(arg CONF_FILE)"' />
+  </include>
+  <!-- ros_bridge -->
+  <rosparam command="load" file="$(find hrpsys_choreonoid_tutorials)/models/JAXON_JVRC_controller_config.yaml" />
+  <include file="$(find hrpsys_choreonoid)/launch/ros_bridge_choreonoid.launch" >
+    <!-- robot dependant settings -->
+    <arg name="SIMULATOR_NAME" value="RobotHardware_choreonoid0" />
+    <arg name="MODEL_FILE"     value="$(arg MODEL_FILE)" />
+    <arg name="COLLADA_FILE"   value="$(arg URDF_FILE)"/>
+    <arg name="CONF_FILE"      value="$(arg CONF_FILE)" />
+    <arg name="USE_WALKING"    default="false"  />
+    <arg name="USE_IMPEDANCECONTROLLER" default="false"  />
+    <arg name="USE_REFERENCEFORCEUPDATER" default="false" />
+    <arg name="USE_OBJECTCONTACTTURNAROUNDDETECTOR" default="false" />
+  </include>
+
+</launch>
