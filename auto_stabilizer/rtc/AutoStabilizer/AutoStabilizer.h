@@ -169,7 +169,7 @@ protected:
 
 protected:
   // utility functions
-  static bool readInportData(Ports& ports, cnoid::BodyPtr refRobot, std::vector<EndEffector>& endEffectors);
+  static bool readInportData(Ports& ports, cnoid::BodyPtr refRobot, cnoid::BodyPtr actRobot, std::vector<EndEffector>& endEffectors);
 };
 
 

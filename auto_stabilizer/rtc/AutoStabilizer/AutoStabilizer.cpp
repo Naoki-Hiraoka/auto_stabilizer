@@ -1,7 +1,7 @@
 #include "AutoStabilizer.h"
 #include <cnoid/BodyLoader>
 #include <cnoid/ForceSensor>
-#include <cnoid/AccelerationSensor>
+#include <cnoid/RateGyroSensor>
 #include <cnoid/EigenUtil>
 
 #define DEBUGP (loop%200==0)
@@ -222,9 +222,8 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
 }
 
 // static function
-bool AutoStabilizer::readInportData(AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobot, std::vector<AutoStabilizer::EndEffector>& endEffectors){
+bool AutoStabilizer::readInportData(AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobot, cnoid::BodyPtr actRobot, std::vector<AutoStabilizer::EndEffector>& endEffectors){
   bool refRobot_changed = false;
-
   if(ports.m_qRefIn_.isNew()){
     ports.m_qRefIn_.read();
     if(ports.m_qRef_.data.length() == refRobot->numJoints()){
@@ -254,6 +253,7 @@ bool AutoStabilizer::readInportData(AutoStabilizer::Ports& ports, cnoid::BodyPtr
     refRobot->calcForwardKinematics();
     refRobot->calcCenterOfMass();
   }
+
   for(int i=0;i<ports.m_refWrenchIn_.size();i++){
     if(ports.m_refWrenchIn_[i]->isNew()){
       ports.m_refWrenchIn_[i]->read();
@@ -264,6 +264,43 @@ bool AutoStabilizer::readInportData(AutoStabilizer::Ports& ports, cnoid::BodyPtr
       }
     }
   }
+
+  bool actRobot_changed = false;
+  if(ports.m_qActIn_.isNew()){
+    ports.m_qActIn_.read();
+    if(ports.m_qAct_.data.length() == actRobot->numJoints()){
+      for(int i=0;i<ports.m_qAct_.data.length();i++){
+        if(std::isfinite(ports.m_qAct_.data[i])) actRobot->joint(i)->q() = ports.m_qAct_.data[i];
+      }
+      actRobot_changed = true;
+    }
+  }
+  if(ports.m_dqActIn_.isNew()){
+    ports.m_dqActIn_.read();
+    if(ports.m_dqAct_.data.length() == actRobot->numJoints()){
+      for(int i=0;i<ports.m_dqAct_.data.length();i++){
+        if(std::isfinite(ports.m_dqAct_.data[i])) actRobot->joint(i)->dq() = ports.m_dqAct_.data[i];
+      }
+      actRobot_changed = true;
+    }
+  }
+  if(ports.m_actImuIn_.isNew()){
+    ports.m_actImuIn_.read();
+    if(std::isfinite(ports.m_actImu_.data.r) && std::isfinite(ports.m_actImu_.data.p) && std::isfinite(ports.m_actImu_.data.y)){
+      actRobot->calcForwardKinematics();
+      cnoid::RateGyroSensorPtr imu = actRobot->findDevice<cnoid::RateGyroSensor>("gyrometer");
+      cnoid::Matrix3 imuR = imu->link()->R() * imu->R_local();
+      cnoid::Matrix3 actR = cnoid::rotFromRpy(ports.m_actImu_.data.r, ports.m_actImu_.data.p, ports.m_actImu_.data.y);
+      actRobot->rootLink()->R() = Eigen::Matrix3d(Eigen::AngleAxisd(actR) * Eigen::AngleAxisd(imuR.transpose() * actRobot->rootLink()->R())); // 単純に3x3行列の空間でRを積算していると、だんだん数値誤差によってユニタリ行列でなくなってしまう恐れがあるので念の為
+    }
+    actRobot_changed = true;
+  }
+  if(actRobot_changed){
+    actRobot->calcForwardKinematics();
+    actRobot->calcCenterOfMass();
+  }
+
+
   return true;
 }
 
@@ -274,7 +311,7 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
   double dt = 1.0 / this->get_context(ec_id)->get_rate();
   this->loop_++;
 
-  AutoStabilizer::readInportData(this->ports_, this->refRobot_, this->endEffectors_);
+  AutoStabilizer::readInportData(this->ports_, this->refRobot_, this->actRobot_, this->endEffectors_);
 
   this->ports_.m_q_.tm = this->ports_.m_qRef_.tm;
   this->ports_.m_q_.data.length(this->refRobot_->numJoints());
