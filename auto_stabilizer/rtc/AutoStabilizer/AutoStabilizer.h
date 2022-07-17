@@ -98,6 +98,8 @@ protected:
 
     RTC::TimedDoubleSeq m_q_;
     RTC::OutPort<RTC::TimedDoubleSeq> m_qOut_;
+    RTC::TimedDoubleSeq m_genTau_;
+    RTC::OutPort<RTC::TimedDoubleSeq> m_genTauOut_;
     RTC::TimedPose3D m_genBasePose_; // Generate World frame
     RTC::OutPort<RTC::TimedPose3D> m_genBasePoseOut_;
     RTC::TimedDoubleSeq m_genBaseTform_;  // Generate World frame
@@ -169,7 +171,8 @@ protected:
 
 protected:
   // utility functions
-  static bool readInportData(Ports& ports, cnoid::BodyPtr refRobot, cnoid::BodyPtr actRobot, std::vector<EndEffector>& endEffectors);
+  static bool readInPortData(Ports& ports, cnoid::BodyPtr refRobot, cnoid::BodyPtr actRobot, std::vector<EndEffector>& endEffectors);
+  static bool writeOutPortData(Ports& ports, cnoid::BodyPtr genRobot);
 };
 
 
