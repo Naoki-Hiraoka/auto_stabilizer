@@ -54,7 +54,7 @@ public:
   bool setFootStepsWithParam(const OpenHRP::AutoStabilizerService::FootstepSequence& fs, const OpenHRP::AutoStabilizerService::StepParamSequence& sps, CORBA::Long overwrite_fs_idx);
   bool setFootStepsWithParam(const OpenHRP::AutoStabilizerService::FootstepsSequence& fss, const OpenHRP::AutoStabilizerService::StepParamsSequence& spss, CORBA::Long overwrite_fs_idx);
   void waitFootSteps();
-  bool startAutoBalancer(const ::OpenHRP::AutoStabilizerService::StrSequence& limbs);
+  bool startAutoBalancer();
   bool stopAutoBalancer();
   bool setGaitGeneratorParam(const OpenHRP::AutoStabilizerService::GaitGeneratorParam& i_param);
   bool getGaitGeneratorParam(OpenHRP::AutoStabilizerService::GaitGeneratorParam& i_param);
@@ -127,23 +127,23 @@ protected:
      */
     enum mode_enum{ MODE_IDLE, MODE_SYNC_TO_ABC, MODE_ABC, MODE_SYNC_TO_ST, MODE_ST, MODE_SYNC_TO_STOPST, MODE_SYNC_TO_IDLE};
     enum transition_enum{ START_ABC, STOP_ABC, START_ST, STOP_ST};
-    double transition_time;
+    double abc_transition_time, st_transition_time;
   private:
     mode_enum current, previous, next;
     double remain_time;
   public:
-    ControlMode(){ reset(); transition_time = 2.0;}
+    ControlMode(){ reset(); abc_transition_time = 2.0; st_transition_time = 2.0;}
     void reset(){ current = previous = next = MODE_IDLE; remain_time = 0;}
     bool setNextTransition(const transition_enum request){
       switch(request){
       case START_ABC:
-        if(current == MODE_IDLE){ next = MODE_SYNC_TO_ABC; remain_time = transition_time; return true; }else{ return false; }
+        if(current == MODE_IDLE){ next = MODE_SYNC_TO_ABC; remain_time = abc_transition_time; return true; }else{ return false; }
       case STOP_ABC:
-        if(current == MODE_ABC){ next = MODE_SYNC_TO_IDLE; remain_time = transition_time; return true; }else{ return false; }
+        if(current == MODE_ABC){ next = MODE_SYNC_TO_IDLE; remain_time = abc_transition_time; return true; }else{ return false; }
       case START_ST:
-        if(current == MODE_ABC){ next = MODE_SYNC_TO_ST; remain_time = transition_time; return true; }else{ return false; }
+        if(current == MODE_ABC){ next = MODE_SYNC_TO_ST; remain_time = st_transition_time; return true; }else{ return false; }
       case STOP_ST:
-        if(current == MODE_ST){ next = MODE_SYNC_TO_STOPST; remain_time = transition_time; return true; }else{ return false; }
+        if(current == MODE_ST){ next = MODE_SYNC_TO_STOPST; remain_time = st_transition_time; return true; }else{ return false; }
       default:
         return false;
       }

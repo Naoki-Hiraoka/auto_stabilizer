@@ -422,7 +422,13 @@ bool AutoStabilizer::setFootStepsWithParam(const OpenHRP::AutoStabilizerService:
 void AutoStabilizer::waitFootSteps(){
   return;
 }
-bool AutoStabilizer::startAutoBalancer(const OpenHRP::AutoStabilizerService::StrSequence& limbs){
+
+bool AutoStabilizer::releaseEmergencyStop(){
+  return true;
+}
+
+
+bool AutoStabilizer::startAutoBalancer(){
   if(this->mode_.setNextTransition(ControlMode::START_ABC)){
     std::cerr << "[" << m_profile.instance_name << "] start auto balancer mode" << std::endl;
     while (this->mode_.now() != ControlMode::MODE_ABC) usleep(1000);
@@ -441,29 +447,6 @@ bool AutoStabilizer::stopAutoBalancer(){
   }else{
     return false;
   }
-}
-bool AutoStabilizer::setGaitGeneratorParam(const OpenHRP::AutoStabilizerService::GaitGeneratorParam& i_param){
-  return true;
-}
-bool AutoStabilizer::getGaitGeneratorParam(OpenHRP::AutoStabilizerService::GaitGeneratorParam& i_param){
-  return true;
-}
-bool AutoStabilizer::setAutoBalancerParam(const OpenHRP::AutoStabilizerService::AutoBalancerParam& i_param){
-  return true;
-}
-bool AutoStabilizer::getAutoBalancerParam(OpenHRP::AutoStabilizerService::AutoBalancerParam& i_param){
-  return true;
-}
-
-bool AutoStabilizer::releaseEmergencyStop(){
-  return true;
-}
-
-void AutoStabilizer::getStabilizerParam(OpenHRP::AutoStabilizerService::StabilizerParam& i_param){
-  return;
-}
-void AutoStabilizer::setStabilizerParam(const OpenHRP::AutoStabilizerService::StabilizerParam& i_param){
-  return;
 }
 bool AutoStabilizer::startStabilizer(void){
   if(this->mode_.setNextTransition(ControlMode::START_ST)){
@@ -484,6 +467,29 @@ bool AutoStabilizer::stopStabilizer(void){
   }else{
     return false;
   }
+}
+
+bool AutoStabilizer::setGaitGeneratorParam(const OpenHRP::AutoStabilizerService::GaitGeneratorParam& i_param){
+  return true;
+}
+bool AutoStabilizer::getGaitGeneratorParam(OpenHRP::AutoStabilizerService::GaitGeneratorParam& i_param){
+  return true;
+}
+bool AutoStabilizer::setAutoBalancerParam(const OpenHRP::AutoStabilizerService::AutoBalancerParam& i_param){
+  this->mode_.abc_transition_time = i_param.transition_time;
+  return true;
+}
+bool AutoStabilizer::getAutoBalancerParam(OpenHRP::AutoStabilizerService::AutoBalancerParam& i_param){
+  i_param.transition_time = this->mode_.abc_transition_time;
+  return true;
+}
+void AutoStabilizer::setStabilizerParam(const OpenHRP::AutoStabilizerService::StabilizerParam& i_param){
+  this->mode_.st_transition_time = i_param.transition_time;
+  return;
+}
+void AutoStabilizer::getStabilizerParam(OpenHRP::AutoStabilizerService::StabilizerParam& i_param){
+  i_param.transition_time = this->mode_.st_transition_time;
+  return;
 }
 
 bool AutoStabilizer::getProperty(const std::string& key, std::string& ret) {

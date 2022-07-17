@@ -682,10 +682,10 @@ module OpenHRP
 
     /**
      * @brief Start AutoBalancer mode in which the robot controls the COM.
-     * @param limbs is sequence of limbs to fix. limbs are :rleg, :lleg, :rarm, and :larm
+     * @param
      * @return true if set successfully, false otherwise
      */
-    boolean startAutoBalancer(in StrSequence limbs);
+    boolean startAutoBalancer();
 
     /**
      * @brief Stop AutoBalancer mode.

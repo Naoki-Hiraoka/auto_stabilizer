@@ -49,9 +49,9 @@ void AutoStabilizerService_impl::waitFootSteps()
   return this->comp_->waitFootSteps();
 };
 
-CORBA::Boolean AutoStabilizerService_impl::startAutoBalancer(const OpenHRP::AutoStabilizerService::StrSequence& limbs)
+CORBA::Boolean AutoStabilizerService_impl::startAutoBalancer()
 {
-  return this->comp_->startAutoBalancer(limbs);
+  return this->comp_->startAutoBalancer();
 };
 
 CORBA::Boolean AutoStabilizerService_impl::stopAutoBalancer()

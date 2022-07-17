@@ -21,7 +21,7 @@ public:
   CORBA::Boolean setFootSteps(const OpenHRP::AutoStabilizerService::FootstepsSequence& fss, CORBA::Long overwrite_fs_idx);
   CORBA::Boolean setFootStepsWithParam(const OpenHRP::AutoStabilizerService::FootstepsSequence& fss, const OpenHRP::AutoStabilizerService::StepParamsSequence& spss, CORBA::Long overwrite_fs_idx);
   void waitFootSteps();
-  CORBA::Boolean startAutoBalancer(const OpenHRP::AutoStabilizerService::StrSequence& limbs);
+  CORBA::Boolean startAutoBalancer();
   CORBA::Boolean stopAutoBalancer();
   CORBA::Boolean startStabilizer(void);
   CORBA::Boolean stopStabilizer(void);
