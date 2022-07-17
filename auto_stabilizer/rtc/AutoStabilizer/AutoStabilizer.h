@@ -27,84 +27,7 @@
 
 class AutoStabilizer : public RTC::DataFlowComponentBase{
 public:
-  class Ports {
-  public:
-    Ports() :
-      m_qRefIn_("qRef", m_qRef_),
-      m_refBasePosIn_("refBasePosIn", m_refBasePos_),
-      m_refBaseRpyIn_("refBaseRpyIn", m_refBaseRpy_),
 
-      m_qOut_("q", m_q_),
-      m_genBasePosOut_("genBasePosOut", m_genBasePos_),
-      m_genBaseRpyOut_("genBaseRpyOut", m_genBaseRpy_),
-      m_genBasePoseOut_("genBasePoseOut", m_genBasePose_),
-      m_genBaseTformOut_("genBaseTformOut", m_genBaseTform_),
-
-      m_AutoStabilizerServicePort_("AutoStabilizerService") {
-    }
-
-    RTC::TimedDoubleSeq m_qRef_;
-    RTC::InPort<RTC::TimedDoubleSeq> m_qRefIn_;
-    RTC::TimedPoint3D m_refBasePos_;
-    RTC::InPort<RTC::TimedPoint3D> m_refBasePosIn_;
-    RTC::TimedOrientation3D m_refBaseRpy_;
-    RTC::InPort<RTC::TimedOrientation3D> m_refBaseRpyIn_;
-    std::vector<RTC::TimedDoubleSeq> m_refWrench_;
-    std::vector<std::unique_ptr<RTC::InPort<RTC::TimedDoubleSeq> > > m_refWrenchIn_;
-    std::vector<RTC::TimedDoubleSeq> m_actWrench_;
-    std::vector<std::unique_ptr<RTC::InPort<RTC::TimedDoubleSeq> > > m_actWrenchIn_;
-
-    RTC::TimedDoubleSeq m_q_;
-    RTC::OutPort<RTC::TimedDoubleSeq> m_qOut_;
-    RTC::TimedPoint3D m_genBasePos_;
-    RTC::OutPort<RTC::TimedPoint3D> m_genBasePosOut_;
-    RTC::TimedOrientation3D m_genBaseRpy_;
-    RTC::OutPort<RTC::TimedOrientation3D> m_genBaseRpyOut_;
-    RTC::TimedPose3D m_genBasePose_;
-    RTC::OutPort<RTC::TimedPose3D> m_genBasePoseOut_;
-    RTC::TimedDoubleSeq m_genBaseTform_; // for HrpsysSeqStateROSBridge
-    RTC::OutPort<RTC::TimedDoubleSeq> m_genBaseTformOut_; // for HrpsysSeqStateROSBridge
-
-    AutoStabilizerService_impl m_service0_;
-    RTC::CorbaPort m_AutoStabilizerServicePort_;
-  };
-
-  class ControlMode{
-  public:
-    enum mode_enum{ MODE_IDLE, MODE_SYNC_TO_CONTROL, MODE_CONTROL, MODE_SYNC_TO_IDLE};
-  private:
-    mode_enum current, previous, next;
-  public:
-    ControlMode(){ current = previous = next = MODE_IDLE;}
-    ~ControlMode(){}
-    bool setNextMode(const mode_enum _request){
-      switch(_request){
-      case MODE_SYNC_TO_CONTROL:
-        if(current == MODE_IDLE){ next = MODE_SYNC_TO_CONTROL; return true; }else{ return false; }
-      case MODE_CONTROL:
-        if(current == MODE_SYNC_TO_CONTROL){ next = MODE_CONTROL; return true; }else{ return false; }
-      case MODE_SYNC_TO_IDLE:
-        if(current == MODE_CONTROL){ next = MODE_SYNC_TO_IDLE; return true; }else{ return false; }
-      case MODE_IDLE:
-        if(current == MODE_SYNC_TO_IDLE ){ next = MODE_IDLE; return true; }else{ return false; }
-      default:
-        return false;
-      }
-    }
-    void update(){ previous = current; current = next; }
-    mode_enum now(){ return current; }
-    mode_enum pre(){ return previous; }
-    bool isRunning(){ return (current==MODE_SYNC_TO_CONTROL) || (current==MODE_CONTROL) || (current==MODE_SYNC_TO_IDLE) ;}
-    bool isInitialize(){ return (previous==MODE_IDLE) && (current==MODE_SYNC_TO_CONTROL) ;}
-  };
-
-  class EndEffector {
-  public:
-    std::string name;
-    std::string parentLink;
-    cnoid::Position localT;
-    std::string forceSensor;
-  };
 
   // class OutputOffsetInterpolators {
   // public:
@@ -152,20 +75,101 @@ protected:
   unsigned int debugLevel_;
   unsigned long loop_;
 
+  class Ports {
+  public:
+    Ports();
+
+    RTC::TimedDoubleSeq m_qRef_;
+    RTC::InPort<RTC::TimedDoubleSeq> m_qRefIn_;
+    RTC::TimedPoint3D m_refBasePos_; // Reference World frame
+    RTC::InPort<RTC::TimedPoint3D> m_refBasePosIn_;
+    RTC::TimedOrientation3D m_refBaseRpy_; // Reference World frame
+    RTC::InPort<RTC::TimedOrientation3D> m_refBaseRpyIn_;
+    std::vector<RTC::TimedDoubleSeq> m_refWrench_; // Reference FootOrigin frame. EndEffector origin. 要素数及び順番はendEffectors_と同じ
+    std::vector<std::unique_ptr<RTC::InPort<RTC::TimedDoubleSeq> > > m_refWrenchIn_;
+    RTC::TimedDoubleSeq m_qAct_;
+    RTC::InPort<RTC::TimedDoubleSeq> m_qActIn_;
+    RTC::TimedDoubleSeq m_dqAct_;
+    RTC::InPort<RTC::TimedDoubleSeq> m_dqActIn_;
+    RTC::TimedOrientation3D m_actImu_; // Actual Imu World Frame. robotのgyrometerという名のRateGyroSensorの傾きを表す
+    RTC::InPort<RTC::TimedOrientation3D> m_actImuIn_;
+    std::vector<RTC::TimedDoubleSeq> m_actWrench_; // Actual ForceSensor frame. ForceSensor origin. 要素数及び順番はrobot->forceSensorsと同じ
+    std::vector<std::unique_ptr<RTC::InPort<RTC::TimedDoubleSeq> > > m_actWrenchIn_;
+
+    RTC::TimedDoubleSeq m_q_;
+    RTC::OutPort<RTC::TimedDoubleSeq> m_qOut_;
+    RTC::TimedPose3D m_genBasePose_; // Generate World frame
+    RTC::OutPort<RTC::TimedPose3D> m_genBasePoseOut_;
+    RTC::TimedDoubleSeq m_genBaseTform_;  // Generate World frame
+    RTC::OutPort<RTC::TimedDoubleSeq> m_genBaseTformOut_; // for HrpsysSeqStateROSBridge
+
+    AutoStabilizerService_impl m_service0_;
+    RTC::CorbaPort m_AutoStabilizerServicePort_;
+
+    // only for log
+    RTC::TimedPoint3D m_genBasePos_; // Generate World frame
+    RTC::OutPort<RTC::TimedPoint3D> m_genBasePosOut_; // for log
+    RTC::TimedOrientation3D m_genBaseRpy_; // Generate World frame
+    RTC::OutPort<RTC::TimedOrientation3D> m_genBaseRpyOut_; // for log
+
+  };
   Ports ports_;
+
+  class ControlMode{
+  public:
+    enum mode_enum{ MODE_IDLE, MODE_SYNC_TO_CONTROL, MODE_CONTROL, MODE_SYNC_TO_IDLE};
+  private:
+    mode_enum current, previous, next;
+  public:
+    ControlMode(){ current = previous = next = MODE_IDLE;}
+    ~ControlMode(){}
+    bool setNextMode(const mode_enum _request){
+      switch(_request){
+      case MODE_SYNC_TO_CONTROL:
+        if(current == MODE_IDLE){ next = MODE_SYNC_TO_CONTROL; return true; }else{ return false; }
+      case MODE_CONTROL:
+        if(current == MODE_SYNC_TO_CONTROL){ next = MODE_CONTROL; return true; }else{ return false; }
+      case MODE_SYNC_TO_IDLE:
+        if(current == MODE_CONTROL){ next = MODE_SYNC_TO_IDLE; return true; }else{ return false; }
+      case MODE_IDLE:
+        if(current == MODE_SYNC_TO_IDLE ){ next = MODE_IDLE; return true; }else{ return false; }
+      default:
+        return false;
+      }
+    }
+    void update(){ previous = current; current = next; }
+    mode_enum now(){ return current; }
+    mode_enum pre(){ return previous; }
+    bool isRunning(){ return (current==MODE_SYNC_TO_CONTROL) || (current==MODE_CONTROL) || (current==MODE_SYNC_TO_IDLE) ;}
+    bool isInitialize(){ return (previous==MODE_IDLE) && (current==MODE_SYNC_TO_CONTROL) ;}
+  };
   ControlMode mode_;
 
-  //OutputOffsetInterpolators outputOffsetInterpolators_;
+  cnoid::BodyPtr refRobot_; // actual
+  cnoid::BodyPtr actRobot_; // actual
+  cnoid::BodyPtr genRobot_; // output
 
-  cnoid::BodyPtr robot_ref_; // reference (q, basepos and baserpy only)
-  cnoid::BodyPtr robot_act_; // actual
-  cnoid::BodyPtr robot_gen_; // output
+  class EndEffector {
+  public:
+    // constant
+    std::string name;
+    std::string parentLink;
+    cnoid::Position localT; // Parent Link Frame
+    std::string forceSensor;
 
+    // from reference port
+    cnoid::Vector6 refWrench; // FootOrigin frame. EndEffector origin.
+  };
   std::vector<EndEffector> endEffectors_;
 
   // params
   std::vector<cnoid::LinkPtr> useJoints_; // controlで上書きする関節(root含む)のリスト
 
+  //OutputOffsetInterpolators outputOffsetInterpolators_;
+
+protected:
+  // utility functions
+  static bool readInportData(Ports& ports, cnoid::BodyPtr refRobot, std::vector<EndEffector>& endEffectors);
 };
 
 

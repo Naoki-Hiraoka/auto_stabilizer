@@ -32,6 +32,34 @@ class JAXON_RED_HrpsysConfigurator(ChoreonoidHrpsysConfigurator):
             ['log', "DataLogger"]
             ]
 
+    def getJointAngleControllerList(self):
+        controller_list = [self.es, self.ic, self.gc, self.abc, self.st, self.ast, self.co,
+                           self.tc, self.hes, self.el] # ast is added
+        return filter(lambda c: c != None, controller_list)  # only return existing controllers
+
+    def connectComps(self):
+        super(JAXON_RED_HrpsysConfigurator, self).connectComps()
+        if self.ast:
+            connectPorts(self.sh.port("basePosOut"), self.ast.port("refBasePosIn"))
+            connectPorts(self.sh.port("baseRpyOut"), self.ast.port("refBaseRpyIn"))
+            connectPorts(self.rh.port("q"), self.ast.port("qAct"))
+            connectPorts(self.rh.port("dq"), self.ast.port("dqAct"))
+            if self.kf:
+                connectPorts(self.kf.port("rpy"), self.ast.port("actImuIn"))
+            for sen, eef in zip(["rfsensor", "lfsensor", "rhsensor", "lhsensor"], ["rleg", "lleg", "rarm", "larm"]):
+                if self.rfu:
+                    ref_force_port_from = self.rfu.port("ref_"+sen+"Out")
+                elif self.es:
+                    ref_force_port_from = self.es.port(sen+"Out")
+                else:
+                    ref_force_port_from = self.sh.port(sen+"Out")
+                connectPorts(ref_force_port_from, self.ast.port("ref" + eef + "WrenchIn"))
+            for sen in self.getForceSensorNames():
+                if self.rmfo:
+                    connectPorts(self.rmfo.port("off_" + sen), self.ast.port("act"+sen+"In"))
+                else:
+                    connectPorts(self.rh.port(sen), self.ast.port("act"+sen+"In"))
+
     def defJointGroups (self):
         rarm_group = ['rarm', ['RARM_JOINT0', 'RARM_JOINT1', 'RARM_JOINT2', 'RARM_JOINT3', 'RARM_JOINT4', 'RARM_JOINT5', 'RARM_JOINT6', 'RARM_JOINT7']]
         larm_group = ['larm', ['LARM_JOINT0', 'LARM_JOINT1', 'LARM_JOINT2', 'LARM_JOINT3', 'LARM_JOINT4', 'LARM_JOINT5', 'LARM_JOINT6', 'LARM_JOINT7']]

@@ -21,6 +21,24 @@ static const char* AutoStabilizer_spec[] = {
   ""
 };
 
+AutoStabilizer::Ports::Ports() :
+  m_qRefIn_("qRef", m_qRef_),
+  m_refBasePosIn_("refBasePosIn", m_refBasePos_),
+  m_refBaseRpyIn_("refBaseRpyIn", m_refBaseRpy_),
+  m_qActIn_("qAct", m_qAct_),
+  m_dqActIn_("dqAct", m_dqAct_),
+  m_actImuIn_("actImuIn", m_actImu_),
+
+  m_qOut_("q", m_q_),
+  m_genBasePoseOut_("genBasePoseOut", m_genBasePose_),
+  m_genBaseTformOut_("genBaseTformOut", m_genBaseTform_),
+
+  m_genBasePosOut_("genBasePosOut", m_genBasePos_),
+  m_genBaseRpyOut_("genBaseRpyOut", m_genBaseRpy_),
+
+  m_AutoStabilizerServicePort_("AutoStabilizerService") {
+}
+
 AutoStabilizer::AutoStabilizer(RTC::Manager* manager) : RTC::DataFlowComponentBase(manager),
   ports_(),
   debugLevel_(0)
@@ -34,11 +52,14 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
   this->addInPort("qRef", this->ports_.m_qRefIn_);
   this->addInPort("refBasePosIn", this->ports_.m_refBasePosIn_);
   this->addInPort("refBaseRpyIn", this->ports_.m_refBaseRpyIn_);
+  this->addInPort("qAct", this->ports_.m_qActIn_);
+  this->addInPort("dqAct", this->ports_.m_dqActIn_);
+  this->addInPort("actImuIn", this->ports_.m_actImuIn_);
   this->addOutPort("q", this->ports_.m_qOut_);
-  this->addOutPort("genBasePosOut", this->ports_.m_genBasePosOut_);
-  this->addOutPort("genBaseRpyOut", this->ports_.m_genBaseRpyOut_);
   this->addOutPort("genBasePoseOut", this->ports_.m_genBasePoseOut_);
   this->addOutPort("genBaseTformOut", this->ports_.m_genBaseTformOut_);
+  this->addOutPort("genBasePosOut", this->ports_.m_genBasePosOut_);
+  this->addOutPort("genBaseRpyOut", this->ports_.m_genBaseRpyOut_);
   this->ports_.m_AutoStabilizerServicePort_.registerProvider("service0", "AutoStabilizerService", this->ports_.m_service0_);
   this->addPort(this->ports_.m_AutoStabilizerServicePort_);
 
@@ -52,9 +73,12 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
       std::cerr << "\x1b[31m[" << this->m_profile.instance_name << "] " << "failed to load model[" << fileName << "]" << "\x1b[39m" << std::endl;
       return RTC::RTC_ERROR;
     }
-    this->robot_ref_ = robot;
-    this->robot_act_ = robot->clone();
-    this->robot_gen_ = robot->clone();
+    this->refRobot_ = robot;
+    this->refRobot_->calcForwardKinematics(); this->refRobot_->calcCenterOfMass();
+    this->actRobot_ = robot->clone();
+    this->actRobot_->calcForwardKinematics(); this->actRobot_->calcCenterOfMass();
+    this->genRobot_ = robot->clone();
+    this->genRobot_->calcForwardKinematics(); this->genRobot_->calcCenterOfMass();
   }
 
   {
@@ -71,28 +95,20 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
 
       //   name, parentLink, (not used), x, y, z, theta, ax, ay, az
       name = buf;
-      if(!std::getline(ss_endEffectors, buf, ',')) break;
-      parentLink = buf;
+      if(!std::getline(ss_endEffectors, buf, ',')) break; parentLink = buf;
       if(!std::getline(ss_endEffectors, buf, ',')) break; // not used
-      if(!std::getline(ss_endEffectors, buf, ',')) break;
-      localp[0] = std::stod(buf);
-      if(!std::getline(ss_endEffectors, buf, ',')) break;
-      localp[1] = std::stod(buf);
-      if(!std::getline(ss_endEffectors, buf, ',')) break;
-      localp[2] = std::stod(buf);
-      if(!std::getline(ss_endEffectors, buf, ',')) break;
-      localaxis[0] = std::stod(buf);
-      if(!std::getline(ss_endEffectors, buf, ',')) break;
-      localaxis[1] = std::stod(buf);
-      if(!std::getline(ss_endEffectors, buf, ',')) break;
-      localaxis[2] = std::stod(buf);
-      if(!std::getline(ss_endEffectors, buf, ',')) break;
-      localangle = std::stod(buf);
+      if(!std::getline(ss_endEffectors, buf, ',')) break; localp[0] = std::stod(buf);
+      if(!std::getline(ss_endEffectors, buf, ',')) break; localp[1] = std::stod(buf);
+      if(!std::getline(ss_endEffectors, buf, ',')) break; localp[2] = std::stod(buf);
+      if(!std::getline(ss_endEffectors, buf, ',')) break; localaxis[0] = std::stod(buf);
+      if(!std::getline(ss_endEffectors, buf, ',')) break; localaxis[1] = std::stod(buf);
+      if(!std::getline(ss_endEffectors, buf, ',')) break; localaxis[2] = std::stod(buf);
+      if(!std::getline(ss_endEffectors, buf, ',')) break; localangle = std::stod(buf);
 
       // check validity
-      name.erase (std::remove(name.begin(), name.end(), ' '), name.end()); // remove whitespace
-      parentLink.erase (std::remove(name.begin(), name.end(), ' '), name.end()); // remove whitespace
-      if(!this->robot_ref_->link(parentLink)){
+      name.erase(std::remove(name.begin(), name.end(), ' '), name.end()); // remove whitespace
+      parentLink.erase(std::remove(name.begin(), name.end(), ' '), name.end()); // remove whitespace
+      if(!this->refRobot_->link(parentLink)){
         std::cerr << "\x1b[31m[" << this->m_profile.instance_name << "] " << " link [" << parentLink << "]" << " is not found for " << name << "\x1b[39m" << std::endl;
         return RTC::RTC_ERROR;
       }
@@ -119,9 +135,9 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
     }
 
     // 各EndEffectorsから親リンク側に遡っていき、最初に見つかったForceSensorをEndEffectorに対応付ける. 以後、ForceSensorの値を座標変換したものがEndEffectorが受けている力とみなされる. 見つからなければ受けている力は常に0とみなされる
-    cnoid::DeviceList<cnoid::ForceSensor> forceSensors(this->robot_act_->devices());
+    cnoid::DeviceList<cnoid::ForceSensor> forceSensors(this->actRobot_->devices());
     for (int i=0;i<this->endEffectors_.size();i++){
-      cnoid::LinkPtr link = this->robot_act_->link(this->endEffectors_[i].parentLink);
+      cnoid::LinkPtr link = this->actRobot_->link(this->endEffectors_[i].parentLink);
       bool found = false;
       while (link != nullptr && found == false) {
         for (size_t j = 0; j < forceSensors.size(); j++) {
@@ -149,7 +165,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
     }
 
     // 各ForceSensorにつき、act<name>InというInportをつくる
-    cnoid::DeviceList<cnoid::ForceSensor> forceSensors(this->robot_act_->devices());
+    cnoid::DeviceList<cnoid::ForceSensor> forceSensors(this->actRobot_->devices());
     this->ports_.m_actWrenchIn_.resize(forceSensors.size());
     this->ports_.m_actWrench_.resize(forceSensors.size());
     for(int i=0;i<forceSensors.size();i++){
@@ -162,7 +178,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
   // initialize parameters
   this->loop_ = 0;
 
-  
+
 
   // if(!this->robot_com_->rootLink()->isFixedJoint()) this->useJoints_.push_back(this->robot_com_->rootLink());
   // for(int i=0;i<this->robot_com_->numJoints();i++) this->useJoints_.push_back(this->robot_com_->joint(i));
@@ -173,18 +189,18 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
 
   // for(size_t i=0;i<this->robot_com_->numJoints();i++){
   //   // apply margin
-  //   if(this->robot_ref_->joint(i)->q_upper() - this->robot_ref_->joint(i)->q_lower() > 0.002){
-  //     this->robot_com_->joint(i)->setJointRange(this->robot_ref_->joint(i)->q_lower()+0.001,this->robot_ref_->joint(i)->q_upper()-0.001);
+  //   if(this->refRobot_->joint(i)->q_upper() - this->refRobot_->joint(i)->q_lower() > 0.002){
+  //     this->robot_com_->joint(i)->setJointRange(this->refRobot_->joint(i)->q_lower()+0.001,this->refRobot_->joint(i)->q_upper()-0.001);
   //   }
   //   // apply margin
   //   // 1.0だと安全.4.0は脚.10.0はlapid manipulation らしい. limitを小さくしすぎた状態で、速い指令を送ると、狭いlimitの中で高優先度タスクを頑張って満たそうとすることで、低優先度タスクを満たす余裕がなくエラーが大きくなってしまうことに注意.
-  //   if(this->robot_ref_->joint(i)->dq_upper() - this->robot_ref_->joint(i)->dq_lower() > 0.02){
-  //     this->robot_com_->joint(i)->setJointVelocityRange(std::max(this->robot_ref_->joint(i)->dq_lower()+0.01, -this->jointVelocityLimit_),
-  //                                                         std::min(this->robot_ref_->joint(i)->dq_upper()-0.01, this->jointVelocityLimit_));
+  //   if(this->refRobot_->joint(i)->dq_upper() - this->refRobot_->joint(i)->dq_lower() > 0.02){
+  //     this->robot_com_->joint(i)->setJointVelocityRange(std::max(this->refRobot_->joint(i)->dq_lower()+0.01, -this->jointVelocityLimit_),
+  //                                                         std::min(this->refRobot_->joint(i)->dq_upper()-0.01, this->jointVelocityLimit_));
   //   }
   // }
-  // this->robot_com_->rootLink()->setJointVelocityRange(std::max(this->robot_ref_->rootLink()->dq_lower()+0.01, -this->jointVelocityLimit_),
-  //                                                       std::min(this->robot_ref_->rootLink()->dq_upper()-0.01, this->jointVelocityLimit_));
+  // this->robot_com_->rootLink()->setJointVelocityRange(std::max(this->refRobot_->rootLink()->dq_lower()+0.01, -this->jointVelocityLimit_),
+  //                                                       std::min(this->refRobot_->rootLink()->dq_upper()-0.01, this->jointVelocityLimit_));
 
   // std::string jointLimitTableStr;
   // if(this->getProperties().hasKey("joint_limit_table")) jointLimitTableStr = std::string(this->getProperties()["joint_limit_table"]);
@@ -205,6 +221,52 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
   return RTC::RTC_OK;
 }
 
+// static function
+bool AutoStabilizer::readInportData(AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobot, std::vector<AutoStabilizer::EndEffector>& endEffectors){
+  bool refRobot_changed = false;
+
+  if(ports.m_qRefIn_.isNew()){
+    ports.m_qRefIn_.read();
+    if(ports.m_qRef_.data.length() == refRobot->numJoints()){
+      for(int i=0;i<ports.m_qRef_.data.length();i++){
+        if(std::isfinite(ports.m_qRef_.data[i])) refRobot->joint(i)->q() = ports.m_qRef_.data[i];
+      }
+      refRobot_changed = true;
+    }
+  }
+  if(ports.m_refBasePosIn_.isNew()){
+    ports.m_refBasePosIn_.read();
+    if(std::isfinite(ports.m_refBasePos_.data.x) && std::isfinite(ports.m_refBasePos_.data.y) && std::isfinite(ports.m_refBasePos_.data.z)){
+      refRobot->rootLink()->p()[0] = ports.m_refBasePos_.data.x;
+      refRobot->rootLink()->p()[1] = ports.m_refBasePos_.data.y;
+      refRobot->rootLink()->p()[2] = ports.m_refBasePos_.data.z;
+    }
+    refRobot_changed = true;
+  }
+  if(ports.m_refBaseRpyIn_.isNew()){
+    ports.m_refBaseRpyIn_.read();
+    if(std::isfinite(ports.m_refBaseRpy_.data.r) && std::isfinite(ports.m_refBaseRpy_.data.p) && std::isfinite(ports.m_refBaseRpy_.data.y)){
+      refRobot->rootLink()->R() = cnoid::rotFromRpy(ports.m_refBaseRpy_.data.r, ports.m_refBaseRpy_.data.p, ports.m_refBaseRpy_.data.y);
+    }
+    refRobot_changed = true;
+  }
+  if(refRobot_changed){
+    refRobot->calcForwardKinematics();
+    refRobot->calcCenterOfMass();
+  }
+  for(int i=0;i<ports.m_refWrenchIn_.size();i++){
+    if(ports.m_refWrenchIn_[i]->isNew()){
+      ports.m_refWrenchIn_[i]->read();
+      if(ports.m_refWrench_[i].data.length() == 6){
+        for(int j=0;j<6;j++){
+          if(std::isfinite(ports.m_refWrench_[i].data[j])) endEffectors[i].refWrench[j] = ports.m_refWrench_[i].data[j];
+        }
+      }
+    }
+  }
+  return true;
+}
+
 RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
   std::lock_guard<std::mutex> guard(this->mutex_);
 
@@ -212,15 +274,14 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
   double dt = 1.0 / this->get_context(ec_id)->get_rate();
   this->loop_++;
 
-  if (this->ports_.m_qRefIn_.isNew()){
-    this->ports_.m_qRefIn_.read();
-    this->ports_.m_q_.tm = this->ports_.m_qRef_.tm;
-    this->ports_.m_q_.data.length(this->ports_.m_qRef_.data.length());
-    for(int i=0;i<this->ports_.m_q_.data.length();i++){
-      this->ports_.m_q_.data[i] = this->ports_.m_qRef_.data[i];
-    }
-    this->ports_.m_qOut_.write();
+  AutoStabilizer::readInportData(this->ports_, this->refRobot_, this->endEffectors_);
+
+  this->ports_.m_q_.tm = this->ports_.m_qRef_.tm;
+  this->ports_.m_q_.data.length(this->refRobot_->numJoints());
+  for(int i=0;i<this->ports_.m_q_.data.length();i++){
+    this->ports_.m_q_.data[i] = this->refRobot_->joint(i)->q();
   }
+  this->ports_.m_qOut_.write();
 
   return RTC::RTC_OK;
 }
