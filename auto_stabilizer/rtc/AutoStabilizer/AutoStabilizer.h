@@ -63,8 +63,8 @@ public:
   bool releaseEmergencyStop();
   void getStabilizerParam(OpenHRP::AutoStabilizerService::StabilizerParam& i_param);
   void setStabilizerParam(const OpenHRP::AutoStabilizerService::StabilizerParam& i_param);
-  void startStabilizer(void);
-  void stopStabilizer(void);
+  bool startStabilizer(void);
+  bool stopStabilizer(void);
 
 protected:
   bool getProperty(const std::string& key, std::string& ret);
@@ -119,31 +119,62 @@ protected:
 
   class ControlMode{
   public:
-    enum mode_enum{ MODE_IDLE, MODE_SYNC_TO_CONTROL, MODE_CONTROL, MODE_SYNC_TO_IDLE};
+    /*
+      MODE_IDLE -> startAutoBalancer() -> MODE_SYNC_TO_ABC -> MODE_ABC -> startStabilizer() -> MODE_SYNC_TO_ST -> MODE_ST -> stopStabilizer() -> MODE_SYNC_TO_STOPST -> MODE_ABC -> stopAutoBalancer() -> MODE_SYNC_TO_IDLE -> MODE_IDLE
+      MODE_SYNC_TO*の時間はtransition_time次第だが、少なくとも1周期は経由する
+      MODE_SYNC_TO*では、基本的に次のMODEと同じ処理が行われるが、必要に応じて前回のMODEから補間するような軌道に加工される
+      補間している途中で別のmodeに切り替わることは無いので、そこは安心してプログラムを書いてよい(例外はonActivated)
+     */
+    enum mode_enum{ MODE_IDLE, MODE_SYNC_TO_ABC, MODE_ABC, MODE_SYNC_TO_ST, MODE_ST, MODE_SYNC_TO_STOPST, MODE_SYNC_TO_IDLE};
+    enum transition_enum{ START_ABC, STOP_ABC, START_ST, STOP_ST};
+    double transition_time;
   private:
     mode_enum current, previous, next;
+    double remain_time;
   public:
-    ControlMode(){ current = previous = next = MODE_IDLE;}
-    ~ControlMode(){}
-    bool setNextMode(const mode_enum _request){
-      switch(_request){
-      case MODE_SYNC_TO_CONTROL:
-        if(current == MODE_IDLE){ next = MODE_SYNC_TO_CONTROL; return true; }else{ return false; }
-      case MODE_CONTROL:
-        if(current == MODE_SYNC_TO_CONTROL){ next = MODE_CONTROL; return true; }else{ return false; }
-      case MODE_SYNC_TO_IDLE:
-        if(current == MODE_CONTROL){ next = MODE_SYNC_TO_IDLE; return true; }else{ return false; }
-      case MODE_IDLE:
-        if(current == MODE_SYNC_TO_IDLE ){ next = MODE_IDLE; return true; }else{ return false; }
+    ControlMode(){ reset(); transition_time = 2.0;}
+    void reset(){ current = previous = next = MODE_IDLE; remain_time = 0;}
+    bool setNextTransition(const transition_enum request){
+      switch(request){
+      case START_ABC:
+        if(current == MODE_IDLE){ next = MODE_SYNC_TO_ABC; remain_time = transition_time; return true; }else{ return false; }
+      case STOP_ABC:
+        if(current == MODE_ABC){ next = MODE_SYNC_TO_IDLE; remain_time = transition_time; return true; }else{ return false; }
+      case START_ST:
+        if(current == MODE_ABC){ next = MODE_SYNC_TO_ST; remain_time = transition_time; return true; }else{ return false; }
+      case STOP_ST:
+        if(current == MODE_ST){ next = MODE_SYNC_TO_STOPST; remain_time = transition_time; return true; }else{ return false; }
       default:
         return false;
       }
     }
-    void update(){ previous = current; current = next; }
+    void update(double dt){
+      if(current != next) {
+        previous = current; current = next;
+      }else{
+        previous = current;
+        remain_time -= dt;
+        if(remain_time <= 0.0){
+          remain_time = 0.0;
+          switch(current){
+          case MODE_SYNC_TO_ABC:
+            current = next = MODE_ABC; break;
+          case MODE_SYNC_TO_IDLE:
+            current = next = MODE_IDLE; break;
+          case MODE_SYNC_TO_ST:
+            current = next = MODE_ST; break;
+          case MODE_SYNC_TO_STOPST:
+            current = next = MODE_ABC; break;
+          default:
+            break;
+          }
+        }
+      }
+    }
     mode_enum now(){ return current; }
     mode_enum pre(){ return previous; }
-    bool isRunning(){ return (current==MODE_SYNC_TO_CONTROL) || (current==MODE_CONTROL) || (current==MODE_SYNC_TO_IDLE) ;}
-    bool isInitialize(){ return (previous==MODE_IDLE) && (current==MODE_SYNC_TO_CONTROL) ;}
+    bool isABCRunning(){ return (current==MODE_SYNC_TO_ABC) || (current==MODE_ABC) || (current==MODE_SYNC_TO_ST) || (current==MODE_ST) || (current==MODE_SYNC_TO_STOPST) ;}
+    bool isSTRunning(){ return (current==MODE_SYNC_TO_ST) || (current==MODE_ST) ;}
   };
   ControlMode mode_;
 

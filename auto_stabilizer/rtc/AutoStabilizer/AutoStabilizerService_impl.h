@@ -23,8 +23,8 @@ public:
   void waitFootSteps();
   CORBA::Boolean startAutoBalancer(const OpenHRP::AutoStabilizerService::StrSequence& limbs);
   CORBA::Boolean stopAutoBalancer();
-  void startStabilizer(void);
-  void stopStabilizer(void);
+  CORBA::Boolean startStabilizer(void);
+  CORBA::Boolean stopStabilizer(void);
   CORBA::Boolean setGaitGeneratorParam(const OpenHRP::AutoStabilizerService::GaitGeneratorParam& i_param);
   CORBA::Boolean getGaitGeneratorParam(OpenHRP::AutoStabilizerService::GaitGeneratorParam_out i_param);
   CORBA::Boolean setAutoBalancerParam(const OpenHRP::AutoStabilizerService::AutoBalancerParam& i_param);

@@ -59,14 +59,14 @@ CORBA::Boolean AutoStabilizerService_impl::stopAutoBalancer()
   return this->comp_->stopAutoBalancer();
 };
 
-void AutoStabilizerService_impl::startStabilizer(void)
+CORBA::Boolean AutoStabilizerService_impl::startStabilizer(void)
 {
-  this->comp_->startStabilizer();
+  return this->comp_->startStabilizer();
 }
 
-void AutoStabilizerService_impl::stopStabilizer(void)
+CORBA::Boolean AutoStabilizerService_impl::stopStabilizer(void)
 {
-  this->comp_->stopStabilizer();
+  return this->comp_->stopStabilizer();
 }
 
 CORBA::Boolean AutoStabilizerService_impl::setGaitGeneratorParam(const OpenHRP::AutoStabilizerService::GaitGeneratorParam& i_param)

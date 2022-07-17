@@ -748,14 +748,14 @@ module OpenHRP
      * @param
      * @return
      */
-    void startStabilizer();
+    boolean startStabilizer();
 
     /**
      * @brief Sop Stabilizer mode.
      * @param
      * @return
      */
-    void stopStabilizer();
+    boolean stopStabilizer();
   };
 };
 

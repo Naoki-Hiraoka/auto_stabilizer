@@ -366,6 +366,7 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
   this->loop_++;
 
   if(AutoStabilizer::readInPortData(this->ports_, this->refRobot_, this->actRobot_, this->endEffectors_)){ // if qRef is updated
+    this->mode_.update(dt);
 
     this->genRobot_->rootLink()->T() = this->refRobot_->rootLink()->T();
     for(int i=0;i<this->genRobot_->numJoints();i++){
@@ -382,11 +383,11 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
 RTC::ReturnCode_t AutoStabilizer::onActivated(RTC::UniqueId ec_id){
   std::cerr << "[" << m_profile.instance_name << "] "<< "onActivated(" << ec_id << ")" << std::endl;
   // 各種処理を初期化する TODO
+  this->mode_.reset();
   return RTC::RTC_OK;
 }
 RTC::ReturnCode_t AutoStabilizer::onDeactivated(RTC::UniqueId ec_id){
   std::cerr << "[" << m_profile.instance_name << "] "<< "onDeactivated(" << ec_id << ")" << std::endl;
-  // 各種処理を初期化する TODO
   return RTC::RTC_OK;
 }
 RTC::ReturnCode_t AutoStabilizer::onFinalize(){ return RTC::RTC_OK; }
@@ -421,11 +422,25 @@ bool AutoStabilizer::setFootStepsWithParam(const OpenHRP::AutoStabilizerService:
 void AutoStabilizer::waitFootSteps(){
   return;
 }
-bool AutoStabilizer::startAutoBalancer(const ::OpenHRP::AutoStabilizerService::StrSequence& limbs){
-  return true;
+bool AutoStabilizer::startAutoBalancer(const OpenHRP::AutoStabilizerService::StrSequence& limbs){
+  if(this->mode_.setNextTransition(ControlMode::START_ABC)){
+    std::cerr << "[" << m_profile.instance_name << "] start auto balancer mode" << std::endl;
+    while (this->mode_.now() != ControlMode::MODE_ABC) usleep(1000);
+    usleep(1000);
+    return true;
+  }else{
+    return false;
+  }
 }
 bool AutoStabilizer::stopAutoBalancer(){
-  return true;
+  if(this->mode_.setNextTransition(ControlMode::STOP_ABC)){
+    std::cerr << "[" << m_profile.instance_name << "] stop auto balancer mode" << std::endl;
+    while (this->mode_.now() != ControlMode::MODE_IDLE) usleep(1000);
+    usleep(1000);
+    return true;
+  }else{
+    return false;
+  }
 }
 bool AutoStabilizer::setGaitGeneratorParam(const OpenHRP::AutoStabilizerService::GaitGeneratorParam& i_param){
   return true;
@@ -450,11 +465,25 @@ void AutoStabilizer::getStabilizerParam(OpenHRP::AutoStabilizerService::Stabiliz
 void AutoStabilizer::setStabilizerParam(const OpenHRP::AutoStabilizerService::StabilizerParam& i_param){
   return;
 }
-void AutoStabilizer::startStabilizer(void){
-  return;
+bool AutoStabilizer::startStabilizer(void){
+  if(this->mode_.setNextTransition(ControlMode::START_ST)){
+    std::cerr << "[" << m_profile.instance_name << "] start ST" << std::endl;
+    while (this->mode_.now() != ControlMode::MODE_ST) usleep(1000);
+    usleep(1000);
+    return true;
+  }else{
+    return false;
+  }
 }
-void AutoStabilizer::stopStabilizer(void){
-  return;
+bool AutoStabilizer::stopStabilizer(void){
+  if(this->mode_.setNextTransition(ControlMode::STOP_ST)){
+    std::cerr << "[" << m_profile.instance_name << "] stop ST" << std::endl;
+    while (this->mode_.now() != ControlMode::MODE_ABC) usleep(1000);
+    usleep(1000);
+    return true;
+  }else{
+    return false;
+  }
 }
 
 bool AutoStabilizer::getProperty(const std::string& key, std::string& ret) {
