@@ -19,23 +19,13 @@
 
 #include <cnoid/Body>
 
-// #include <cpp_filters/TwoPointInterpolator.h>
+#include <cpp_filters/TwoPointInterpolator.h>
 // #include <cpp_filters/IIRFilter.h>
 // #include <joint_limit_table/JointLimitTable.h>
 
 #include "AutoStabilizerService_impl.h"
 
 class AutoStabilizer : public RTC::DataFlowComponentBase{
-public:
-
-
-  // class OutputOffsetInterpolators {
-  // public:
-  //   std::shared_ptr<cpp_filters::TwoPointInterpolator<cnoid::Vector3> > rootpInterpolator_;
-  //   std::shared_ptr<cpp_filters::TwoPointInterpolatorSO3> rootRInterpolator_;
-  //   std::unordered_map<cnoid::LinkPtr, std::shared_ptr<cpp_filters::TwoPointInterpolator<double> > > jointInterpolatorMap_; // controlで上書きしない関節について、refereceに加えるoffset
-  // };
-
 public:
   AutoStabilizer(RTC::Manager* manager);
   virtual RTC::ReturnCode_t onInitialize();
@@ -81,6 +71,8 @@ protected:
 
     RTC::TimedDoubleSeq m_qRef_;
     RTC::InPort<RTC::TimedDoubleSeq> m_qRefIn_;
+    RTC::TimedDoubleSeq m_refTau_;
+    RTC::InPort<RTC::TimedDoubleSeq> m_refTauIn_;
     RTC::TimedPoint3D m_refBasePos_; // Reference World frame
     RTC::InPort<RTC::TimedPoint3D> m_refBasePosIn_;
     RTC::TimedOrientation3D m_refBaseRpy_; // Reference World frame
@@ -121,8 +113,8 @@ protected:
   public:
     /*
       MODE_IDLE -> startAutoBalancer() -> MODE_SYNC_TO_ABC -> MODE_ABC -> startStabilizer() -> MODE_SYNC_TO_ST -> MODE_ST -> stopStabilizer() -> MODE_SYNC_TO_STOPST -> MODE_ABC -> stopAutoBalancer() -> MODE_SYNC_TO_IDLE -> MODE_IDLE
-      MODE_SYNC_TO*の時間はtransition_time次第だが、少なくとも1周期は経由する
-      MODE_SYNC_TO*では、基本的に次のMODEと同じ処理が行われるが、必要に応じて前回のMODEから補間するような軌道に加工される
+      MODE_SYNC_TO*の時間はtransition_time次第だが、少なくとも1周期は経由する. startの方はすぐに遷移する.
+      MODE_SYNC_TO*では、基本的に次のMODEと同じ処理が行われるが、前回のMODEの出力から補間するような軌道に加工される
       補間している途中で別のmodeに切り替わることは無いので、そこは安心してプログラムを書いてよい(例外はonActivated)
      */
     enum mode_enum{ MODE_IDLE, MODE_SYNC_TO_ABC, MODE_ABC, MODE_SYNC_TO_ST, MODE_ST, MODE_SYNC_TO_STOPST, MODE_SYNC_TO_IDLE};
@@ -137,11 +129,11 @@ protected:
     bool setNextTransition(const transition_enum request){
       switch(request){
       case START_ABC:
-        if(current == MODE_IDLE){ next = MODE_SYNC_TO_ABC; remain_time = abc_transition_time; return true; }else{ return false; }
+        if(current == MODE_IDLE){ next = MODE_SYNC_TO_ABC; remain_time = 0.0; return true; }else{ return false; }
       case STOP_ABC:
         if(current == MODE_ABC){ next = MODE_SYNC_TO_IDLE; remain_time = abc_transition_time; return true; }else{ return false; }
       case START_ST:
-        if(current == MODE_ABC){ next = MODE_SYNC_TO_ST; remain_time = st_transition_time; return true; }else{ return false; }
+        if(current == MODE_ABC){ next = MODE_SYNC_TO_ST; remain_time = 0.0; return true; }else{ return false; }
       case STOP_ST:
         if(current == MODE_ST){ next = MODE_SYNC_TO_STOPST; remain_time = st_transition_time; return true; }else{ return false; }
       default:
@@ -171,10 +163,12 @@ protected:
         }
       }
     }
-    mode_enum now(){ return current; }
-    mode_enum pre(){ return previous; }
-    bool isABCRunning(){ return (current==MODE_SYNC_TO_ABC) || (current==MODE_ABC) || (current==MODE_SYNC_TO_ST) || (current==MODE_ST) || (current==MODE_SYNC_TO_STOPST) ;}
-    bool isSTRunning(){ return (current==MODE_SYNC_TO_ST) || (current==MODE_ST) ;}
+    mode_enum now() const{ return current; }
+    mode_enum pre() const{ return previous; }
+    bool isABCRunning() const{ return (current==MODE_SYNC_TO_ABC) || (current==MODE_ABC) || (current==MODE_SYNC_TO_ST) || (current==MODE_ST) || (current==MODE_SYNC_TO_STOPST) ;}
+    bool isSTRunning() const{ return (current==MODE_SYNC_TO_ST) || (current==MODE_ST) ;}
+    bool isSyncInit() const{ return (current != previous) && isSync();}
+    bool isSync() const{ return ((current==MODE_SYNC_TO_ABC) || (current==MODE_SYNC_TO_ST) || (current==MODE_SYNC_TO_STOPST) || (current==MODE_SYNC_TO_IDLE));}
   };
   ControlMode mode_;
 
@@ -203,7 +197,16 @@ protected:
 protected:
   // utility functions
   static bool readInPortData(Ports& ports, cnoid::BodyPtr refRobot, cnoid::BodyPtr actRobot, std::vector<EndEffector>& endEffectors);
-  static bool writeOutPortData(Ports& ports, cnoid::BodyPtr genRobot);
+
+  class OutputOffsetInterpolators {
+  public:
+    std::shared_ptr<cpp_filters::TwoPointInterpolator<cnoid::Vector3> > genBasePosInterpolator_;
+    std::shared_ptr<cpp_filters::TwoPointInterpolatorSO3> genBaseRInterpolator_;
+    std::vector<std::shared_ptr<cpp_filters::TwoPointInterpolator<double> > > qInterpolator_; // controlで上書きしない関節について、refereceに加えるoffset
+    std::vector<std::shared_ptr<cpp_filters::TwoPointInterpolator<double> > > genTauInterpolator_; // controlで上書きしない関節について、refereceに加えるoffset
+  };
+  OutputOffsetInterpolators outputOffsetInterpolators_;
+  static bool writeOutPortData(Ports& ports, cnoid::BodyPtr genRobot, const ControlMode& mode);
 };
 
 

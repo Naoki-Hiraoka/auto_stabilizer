@@ -23,6 +23,7 @@ static const char* AutoStabilizer_spec[] = {
 
 AutoStabilizer::Ports::Ports() :
   m_qRefIn_("qRef", m_qRef_),
+  m_refTauIn_("refTau", m_refTau_),
   m_refBasePosIn_("refBasePosIn", m_refBasePos_),
   m_refBaseRpyIn_("refBaseRpyIn", m_refBaseRpy_),
   m_qActIn_("qAct", m_qAct_),
@@ -51,6 +52,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
 
   // add ports
   this->addInPort("qRef", this->ports_.m_qRefIn_);
+  this->addInPort("refTau", this->ports_.m_refTauIn_);
   this->addInPort("refBasePosIn", this->ports_.m_refBasePosIn_);
   this->addInPort("refBaseRpyIn", this->ports_.m_refBaseRpyIn_);
   this->addInPort("qAct", this->ports_.m_qActIn_);
@@ -237,6 +239,14 @@ bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr
       qRef_updated = true;
     }
   }
+  if(ports.m_refTauIn_.isNew()){
+    ports.m_refTauIn_.read();
+    if(ports.m_refTau_.data.length() == refRobot->numJoints()){
+      for(int i=0;i<ports.m_refTau_.data.length();i++){
+        if(std::isfinite(ports.m_refTau_.data[i])) refRobot->joint(i)->u() = ports.m_refTau_.data[i];
+      }
+    }
+  }
   if(ports.m_refBasePosIn_.isNew()){
     ports.m_refBasePosIn_.read();
     if(std::isfinite(ports.m_refBasePos_.data.x) && std::isfinite(ports.m_refBasePos_.data.y) && std::isfinite(ports.m_refBasePos_.data.z)){
@@ -308,7 +318,7 @@ bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr
 }
 
 // static function
-bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr genRobot){
+bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr genRobot, const AutoStabilizer::ControlMode& mode){
   ports.m_q_.tm = ports.m_qRef_.tm;
   ports.m_q_.data.length(genRobot->numJoints());
   for(int i=0;i<genRobot->numJoints();i++){
@@ -365,17 +375,17 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
   double dt = 1.0 / this->get_context(ec_id)->get_rate();
   this->loop_++;
 
-  if(AutoStabilizer::readInPortData(this->ports_, this->refRobot_, this->actRobot_, this->endEffectors_)){ // if qRef is updated
-    this->mode_.update(dt);
+  if(!AutoStabilizer::readInPortData(this->ports_, this->refRobot_, this->actRobot_, this->endEffectors_)) return RTC::RTC_OK;  // qRef が届かなければ何もしない
 
-    this->genRobot_->rootLink()->T() = this->refRobot_->rootLink()->T();
-    for(int i=0;i<this->genRobot_->numJoints();i++){
-      this->genRobot_->joint(i)->q() = this->refRobot_->joint(i)->q();
-      this->genRobot_->joint(i)->u() = 0;
-    }
+  this->mode_.update(dt);
 
-    AutoStabilizer::writeOutPortData(this->ports_, this->genRobot_);
+  this->genRobot_->rootLink()->T() = this->refRobot_->rootLink()->T();
+  for(int i=0;i<this->genRobot_->numJoints();i++){
+    this->genRobot_->joint(i)->q() = this->refRobot_->joint(i)->q();
+    this->genRobot_->joint(i)->u() = this->refRobot_->joint(i)->u();
   }
+
+  AutoStabilizer::writeOutPortData(this->ports_, this->genRobot_, this->mode_);
 
   return RTC::RTC_OK;
 }

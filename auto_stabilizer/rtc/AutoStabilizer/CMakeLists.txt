@@ -9,9 +9,8 @@ find_package(catkin REQUIRED COMPONENTS
   #fullbody_inverse_kinematics_solver
   #prioritized_qp
   #prioritized_inverse_kinematics_solver
-  #cpp_filters
+  cpp_filters
   #ik_constraint_joint_limit_table
-
   )
 find_package(choreonoid REQUIRED)
 

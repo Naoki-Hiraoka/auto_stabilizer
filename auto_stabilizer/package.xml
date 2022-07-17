@@ -14,6 +14,7 @@
 
   <depend>qpoases_vendor</depend>
   <depend>rtmbuild2</depend>
+  <depend>cpp_filters</depend>
   <depend>choreonoid</depend>
   <depend>hrpsys_ros_bridge</depend>
 

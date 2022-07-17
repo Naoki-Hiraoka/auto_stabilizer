@@ -13,4 +13,8 @@
     local-name: rtmbuild2
 - git:
     uri: https://github.com/choreonoid/choreonoid
-    local-name: choreonoid # release-1.8
+    local-name: choreonoid
+    version: release-1.7
+- git:
+    uri: https://github.com/Naoki-Hiraoka/cpp_filters
+    local-name: cpp_filters
