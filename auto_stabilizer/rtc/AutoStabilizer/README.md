@@ -1,0 +1,3 @@
+## メモ
+
+- idlのmodule名は、パッケージ名とそろえてauto_stabilizerにしたかった。しかし、hrpsys-baseのhrpsys_config.pyが、module名がOpenHRPでないとやりにくい書かれ方になっているので、仕方なくmodule名をOpenHRPにした

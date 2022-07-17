@@ -33,6 +33,7 @@ target_link_libraries(AutoStabilizer
   ${catkin_LIBRARIES}
   ${CHOREONOID_BODY_LIBRARIES}
   ${openrtm_aist_LIBRARIES}
+  ${${PROJECT_NAME}_IDLLIBRARY_DIRS}
   )
 set_target_properties(AutoStabilizer PROPERTIES PREFIX "")
 add_dependencies(AutoStabilizer RTMBUILD2_${PROJECT_NAME}_genrpc) # wait for rtmbuild2_genidl
