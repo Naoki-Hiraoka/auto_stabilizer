@@ -30,36 +30,40 @@ public:
   class Ports {
   public:
     Ports() :
-      m_qRefIn_("qRefIn", m_qRef_),// from sh
-      m_basePosRefIn_("basePosRefIn", m_basePosRef_),// from sh
-      m_baseRpyRefIn_("baseRpyRefIn", m_baseRpyRef_),// from sh
+      m_qRefIn_("qRef", m_qRef_),
+      m_refBasePosIn_("refBasePosIn", m_refBasePos_),
+      m_refBaseRpyIn_("refBaseRpyIn", m_refBaseRpy_),
 
-      m_qComOut_("qComOut", m_qCom_),
-      m_basePosComOut_("basePosComOut", m_basePosCom_),
-      m_baseRpyComOut_("baseRpyComOut", m_baseRpyCom_),
-      m_basePoseComOut_("basePoseComOut", m_basePoseCom_),
-      m_baseTformComOut_("baseTformComOut", m_baseTformCom_),
+      m_qOut_("q", m_q_),
+      m_genBasePosOut_("genBasePosOut", m_genBasePos_),
+      m_genBaseRpyOut_("genBaseRpyOut", m_genBaseRpy_),
+      m_genBasePoseOut_("genBasePoseOut", m_genBasePose_),
+      m_genBaseTformOut_("genBaseTformOut", m_genBaseTform_),
 
       m_AutoStabilizerServicePort_("AutoStabilizerService") {
     }
 
     RTC::TimedDoubleSeq m_qRef_;
     RTC::InPort<RTC::TimedDoubleSeq> m_qRefIn_;
-    RTC::TimedPoint3D m_basePosRef_;
-    RTC::InPort<RTC::TimedPoint3D> m_basePosRefIn_;
-    RTC::TimedOrientation3D m_baseRpyRef_;
-    RTC::InPort<RTC::TimedOrientation3D> m_baseRpyRefIn_;
+    RTC::TimedPoint3D m_refBasePos_;
+    RTC::InPort<RTC::TimedPoint3D> m_refBasePosIn_;
+    RTC::TimedOrientation3D m_refBaseRpy_;
+    RTC::InPort<RTC::TimedOrientation3D> m_refBaseRpyIn_;
+    std::vector<RTC::TimedDoubleSeq> m_refWrench_;
+    std::vector<std::unique_ptr<RTC::InPort<RTC::TimedDoubleSeq> > > m_refWrenchIn_;
+    std::vector<RTC::TimedDoubleSeq> m_actWrench_;
+    std::vector<std::unique_ptr<RTC::InPort<RTC::TimedDoubleSeq> > > m_actWrenchIn_;
 
-    RTC::TimedDoubleSeq m_qCom_;
-    RTC::OutPort<RTC::TimedDoubleSeq> m_qComOut_;
-    RTC::TimedPoint3D m_basePosCom_;
-    RTC::OutPort<RTC::TimedPoint3D> m_basePosComOut_;
-    RTC::TimedOrientation3D m_baseRpyCom_;
-    RTC::OutPort<RTC::TimedOrientation3D> m_baseRpyComOut_;
-    RTC::TimedPose3D m_basePoseCom_;
-    RTC::OutPort<RTC::TimedPose3D> m_basePoseComOut_;
-    RTC::TimedDoubleSeq m_baseTformCom_; // for HrpsysSeqStateROSBridge
-    RTC::OutPort<RTC::TimedDoubleSeq> m_baseTformComOut_; // for HrpsysSeqStateROSBridge
+    RTC::TimedDoubleSeq m_q_;
+    RTC::OutPort<RTC::TimedDoubleSeq> m_qOut_;
+    RTC::TimedPoint3D m_genBasePos_;
+    RTC::OutPort<RTC::TimedPoint3D> m_genBasePosOut_;
+    RTC::TimedOrientation3D m_genBaseRpy_;
+    RTC::OutPort<RTC::TimedOrientation3D> m_genBaseRpyOut_;
+    RTC::TimedPose3D m_genBasePose_;
+    RTC::OutPort<RTC::TimedPose3D> m_genBasePoseOut_;
+    RTC::TimedDoubleSeq m_genBaseTform_; // for HrpsysSeqStateROSBridge
+    RTC::OutPort<RTC::TimedDoubleSeq> m_genBaseTformOut_; // for HrpsysSeqStateROSBridge
 
     AutoStabilizerService_impl m_service0_;
     RTC::CorbaPort m_AutoStabilizerServicePort_;
@@ -92,6 +96,14 @@ public:
     mode_enum pre(){ return previous; }
     bool isRunning(){ return (current==MODE_SYNC_TO_CONTROL) || (current==MODE_CONTROL) || (current==MODE_SYNC_TO_IDLE) ;}
     bool isInitialize(){ return (previous==MODE_IDLE) && (current==MODE_SYNC_TO_CONTROL) ;}
+  };
+
+  class EndEffector {
+  public:
+    std::string name;
+    std::string parentLink;
+    cnoid::Position localT;
+    std::string forceSensor;
   };
 
   // class OutputOffsetInterpolators {
@@ -143,13 +155,16 @@ protected:
   Ports ports_;
   ControlMode mode_;
 
-  std::vector<cnoid::LinkPtr> useJoints_; // controlで上書きする関節(root含む)のリスト
   //OutputOffsetInterpolators outputOffsetInterpolators_;
 
-  cnoid::BodyPtr m_robot_ref_; // reference (q, basepos and baserpy only)
-  cnoid::BodyPtr m_robot_com_; // command<
+  cnoid::BodyPtr robot_ref_; // reference (q, basepos and baserpy only)
+  cnoid::BodyPtr robot_act_; // actual
+  cnoid::BodyPtr robot_gen_; // output
+
+  std::vector<EndEffector> endEffectors_;
 
   // params
+  std::vector<cnoid::LinkPtr> useJoints_; // controlで上書きする関節(root含む)のリスト
 
 };
 

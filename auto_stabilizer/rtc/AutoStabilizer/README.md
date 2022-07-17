@@ -1,3 +1,5 @@
 ## メモ
 
 - idlのmodule名は、パッケージ名とそろえてauto_stabilizerにしたかった。しかし、hrpsys-baseのhrpsys_config.pyが、module名がOpenHRPでないとやりにくい書かれ方になっているので、仕方なくmodule名をOpenHRPにした
+- port "qRef", "q"は、hrpsys-baseのhrpsys_config.pyの作法に揃えるため、この名前にしている
+- AutoStabilizer::endEffectors_は、可変長にしたり順番を任意にしたりといろいろ拡張性をもたせることもできるが、masterのhrpsysが中途半端に拡張性をもたせた結果その機能を十分に使いこなせていないどころか可読性を下げる結果にしかなっていないので、今回は単純に順番固定の配列にして、0番目が右脚、1番目が左脚という仮定も堂々とおくことにした。
