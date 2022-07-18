@@ -20,6 +20,12 @@
 #include <cnoid/Body>
 
 #include <cpp_filters/TwoPointInterpolator.h>
+#include <fullbody_inverse_kinematics_solver/FullbodyInverseKinematicsSolverFast.h>
+#include <ik_constraint/PositionConstraint.h>
+#include <ik_constraint/COMConstraint.h>
+#include <ik_constraint/JointAngleConstraint.h>
+#include <ik_constraint/AngularMomentumConstraint.h>
+
 // #include <cpp_filters/IIRFilter.h>
 // #include <joint_limit_table/JointLimitTable.h>
 
@@ -52,9 +58,6 @@ public:
   void setStabilizerParam(const OpenHRP::AutoStabilizerService::StabilizerParam& i_param);
   bool startStabilizer(void);
   bool stopStabilizer(void);
-
-public:
-  enum Leg_enum { RLEG=0, LLEG=1 };
 
 protected:
   std::mutex mutex_;
@@ -164,37 +167,74 @@ protected:
     double remainTime() const{ return remain_time;}
     Mode_enum now() const{ return current; }
     Mode_enum pre() const{ return previous; }
+    bool isABCInit() const{ return (current == MODE_SYNC_TO_ABC) && (previous == MODE_IDLE);}
     bool isABCRunning() const{ return (current==MODE_SYNC_TO_ABC) || (current==MODE_ABC) || (current==MODE_SYNC_TO_ST) || (current==MODE_ST) || (current==MODE_SYNC_TO_STOPST) ;}
+    bool isSTInit() const{ return (current == MODE_SYNC_TO_ST) && (previous == MODE_ABC);}
     bool isSTRunning() const{ return (current==MODE_SYNC_TO_ST) || (current==MODE_ST) ;}
     bool isSyncInit() const{ return (current != previous) && isSync();}
     bool isSync() const{ return ((current==MODE_SYNC_TO_ABC) || (current==MODE_SYNC_TO_ST) || (current==MODE_SYNC_TO_STOPST) || (current==MODE_SYNC_TO_IDLE));}
   };
   ControlMode mode_;
 
-  cnoid::BodyPtr refRobot_; // actual
-  cnoid::BodyPtr actRobot_; // actual
+  cnoid::BodyPtr refRobot_; // reference. reference world frame
+  cnoid::BodyPtr refRobotOrigin_; // reference. generate frame
+  cnoid::BodyPtr actRobot_; // actual. actual imu world frame
+  cnoid::BodyPtr actRobotOrigin_; // actual. generate frame
   cnoid::BodyPtr genRobot_; // output
 
   class EndEffectorParam {
   public:
     // constant
     std::string name = ""; // 右脚はrleg. 左脚はllegという名前である必要がある
-    std::string parentLink = "";
+    std::string parentLink = ""; // 必ずrobot->link(parentLink)がnullptrではないことを約束する. そのため、毎回robot->link(parentLink)がnullptrかをチェックしなくても良い
     cnoid::Position localT = cnoid::Position::Identity(); // Parent Link Frame
-    std::string forceSensor = ""; // actualのForceSensorの値を座標変換したものがEndEffectorが受けている力とみなされる. forceSensorが""ならば受けている力は常に0とみなされる
+    std::string forceSensor = ""; // actualのForceSensorの値を座標変換したものがEndEffectorが受けている力とみなされる. forceSensorが""ならば受けている力は常に0とみなされる. forceSensorが""で無いならばrobot->findDevice<cnoid::ForceSensor>(endEffectorParams[i].forceSensor)がnullptrでは無いことを約束するので、毎回nullptrかをチェックしなくても良い
 
     // from reference port
-    cnoid::Vector6 refWrench = cnoid::Vector6::Zero(); // FootOrigin frame. EndEffector origin.
+    cnoid::Vector6 refWrenchOrigin = cnoid::Vector6::Zero(); // FootOrigin frame. EndEffector origin. ロボットが受ける力
+
+    // AutoStabilizerの内部で計算される
+    cnoid::Position refPose = cnoid::Position::Identity(); // generate frame
+    cnoid::Vector6 refWrench = cnoid::Vector6::Zero(); // generate frame. EndEffector origin. ロボットが受ける力
+    cnoid::Position actPose = cnoid::Position::Identity(); // generate frame
+    cnoid::Vector6 actWrench = cnoid::Vector6::Zero(); // generate frame. EndEffector origin. ロボットが受ける力
+    cnoid::Position abcTargetPose = cnoid::Position::Identity(); // generate frame. abcで計算された目標位置姿勢
+    cnoid::Position stTargetPose = cnoid::Position::Identity(); // generate frame. stで計算された目標位置姿勢
+    std::shared_ptr<IK::PositionConstraint> ikPositionConstraint = std::make_shared<IK::PositionConstraint>();
   };
-  std::vector<EndEffectorParam> endEffectorParams_; // 要素数2以上. 0: rleg. 1: lleg.
+  std::vector<EndEffectorParam> endEffectorParams_; // 要素数2以上. 0: rleg. 1: lleg. 要素数や順序は変化しない
 
   class LegParam {
   public:
+    // constant
     std::string name = ""; // 右脚はrleg. 左脚はllegという名前である必要がある
-    double refFootOriginWeight = 1.0; // Reference座標系のfootOriginを計算するときに用いるweight. このfootOriginからの相対位置で、GaitGeneratorに管理されていないEndEffectorのReference位置が解釈される
+
+    // AutoStabilizerの内部で計算される
+    bool genContactState = true; // 全てのLegParamのgenContactStateがfalseになることがあるので注意
+    bool genContactStatePrev = true;
+  //   enum Mode_enum{ MODE_GG, MODE_SYNC_TO_REF, MODE_REF, MODE_SYNC_TO_GG}; // MODE_GG: GaitGeneratorの生成する遊脚軌道に従う. MODE_REF: referenceの目標位置に従う
+  //   enum Transition_enum{ START_REF, STOP_REF};
+  //   double ref_transition_time;
+  // private:
+  //   Mode_enum current, previous, next;
+  //   double remain_time;
+  // public:
+
+    // param
+    double refFootOriginWeight = 1.0; // Reference座標系のfootOriginを計算するときに用いるweight. このfootOriginからの相対位置で、GaitGeneratorに管理されていないEndEffectorのReference位置が解釈される. interpolatorによって連続的に変化する. 全てのLegParamのrefFootOriginWeightが0になることはない
     cpp_filters::TwoPointInterpolator<double> refFootOriginWeight_interpolator = cpp_filters::TwoPointInterpolator<double>(1.0,0.0,0.0,cpp_filters::HOFFARBIB);
+    cnoid::Vector3 defaultTranslatePos = cnoid::Vector3::Zero();
   };
   std::vector<LegParam> legParams_; // 要素数2. 0: rleg. 1: lleg.
+
+  class RobotState {
+  public:
+    // AutoStabilizerの内部で計算される
+    cnoid::Position footMidCoords; // generate frame. 実際の両足位置の中間とは異なり、地面の高さのまま移動し、stride typeによるのXY方向の速さの変化によらずに一定の速度で動く. reference frameとgenerate frameの対応付けはこの座標系を用いて行う. interpolatorによって連続的に変化する
+    cpp_filters::TwoPointInterpolator<cnoid::Vector3> footMidCoordsPosInterpolator = cpp_filters::TwoPointInterpolator<cnoid::Vector3>(cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::HOFFARBIB);
+    cpp_filters::TwoPointInterpolatorSO3 footMidCoordsRInterpolator = cpp_filters::TwoPointInterpolatorSO3(cnoid::Matrix3::Identity(),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::HOFFARBIB);
+  };
+  RobotState robotState_;
 
   class JointParam {
   public:
@@ -207,15 +247,29 @@ protected:
   };
   std::vector<JointParam> jointParams_; // 要素数robot->numJoints(). jointIdの順.
 
+
 protected:
   // utility functions
   bool getProperty(const std::string& key, std::string& ret);
 
   static bool readInPortData(Ports& ports, cnoid::BodyPtr refRobot, cnoid::BodyPtr actRobot, std::vector<EndEffectorParam>& endEffectorParams);
   static bool passThroughReference(cnoid::BodyPtr refRobot, cnoid::BodyPtr genRobot);
-  static bool execAutoBalancer();
+  static cnoid::Position calcRefFootMidCoords(const cnoid::BodyPtr refRobotOrigin, const std::vector<LegParam>& legParams, const std::vector<EndEffectorParam>& endEffectorParams);
+  static void moveCoords(cnoid::BodyPtr robot, const cnoid::Position& target, const cnoid::Position& at);
+  static bool calcReferenceParameters(const ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, std::vector<LegParam>& legParams, std::vector<EndEffectorParam>& endEffectorParams, RobotState& robotState);
+  static bool calcActualParameters(const ControlMode& mode, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, std::vector<LegParam>& legParams, std::vector<EndEffectorParam>& endEffectorParams);
+  static bool execAutoBalancer(const ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, std::vector<LegParam>& legParams, std::vector<EndEffectorParam>& endEffectorParams, RobotState& robotState);
   static bool execStabilizer();
-  static bool solveFullbodyIK();
+  class FullbodyIKParam {
+  public:
+    cnoid::VectorX jlim_avoid_weight_old;
+    std::unordered_map<cnoid::LinkPtr,std::shared_ptr<IK::JointAngleConstraint> > refJointAngleConstraint;
+    std::shared_ptr<IK::PositionConstraint> rootPositionConstraint;
+    std::shared_ptr<IK::COMConstraint> comConstraint;
+    std::shared_ptr<IK::AngularMomentumConstraint> angularMomentumConstraint;
+  };
+  FullbodyIKParam fullbodyIKParam_;
+  static bool solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::BodyPtr& refRobot, std::vector<EndEffectorParam>& endEffectorParams, FullbodyIKParam& fullbodyIKParam, const std::vector<cnoid::LinkPtr>& controllableJoints, double dt);
   class OutputOffsetInterpolators {
   public:
     cpp_filters::TwoPointInterpolator<cnoid::Vector3> genBasePosInterpolator = cpp_filters::TwoPointInterpolator<cnoid::Vector3>(cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::HOFFARBIB);

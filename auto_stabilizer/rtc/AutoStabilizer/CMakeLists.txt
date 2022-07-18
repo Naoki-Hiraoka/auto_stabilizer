@@ -6,7 +6,8 @@ set(CMAKE_BUILD_TYPE Release)
 add_definitions(-Wno-deprecated)
 
 find_package(catkin REQUIRED COMPONENTS
-  #fullbody_inverse_kinematics_solver
+  ik_constraint
+  fullbody_inverse_kinematics_solver
   #prioritized_qp
   #prioritized_inverse_kinematics_solver
   cpp_filters
