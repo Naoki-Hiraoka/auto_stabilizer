@@ -36,4 +36,9 @@
     <arg name="USE_OBJECTCONTACTTURNAROUNDDETECTOR" default="false" />
   </include>
 
+  <node pkg="auto_stabilizer" name="AutoStabilizerServiceROSBridge" type="AutoStabilizerServiceROSBridgeComp"
+        output="screen" args ='-o "corba.master_manager:localhost:2810" -o "corba.nameservers:localhost:15005" -o "naming.formats:%n.rtc" -o "exec_cxt.periodic.type:PeriodicExecutionContext" -o "exec_cxt.periodic.rate:2000" -o "logger.file_name:/tmp/rtc%p.log"' />
+  <rtconnect from="AutoStabilizerServiceROSBridge.rtc:AutoStabilizerService" to="ast.rtc:AutoStabilizerService"  subscription_type="new"/>
+  <rtactivate component="AutoStabilizerServiceROSBridge.rtc" />
+  <node name="rtmlaunch_jaxon_jvrc_choreonoid" pkg="openrtm_tools" type="rtmlaunch.py" args="$(find auto_stabilizer_choreonoid_sample)/launch/jaxon_jvrc_choreonoid.launch" output="screen"/>
 </launch>

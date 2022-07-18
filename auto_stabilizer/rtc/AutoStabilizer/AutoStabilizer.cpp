@@ -69,6 +69,22 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
   this->addPort(this->ports_.m_AutoStabilizerServicePort_);
 
   {
+    // load dt
+    std::string buf; this->getProperty("dt", buf);
+    this->dt_ = std::stod(buf);
+    if(this->dt_ <= 0.0){
+      this->getProperty("exec_cxt.periodic.rate", buf);
+      double rate = std::stod(buf);
+      if(rate > 0.0){
+        this->dt_ = 1.0/rate;
+      }else{
+        std::cerr << "\x1b[31m[" << this->m_profile.instance_name << "] " << "dt is invalid" << "\x1b[39m" << std::endl;
+        return RTC::RTC_ERROR;
+      }
+    }
+  }
+
+  {
     // load robot model
     cnoid::BodyLoader bodyLoader;
     std::string fileName; this->getProperty("model", fileName);
@@ -486,12 +502,11 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
   std::lock_guard<std::mutex> guard(this->mutex_);
 
   std::string instance_name = std::string(this->m_profile.instance_name);
-  double dt = 1.0 / this->get_context(ec_id)->get_rate();
   this->loop_++;
 
   if(!AutoStabilizer::readInPortData(this->ports_, this->refRobot_, this->actRobot_, this->endEffectorParams_)) return RTC::RTC_OK;  // qRef が届かなければ何もしない
 
-  this->mode_.update(dt);
+  this->mode_.update(this->dt_);
 
   if(!this->mode_.isABCRunning()) {
     AutoStabilizer::passThroughReference(this->refRobot_, this->genRobot_);
@@ -503,18 +518,20 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
     AutoStabilizer::solveFullbodyIK();
   }
 
-  AutoStabilizer::writeOutPortData(this->ports_, this->genRobot_, this->mode_, this->outputOffsetInterpolators_, dt);
+  AutoStabilizer::writeOutPortData(this->ports_, this->genRobot_, this->mode_, this->outputOffsetInterpolators_, this->dt_);
 
   return RTC::RTC_OK;
 }
 
 RTC::ReturnCode_t AutoStabilizer::onActivated(RTC::UniqueId ec_id){
+  std::lock_guard<std::mutex> guard(this->mutex_);
   std::cerr << "[" << m_profile.instance_name << "] "<< "onActivated(" << ec_id << ")" << std::endl;
   // 各種処理を初期化する TODO
   this->mode_.reset();
   return RTC::RTC_OK;
 }
 RTC::ReturnCode_t AutoStabilizer::onDeactivated(RTC::UniqueId ec_id){
+  std::lock_guard<std::mutex> guard(this->mutex_);
   std::cerr << "[" << m_profile.instance_name << "] "<< "onDeactivated(" << ec_id << ")" << std::endl;
   return RTC::RTC_OK;
 }
@@ -533,10 +550,6 @@ bool AutoStabilizer::goStop(){
   return true;
 }
 bool AutoStabilizer::jumpTo(const double& x, const double& y, const double& z, const double& ts, const double& tf){
-  std::lock_guard<std::mutex> guard(this->mutex_);
-  return true;
-}
-bool AutoStabilizer::emergencyStop (){
   std::lock_guard<std::mutex> guard(this->mutex_);
   return true;
 }

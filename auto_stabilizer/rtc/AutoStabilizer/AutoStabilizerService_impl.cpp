@@ -29,11 +29,6 @@ CORBA::Boolean AutoStabilizerService_impl::jumpTo( CORBA::Double x,  CORBA::Doub
   return this->comp_->jumpTo(x, y, z, ts, tf);
 };
 
-CORBA::Boolean AutoStabilizerService_impl::emergencyStop()
-{
-  return this->comp_->emergencyStop();
-};
-
 CORBA::Boolean AutoStabilizerService_impl::setFootSteps(const OpenHRP::AutoStabilizerService::FootstepsSequence& fss, CORBA::Long overwrite_fs_idx)
 {
   return this->comp_->setFootSteps(fss, overwrite_fs_idx);

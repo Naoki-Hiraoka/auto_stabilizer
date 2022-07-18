@@ -38,7 +38,6 @@ public:
   bool goVelocity(const double& vx, const double& vy, const double& vth);
   bool goStop();
   bool jumpTo(const double& x, const double& y, const double& z, const double& ts, const double& tf);
-  bool emergencyStop ();
   bool setFootSteps(const OpenHRP::AutoStabilizerService::FootstepsSequence& fss, CORBA::Long overwrite_fs_idx);
   bool setFootStepsWithParam(const OpenHRP::AutoStabilizerService::FootstepsSequence& fss, const OpenHRP::AutoStabilizerService::StepParamsSequence& spss, CORBA::Long overwrite_fs_idx);
   void waitFootSteps();
@@ -61,7 +60,8 @@ protected:
   std::mutex mutex_;
 
   unsigned int debugLevel_;
-  unsigned long loop_;
+  unsigned long long loop_;
+  double dt_;
 
   class Ports {
   public:
@@ -111,8 +111,8 @@ protected:
   public:
     /*
       MODE_IDLE -> startAutoBalancer() -> MODE_SYNC_TO_ABC -> MODE_ABC -> startStabilizer() -> MODE_SYNC_TO_ST -> MODE_ST -> stopStabilizer() -> MODE_SYNC_TO_STOPST -> MODE_ABC -> stopAutoBalancer() -> MODE_SYNC_TO_IDLE -> MODE_IDLE
-      MODE_SYNC_TO*の時間はtransition_time次第だが、少なくとも1周期は経由する. startの方はすぐに遷移する.
-      MODE_SYNC_TO*では、基本的に次のMODEと同じ処理が行われるが、前回のMODEの出力から補間するような軌道に加工される
+      MODE_SYNC_TO*の時間はstartの方はすぐに遷移し、stopの方はtransition_timeの時間をかけて遷移するが、少なくとも1周期はMODE_SYNC_TO*を経由する.
+      MODE_SYNC_TO*では、基本的に次のMODEと同じ処理が行われるが、出力時に前回のMODEの出力から補間するような軌道に加工されることで出力の連続性を確保する
       補間している途中で別のmodeに切り替わることは無いので、そこは安心してプログラムを書いてよい(例外はonActivated)
      */
     enum Mode_enum{ MODE_IDLE, MODE_SYNC_TO_ABC, MODE_ABC, MODE_SYNC_TO_ST, MODE_ST, MODE_SYNC_TO_STOPST, MODE_SYNC_TO_IDLE};
@@ -196,7 +196,6 @@ protected:
   };
   std::vector<LegParam> legParams_; // 要素数2. 0: rleg. 1: lleg.
 
-  // params
   class JointParam {
   public:
     // constant
@@ -208,8 +207,6 @@ protected:
   };
   std::vector<JointParam> jointParams_; // 要素数robot->numJoints(). jointIdの順.
 
-  //OutputOffsetInterpolators outputOffsetInterpolators_;
-
 protected:
   // utility functions
   bool getProperty(const std::string& key, std::string& ret);
@@ -219,7 +216,6 @@ protected:
   static bool execAutoBalancer();
   static bool execStabilizer();
   static bool solveFullbodyIK();
-
   class OutputOffsetInterpolators {
   public:
     cpp_filters::TwoPointInterpolator<cnoid::Vector3> genBasePosInterpolator = cpp_filters::TwoPointInterpolator<cnoid::Vector3>(cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::HOFFARBIB);

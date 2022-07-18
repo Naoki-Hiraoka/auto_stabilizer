@@ -651,13 +651,6 @@ module OpenHRP
     boolean jumpTo(in double x, in double y, in double z, in double ts, in double tf);
 
     /**
-     * @brief Stop stepping immediately.
-     * @param
-     * @return true if set successfully, false otherwise
-     */
-    boolean emergencyStop();
-
-    /**
      * @brief Set footsteps. Returns without waiting for whole steps to be executed.
      * @param fss is sequence of FootStep structure.
               overwrite_fs_idx is index to be overwritten. overwrite_fs_idx is used only in walking.
