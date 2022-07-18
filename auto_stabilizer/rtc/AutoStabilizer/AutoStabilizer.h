@@ -39,9 +39,7 @@ public:
   bool goStop();
   bool jumpTo(const double& x, const double& y, const double& z, const double& ts, const double& tf);
   bool emergencyStop ();
-  bool setFootSteps(const OpenHRP::AutoStabilizerService::FootstepSequence& fs, CORBA::Long overwrite_fs_idx);
   bool setFootSteps(const OpenHRP::AutoStabilizerService::FootstepsSequence& fss, CORBA::Long overwrite_fs_idx);
-  bool setFootStepsWithParam(const OpenHRP::AutoStabilizerService::FootstepSequence& fs, const OpenHRP::AutoStabilizerService::StepParamSequence& sps, CORBA::Long overwrite_fs_idx);
   bool setFootStepsWithParam(const OpenHRP::AutoStabilizerService::FootstepsSequence& fss, const OpenHRP::AutoStabilizerService::StepParamsSequence& spss, CORBA::Long overwrite_fs_idx);
   void waitFootSteps();
   bool startAutoBalancer();
@@ -56,8 +54,8 @@ public:
   bool startStabilizer(void);
   bool stopStabilizer(void);
 
-protected:
-  bool getProperty(const std::string& key, std::string& ret);
+public:
+  enum Leg_enum { RLEG=0, LLEG=1 };
 
 protected:
   std::mutex mutex_;
@@ -117,16 +115,16 @@ protected:
       MODE_SYNC_TO*では、基本的に次のMODEと同じ処理が行われるが、前回のMODEの出力から補間するような軌道に加工される
       補間している途中で別のmodeに切り替わることは無いので、そこは安心してプログラムを書いてよい(例外はonActivated)
      */
-    enum mode_enum{ MODE_IDLE, MODE_SYNC_TO_ABC, MODE_ABC, MODE_SYNC_TO_ST, MODE_ST, MODE_SYNC_TO_STOPST, MODE_SYNC_TO_IDLE};
-    enum transition_enum{ START_ABC, STOP_ABC, START_ST, STOP_ST};
+    enum Mode_enum{ MODE_IDLE, MODE_SYNC_TO_ABC, MODE_ABC, MODE_SYNC_TO_ST, MODE_ST, MODE_SYNC_TO_STOPST, MODE_SYNC_TO_IDLE};
+    enum Transition_enum{ START_ABC, STOP_ABC, START_ST, STOP_ST};
     double abc_transition_time, st_transition_time;
   private:
-    mode_enum current, previous, next;
+    Mode_enum current, previous, next;
     double remain_time;
   public:
     ControlMode(){ reset(); abc_transition_time = 2.0; st_transition_time = 2.0;}
     void reset(){ current = previous = next = MODE_IDLE; remain_time = 0;}
-    bool setNextTransition(const transition_enum request){
+    bool setNextTransition(const Transition_enum request){
       switch(request){
       case START_ABC:
         if(current == MODE_IDLE){ next = MODE_SYNC_TO_ABC; remain_time = 0.0; return true; }else{ return false; }
@@ -163,8 +161,9 @@ protected:
         }
       }
     }
-    mode_enum now() const{ return current; }
-    mode_enum pre() const{ return previous; }
+    double remainTime() const{ return remain_time;}
+    Mode_enum now() const{ return current; }
+    Mode_enum pre() const{ return previous; }
     bool isABCRunning() const{ return (current==MODE_SYNC_TO_ABC) || (current==MODE_ABC) || (current==MODE_SYNC_TO_ST) || (current==MODE_ST) || (current==MODE_SYNC_TO_STOPST) ;}
     bool isSTRunning() const{ return (current==MODE_SYNC_TO_ST) || (current==MODE_ST) ;}
     bool isSyncInit() const{ return (current != previous) && isSync();}
@@ -176,37 +175,60 @@ protected:
   cnoid::BodyPtr actRobot_; // actual
   cnoid::BodyPtr genRobot_; // output
 
-  class EndEffector {
+  class EndEffectorParam {
   public:
     // constant
-    std::string name;
-    std::string parentLink;
-    cnoid::Position localT; // Parent Link Frame
-    std::string forceSensor;
+    std::string name = ""; // 右脚はrleg. 左脚はllegという名前である必要がある
+    std::string parentLink = "";
+    cnoid::Position localT = cnoid::Position::Identity(); // Parent Link Frame
+    std::string forceSensor = ""; // actualのForceSensorの値を座標変換したものがEndEffectorが受けている力とみなされる. forceSensorが""ならば受けている力は常に0とみなされる
 
     // from reference port
-    cnoid::Vector6 refWrench; // FootOrigin frame. EndEffector origin.
+    cnoid::Vector6 refWrench = cnoid::Vector6::Zero(); // FootOrigin frame. EndEffector origin.
   };
-  std::vector<EndEffector> endEffectors_;
+  std::vector<EndEffectorParam> endEffectorParams_; // 要素数2以上. 0: rleg. 1: lleg.
+
+  class LegParam {
+  public:
+    std::string name = ""; // 右脚はrleg. 左脚はllegという名前である必要がある
+    double refFootOriginWeight = 1.0; // Reference座標系のfootOriginを計算するときに用いるweight. このfootOriginからの相対位置で、GaitGeneratorに管理されていないEndEffectorのReference位置が解釈される
+    cpp_filters::TwoPointInterpolator<double> refFootOriginWeight_interpolator = cpp_filters::TwoPointInterpolator<double>(1.0,0.0,0.0,cpp_filters::HOFFARBIB);
+  };
+  std::vector<LegParam> legParams_; // 要素数2. 0: rleg. 1: lleg.
 
   // params
-  std::vector<cnoid::LinkPtr> useJoints_; // controlで上書きする関節(root含む)のリスト
+  class JointParam {
+  public:
+    // constant
+    std::string name = ""; // 関節名
+    double maxTorque = 0.0; // モデルのclimit * gearRatio * torqueConstより計算
+
+    // params
+    bool controllable = true; // falseの場合、qやtauはrefの値をそのまま出力する. その関節は存在しないかのように扱う. このパラメータはMODE_IDLEのときにしか変更されないので、そこは安心してプログラムを書いて良い
+  };
+  std::vector<JointParam> jointParams_; // 要素数robot->numJoints(). jointIdの順.
 
   //OutputOffsetInterpolators outputOffsetInterpolators_;
 
 protected:
   // utility functions
-  static bool readInPortData(Ports& ports, cnoid::BodyPtr refRobot, cnoid::BodyPtr actRobot, std::vector<EndEffector>& endEffectors);
+  bool getProperty(const std::string& key, std::string& ret);
+
+  static bool readInPortData(Ports& ports, cnoid::BodyPtr refRobot, cnoid::BodyPtr actRobot, std::vector<EndEffectorParam>& endEffectorParams);
+  static bool passThroughReference(cnoid::BodyPtr refRobot, cnoid::BodyPtr genRobot);
+  static bool execAutoBalancer();
+  static bool execStabilizer();
+  static bool solveFullbodyIK();
 
   class OutputOffsetInterpolators {
   public:
-    std::shared_ptr<cpp_filters::TwoPointInterpolator<cnoid::Vector3> > genBasePosInterpolator_;
-    std::shared_ptr<cpp_filters::TwoPointInterpolatorSO3> genBaseRInterpolator_;
-    std::vector<std::shared_ptr<cpp_filters::TwoPointInterpolator<double> > > qInterpolator_; // controlで上書きしない関節について、refereceに加えるoffset
-    std::vector<std::shared_ptr<cpp_filters::TwoPointInterpolator<double> > > genTauInterpolator_; // controlで上書きしない関節について、refereceに加えるoffset
+    cpp_filters::TwoPointInterpolator<cnoid::Vector3> genBasePosInterpolator = cpp_filters::TwoPointInterpolator<cnoid::Vector3>(cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::HOFFARBIB);
+    cpp_filters::TwoPointInterpolatorSO3 genBaseRInterpolator = cpp_filters::TwoPointInterpolatorSO3(cnoid::Matrix3::Identity(),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::HOFFARBIB);
+    std::vector<cpp_filters::TwoPointInterpolator<double> > qInterpolator; // 要素数はrobot->numJoints(). jointIdの順
+    std::vector<cpp_filters::TwoPointInterpolator<double> > genTauInterpolator; // 要素数はrobot->numJoints(). jointIdの順
   };
-  OutputOffsetInterpolators outputOffsetInterpolators_;
-  static bool writeOutPortData(Ports& ports, cnoid::BodyPtr genRobot, const ControlMode& mode);
+  OutputOffsetInterpolators outputOffsetInterpolators_; // refereceに加えるoffset
+  static bool writeOutPortData(Ports& ports, cnoid::BodyPtr genRobot, const ControlMode& mode, OutputOffsetInterpolators& outputOffsetInterpolators, double dt);
 };
 
 

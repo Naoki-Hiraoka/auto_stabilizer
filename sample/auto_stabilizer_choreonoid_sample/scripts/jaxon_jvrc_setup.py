@@ -44,6 +44,14 @@ class JAXON_RED_HrpsysConfigurator(ChoreonoidHrpsysConfigurator):
             connectPorts(self.sh.port("baseRpyOut"), self.ast.port("refBaseRpyIn"))
             connectPorts(self.rh.port("q"), self.ast.port("qAct"))
             connectPorts(self.rh.port("dq"), self.ast.port("dqAct"))
+            if self.st:
+                disconnectPorts(self.st.port("tau"), self.rh.port("tauRef"))
+                connectPorts(self.st.port("tau"), self.ast.port("refTauIn"))
+                connectPorts(self.ast.port("genTauOut"), self.rh.port("tauRef"))
+            else:
+                disconnectPorts(self.sh.port("tqOut"), self.rh.port("tauRef"))
+                connectPorts(self.sh.port("tqOut"), self.ast.port("refTauIn"))
+                connectPorts(self.ast.port("genTauOut"), self.rh.port("tauRef"))
             if self.kf:
                 connectPorts(self.kf.port("rpy"), self.ast.port("actImuIn"))
             for sen, eef in zip(["rfsensor", "lfsensor", "rhsensor", "lhsensor"], ["rleg", "lleg", "rarm", "larm"]):

@@ -2,6 +2,7 @@
 #include <cnoid/BodyLoader>
 #include <cnoid/ForceSensor>
 #include <cnoid/RateGyroSensor>
+#include <cnoid/ValueTree>
 #include <cnoid/EigenUtil>
 
 #define DEBUGP (loop%200==0)
@@ -23,7 +24,7 @@ static const char* AutoStabilizer_spec[] = {
 
 AutoStabilizer::Ports::Ports() :
   m_qRefIn_("qRef", m_qRef_),
-  m_refTauIn_("refTau", m_refTau_),
+  m_refTauIn_("refTauIn", m_refTau_),
   m_refBasePosIn_("refBasePosIn", m_refBasePos_),
   m_refBaseRpyIn_("refBaseRpyIn", m_refBaseRpy_),
   m_qActIn_("qAct", m_qAct_),
@@ -31,7 +32,7 @@ AutoStabilizer::Ports::Ports() :
   m_actImuIn_("actImuIn", m_actImu_),
 
   m_qOut_("q", m_q_),
-  m_genTauOut_("genTau", m_genTau_),
+  m_genTauOut_("genTauOut", m_genTau_),
   m_genBasePoseOut_("genBasePoseOut", m_genBasePose_),
   m_genBaseTformOut_("genBaseTformOut", m_genBaseTform_),
 
@@ -52,14 +53,14 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
 
   // add ports
   this->addInPort("qRef", this->ports_.m_qRefIn_);
-  this->addInPort("refTau", this->ports_.m_refTauIn_);
+  this->addInPort("refTauIn", this->ports_.m_refTauIn_);
   this->addInPort("refBasePosIn", this->ports_.m_refBasePosIn_);
   this->addInPort("refBaseRpyIn", this->ports_.m_refBaseRpyIn_);
   this->addInPort("qAct", this->ports_.m_qActIn_);
   this->addInPort("dqAct", this->ports_.m_dqActIn_);
   this->addInPort("actImuIn", this->ports_.m_actImuIn_);
   this->addOutPort("q", this->ports_.m_qOut_);
-  this->addOutPort("genTau", this->ports_.m_genTauOut_);
+  this->addOutPort("genTauOut", this->ports_.m_genTauOut_);
   this->addOutPort("genBasePoseOut", this->ports_.m_genBasePoseOut_);
   this->addOutPort("genBaseTformOut", this->ports_.m_genBaseTformOut_);
   this->addOutPort("genBasePosOut", this->ports_.m_genBasePosOut_);
@@ -120,12 +121,12 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
       if(localaxis.norm() == 0) localR = cnoid::Matrix3::Identity();
       else localR = Eigen::AngleAxisd(localangle, localaxis.normalized()).toRotationMatrix();
 
-      EndEffector ikp;
+      EndEffectorParam ikp;
       ikp.name = name;
       ikp.parentLink = parentLink;
       ikp.localT.translation() = localp;
       ikp.localT.linear() = localR;
-      this->endEffectors_.push_back(ikp);
+      this->endEffectorParams_.push_back(ikp);
     }
   }
 
@@ -133,37 +134,61 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
     //add more information to EndEffectors
 
     // 0番目が右脚. 1番目が左脚. という仮定がある.
-    if(this->endEffectors_.size() < 2 || this->endEffectors_[0].name != "rleg" || this->endEffectors_[1].name != "lleg"){
-      std::cerr << "\x1b[31m[" << this->m_profile.instance_name << "] " << " this->endEffectors_.size() < 2 || this->endEffectors_[0].name != \"rleg\" || this->endEffectors_[1].name != \"lleg\" not holds" << "\x1b[39m" << std::endl;
+    if(this->endEffectorParams_.size() < 2 || this->endEffectorParams_[RLEG].name != "rleg" || this->endEffectorParams_[LLEG].name != "lleg"){
+      std::cerr << "\x1b[31m[" << this->m_profile.instance_name << "] " << " this->endEffectorParams_.size() < 2 || this->endEffectorParams_[0].name != \"rleg\" || this->endEffectorParams_[1].name != \"lleg\" not holds" << "\x1b[39m" << std::endl;
       return RTC::RTC_ERROR;
     }
 
     // 各EndEffectorsから親リンク側に遡っていき、最初に見つかったForceSensorをEndEffectorに対応付ける. 以後、ForceSensorの値を座標変換したものがEndEffectorが受けている力とみなされる. 見つからなければ受けている力は常に0とみなされる
     cnoid::DeviceList<cnoid::ForceSensor> forceSensors(this->actRobot_->devices());
-    for (int i=0;i<this->endEffectors_.size();i++){
-      cnoid::LinkPtr link = this->actRobot_->link(this->endEffectors_[i].parentLink);
+    for (int i=0;i<this->endEffectorParams_.size();i++){
+      cnoid::LinkPtr link = this->actRobot_->link(this->endEffectorParams_[i].parentLink);
       bool found = false;
       while (link != nullptr && found == false) {
         for (size_t j = 0; j < forceSensors.size(); j++) {
           if(forceSensors[j]->link() == link) {
-            this->endEffectors_[i].forceSensor = forceSensors[j]->name();
+            this->endEffectorParams_[i].forceSensor = forceSensors[j]->name();
             found = true;
             break;
           }
         }
       }
     }
+  }
 
+  {
+    // generate JointParams
+    for(int i=0;i<this->genRobot_->numJoints();i++){
+      cnoid::LinkPtr joint = this->genRobot_->joint(i);
+      JointParam param;
+      param.name = joint->name();
+      double climit = 0.0, gearRatio = 0.0, torqueConst = 0.0;
+      joint->info()->read("climit",climit); joint->info()->read("gearRatio",gearRatio); joint->info()->read("torqueConst",torqueConst);
+      param.maxTorque = climit * gearRatio * torqueConst;
+      this->jointParams_.push_back(param);
+    }
+
+    // apply margin to jointlimit
+    for(int i=0;i<this->genRobot_->numJoints();i++){
+      cnoid::LinkPtr joint = this->genRobot_->joint(i);
+      if(joint->q_upper() - joint->q_lower() > 0.002){
+        joint->setJointRange(joint->q_lower()+0.001,joint->q_upper()-0.001);
+      }
+      // JointVelocityについて. 1.0だと安全.4.0は脚.10.0はlapid manipulation らしい. limitを小さくしすぎた状態で、速い指令を送ると、狭いlimitの中で高優先度タスクを頑張って満たそうとすることで、低優先度タスクを満たす余裕がなくエラーが大きくなってしまうことに注意.
+      if(joint->dq_upper() - joint->dq_lower() > 0.02){
+        joint->setJointVelocityRange(joint->dq_lower()+0.01,joint->dq_upper()-0.01);
+      }
+    }
   }
 
   {
     // add more ports (ロボットモデルやEndEffectorの情報を使って)
 
     // 各EndEffectorにつき、ref<name>WrenchInというInPortをつくる
-    this->ports_.m_refWrenchIn_.resize(this->endEffectors_.size());
-    this->ports_.m_refWrench_.resize(this->endEffectors_.size());
-    for(int i=0;i<this->endEffectors_.size();i++){
-      std::string name = "ref"+this->endEffectors_[i].name+"WrenchIn";
+    this->ports_.m_refWrenchIn_.resize(this->endEffectorParams_.size());
+    this->ports_.m_refWrench_.resize(this->endEffectorParams_.size());
+    for(int i=0;i<this->endEffectorParams_.size();i++){
+      std::string name = "ref"+this->endEffectorParams_[i].name+"WrenchIn";
       this->ports_.m_refWrenchIn_[i] = std::make_unique<RTC::InPort<RTC::TimedDoubleSeq> >(name.c_str(), this->ports_.m_refWrench_[i]);
       this->addInPort(name.c_str(), *(this->ports_.m_refWrenchIn_[i]));
     }
@@ -226,7 +251,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
 }
 
 // static function
-bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobot, cnoid::BodyPtr actRobot, std::vector<AutoStabilizer::EndEffector>& endEffectors){
+bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobot, cnoid::BodyPtr actRobot, std::vector<AutoStabilizer::EndEffectorParam>& endEffectors){
   bool refRobot_changed = false;
   bool qRef_updated = false;
   if(ports.m_qRefIn_.isNew()){
@@ -317,53 +342,142 @@ bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr
   return qRef_updated;
 }
 
+// statuc function
+bool AutoStabilizer::passThroughReference(cnoid::BodyPtr refRobot, cnoid::BodyPtr genRobot) {
+  genRobot->rootLink()->T() = refRobot->rootLink()->T();
+  genRobot->rootLink()->v() = refRobot->rootLink()->v();
+  genRobot->rootLink()->w() = refRobot->rootLink()->w();
+  genRobot->rootLink()->dv() = refRobot->rootLink()->dv();
+  genRobot->rootLink()->dw() = refRobot->rootLink()->dw();
+  for(int i=0;i<genRobot->numJoints();i++){
+    genRobot->joint(i)->q() = refRobot->joint(i)->q();
+    genRobot->joint(i)->dq() = refRobot->joint(i)->dq();
+    genRobot->joint(i)->ddq() = refRobot->joint(i)->ddq();
+    genRobot->joint(i)->u() = refRobot->joint(i)->u();
+  }
+  genRobot->calcForwardKinematics();
+  genRobot->calcCenterOfMass();
+  return true;
+}
+
 // static function
-bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr genRobot, const AutoStabilizer::ControlMode& mode){
-  ports.m_q_.tm = ports.m_qRef_.tm;
-  ports.m_q_.data.length(genRobot->numJoints());
-  for(int i=0;i<genRobot->numJoints();i++){
-    ports.m_q_.data[i] = genRobot->joint(i)->q();
-  }
-  ports.m_qOut_.write();
+bool AutoStabilizer::execAutoBalancer() {
+  return true;
+}
 
-  ports.m_genTau_.tm = ports.m_qRef_.tm;
-  ports.m_genTau_.data.length(genRobot->numJoints());
-  for(int i=0;i<genRobot->numJoints();i++){
-    ports.m_genTau_.data[i] = genRobot->joint(i)->u();
-  }
-  ports.m_genTauOut_.write();
+// static function
+bool AutoStabilizer::execStabilizer() {
+  return true;
+}
 
-  cnoid::Vector3 baseRpy = cnoid::rpyFromRot(genRobot->rootLink()->R());
-  ports.m_genBasePose_.tm = ports.m_qRef_.tm;
-  ports.m_genBasePose_.data.position.x = genRobot->rootLink()->p()[0];
-  ports.m_genBasePose_.data.position.y = genRobot->rootLink()->p()[1];
-  ports.m_genBasePose_.data.position.z = genRobot->rootLink()->p()[2];
-  ports.m_genBasePose_.data.orientation.r = baseRpy[0];
-  ports.m_genBasePose_.data.orientation.p = baseRpy[1];
-  ports.m_genBasePose_.data.orientation.y = baseRpy[2];
-  ports.m_genBasePoseOut_.write();
+// static function
+bool AutoStabilizer::solveFullbodyIK() {
+  return true;
+}
 
-  ports.m_genBaseTform_.tm = ports.m_qRef_.tm;
-  for(int i=0;i<3;i++){
-    ports.m_genBaseTform_.data[i] = genRobot->rootLink()->p()[i];
-  }
-  for(int i=0;i<3;i++){
-    for(int j=0;j<3;j++){
-      ports.m_genBaseTform_.data[3+i*3+j] = genRobot->rootLink()->R()(i,j);// row major
+// static function
+bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr genRobot, const AutoStabilizer::ControlMode& mode, AutoStabilizer::OutputOffsetInterpolators& outputOffsetInterpolators, double dt){
+  if(outputOffsetInterpolators.qInterpolator.size() == 0){ // 初回のみ
+    for(int i=0;i<genRobot->numJoints();i++){
+      outputOffsetInterpolators.qInterpolator.emplace_back(0.0,0.0,0.0,cpp_filters::HOFFARBIB);
+      outputOffsetInterpolators.genTauInterpolator.emplace_back(0.0,0.0,0.0,cpp_filters::HOFFARBIB);
     }
   }
-  ports.m_genBaseTformOut_.write();
 
-  ports.m_genBasePos_.tm = ports.m_qRef_.tm;
-  ports.m_genBasePos_.data.x = genRobot->rootLink()->p()[0];
-  ports.m_genBasePos_.data.y = genRobot->rootLink()->p()[1];
-  ports.m_genBasePos_.data.z = genRobot->rootLink()->p()[2];
-  ports.m_genBasePosOut_.write();
-  ports.m_genBaseRpy_.tm = ports.m_qRef_.tm;
-  ports.m_genBaseRpy_.data.r = baseRpy[0];
-  ports.m_genBaseRpy_.data.p = baseRpy[1];
-  ports.m_genBaseRpy_.data.y = baseRpy[2];
-  ports.m_genBaseRpyOut_.write();
+  {
+    // q
+    ports.m_q_.tm = ports.m_qRef_.tm;
+    ports.m_q_.data.length(genRobot->numJoints());
+    for(int i=0;i<genRobot->numJoints();i++){
+      if(!mode.isSync()){
+        ports.m_q_.data[i] = genRobot->joint(i)->q();
+      }else{
+        if(mode.isSyncInit()){
+          outputOffsetInterpolators.qInterpolator[i].reset(ports.m_q_.data[i]-genRobot->joint(i)->q());
+        }
+        outputOffsetInterpolators.qInterpolator[i].setGoal(0.0,mode.remainTime());
+        double x,v,a;
+        outputOffsetInterpolators.qInterpolator[i].get(x,v,a,dt);
+        ports.m_q_.data[i] = genRobot->joint(i)->q() + x;
+      }
+    }
+    ports.m_qOut_.write();
+  }
+
+  {
+    // tau
+    ports.m_genTau_.tm = ports.m_qRef_.tm;
+    ports.m_genTau_.data.length(genRobot->numJoints());
+    for(int i=0;i<genRobot->numJoints();i++){
+      if(!mode.isSync()){
+        ports.m_genTau_.data[i] = genRobot->joint(i)->u();
+      }else{
+        if(mode.isSyncInit()){
+          outputOffsetInterpolators.genTauInterpolator[i].reset(ports.m_genTau_.data[i]-genRobot->joint(i)->u());
+        }
+        outputOffsetInterpolators.genTauInterpolator[i].setGoal(0.0,mode.remainTime());
+        double x,v,a;
+        outputOffsetInterpolators.genTauInterpolator[i].get(x,v,a,dt);
+        ports.m_genTau_.data[i] = genRobot->joint(i)->u() + x;
+      }
+    }
+    ports.m_genTauOut_.write();
+  }
+
+  {
+    // basePose
+    cnoid::Vector3 basePos = genRobot->rootLink()->p();
+    cnoid::Matrix3 baseR = genRobot->rootLink()->R();
+    if(mode.isSync()){
+      if(mode.isSyncInit()){
+        cnoid::Vector3 prevPos = cnoid::Vector3(ports.m_genBasePose_.data.position.x,ports.m_genBasePose_.data.position.x,ports.m_genBasePose_.data.position.x);
+        cnoid::Matrix3 prevR = cnoid::rotFromRpy(ports.m_genBasePose_.data.orientation.r, ports.m_genBasePose_.data.orientation.p, ports.m_genBasePose_.data.orientation.y);
+        outputOffsetInterpolators.genBasePosInterpolator.reset(prevPos-basePos);
+        outputOffsetInterpolators.genBaseRInterpolator.reset(prevR * baseR.transpose());
+      }
+      outputOffsetInterpolators.genBasePosInterpolator.setGoal(cnoid::Vector3::Zero(),mode.remainTime());
+      cnoid::Vector3 offsetp;
+      outputOffsetInterpolators.genBasePosInterpolator.get(offsetp,dt);
+      basePos = (basePos + offsetp).eval();
+      outputOffsetInterpolators.genBaseRInterpolator.setGoal(cnoid::Matrix3::Identity(),mode.remainTime());
+      cnoid::Matrix3 offsetR;
+      outputOffsetInterpolators.genBaseRInterpolator.get(offsetR,dt);
+      baseR = (offsetR * baseR).eval();
+    }
+    cnoid::Vector3 baseRpy = cnoid::rpyFromRot(baseR);
+
+    ports.m_genBasePose_.tm = ports.m_qRef_.tm;
+    ports.m_genBasePose_.data.position.x = basePos[0];
+    ports.m_genBasePose_.data.position.y = basePos[1];
+    ports.m_genBasePose_.data.position.z = basePos[2];
+    ports.m_genBasePose_.data.orientation.r = baseRpy[0];
+    ports.m_genBasePose_.data.orientation.p = baseRpy[1];
+    ports.m_genBasePose_.data.orientation.y = baseRpy[2];
+    ports.m_genBasePoseOut_.write();
+
+    ports.m_genBaseTform_.tm = ports.m_qRef_.tm;
+    ports.m_genBaseTform_.data.length(12);
+    for(int i=0;i<3;i++){
+      ports.m_genBaseTform_.data[i] = basePos[i];
+    }
+    for(int i=0;i<3;i++){
+      for(int j=0;j<3;j++){
+        ports.m_genBaseTform_.data[3+i*3+j] = baseR(i,j);// row major
+      }
+    }
+    ports.m_genBaseTformOut_.write();
+
+    ports.m_genBasePos_.tm = ports.m_qRef_.tm;
+    ports.m_genBasePos_.data.x = basePos[0];
+    ports.m_genBasePos_.data.y = basePos[1];
+    ports.m_genBasePos_.data.z = basePos[2];
+    ports.m_genBasePosOut_.write();
+    ports.m_genBaseRpy_.tm = ports.m_qRef_.tm;
+    ports.m_genBaseRpy_.data.r = baseRpy[0];
+    ports.m_genBaseRpy_.data.p = baseRpy[1];
+    ports.m_genBaseRpy_.data.y = baseRpy[2];
+    ports.m_genBaseRpyOut_.write();
+  }
 
   return true;
 }
@@ -375,17 +489,21 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
   double dt = 1.0 / this->get_context(ec_id)->get_rate();
   this->loop_++;
 
-  if(!AutoStabilizer::readInPortData(this->ports_, this->refRobot_, this->actRobot_, this->endEffectors_)) return RTC::RTC_OK;  // qRef が届かなければ何もしない
+  if(!AutoStabilizer::readInPortData(this->ports_, this->refRobot_, this->actRobot_, this->endEffectorParams_)) return RTC::RTC_OK;  // qRef が届かなければ何もしない
 
   this->mode_.update(dt);
 
-  this->genRobot_->rootLink()->T() = this->refRobot_->rootLink()->T();
-  for(int i=0;i<this->genRobot_->numJoints();i++){
-    this->genRobot_->joint(i)->q() = this->refRobot_->joint(i)->q();
-    this->genRobot_->joint(i)->u() = this->refRobot_->joint(i)->u();
+  if(!this->mode_.isABCRunning()) {
+    AutoStabilizer::passThroughReference(this->refRobot_, this->genRobot_);
+  }else{
+    AutoStabilizer::execAutoBalancer();
+    if(!this->mode_.isSTRunning()) {
+      AutoStabilizer::execStabilizer();
+    }
+    AutoStabilizer::solveFullbodyIK();
   }
 
-  AutoStabilizer::writeOutPortData(this->ports_, this->genRobot_, this->mode_);
+  AutoStabilizer::writeOutPortData(this->ports_, this->genRobot_, this->mode_, this->outputOffsetInterpolators_, dt);
 
   return RTC::RTC_OK;
 }
@@ -403,30 +521,31 @@ RTC::ReturnCode_t AutoStabilizer::onDeactivated(RTC::UniqueId ec_id){
 RTC::ReturnCode_t AutoStabilizer::onFinalize(){ return RTC::RTC_OK; }
 
 bool AutoStabilizer::goPos(const double& x, const double& y, const double& th){
+  std::lock_guard<std::mutex> guard(this->mutex_);
   return true;
 }
 bool AutoStabilizer::goVelocity(const double& vx, const double& vy, const double& vth){
+  std::lock_guard<std::mutex> guard(this->mutex_);
   return true;
 }
 bool AutoStabilizer::goStop(){
+  std::lock_guard<std::mutex> guard(this->mutex_);
   return true;
 }
 bool AutoStabilizer::jumpTo(const double& x, const double& y, const double& z, const double& ts, const double& tf){
+  std::lock_guard<std::mutex> guard(this->mutex_);
   return true;
 }
 bool AutoStabilizer::emergencyStop (){
-  return true;
-}
-bool AutoStabilizer::setFootSteps(const OpenHRP::AutoStabilizerService::FootstepSequence& fs, CORBA::Long overwrite_fs_idx){
+  std::lock_guard<std::mutex> guard(this->mutex_);
   return true;
 }
 bool AutoStabilizer::setFootSteps(const OpenHRP::AutoStabilizerService::FootstepsSequence& fss, CORBA::Long overwrite_fs_idx){
-  return true;
-}
-bool AutoStabilizer::setFootStepsWithParam(const OpenHRP::AutoStabilizerService::FootstepSequence& fs, const OpenHRP::AutoStabilizerService::StepParamSequence& sps, CORBA::Long overwrite_fs_idx){
+  std::lock_guard<std::mutex> guard(this->mutex_);
   return true;
 }
 bool AutoStabilizer::setFootStepsWithParam(const OpenHRP::AutoStabilizerService::FootstepsSequence& fss, const OpenHRP::AutoStabilizerService::StepParamsSequence& spss, CORBA::Long overwrite_fs_idx){
+  std::lock_guard<std::mutex> guard(this->mutex_);
   return true;
 }
 void AutoStabilizer::waitFootSteps(){
@@ -434,6 +553,7 @@ void AutoStabilizer::waitFootSteps(){
 }
 
 bool AutoStabilizer::releaseEmergencyStop(){
+  std::lock_guard<std::mutex> guard(this->mutex_);
   return true;
 }
 
@@ -480,24 +600,31 @@ bool AutoStabilizer::stopStabilizer(void){
 }
 
 bool AutoStabilizer::setGaitGeneratorParam(const OpenHRP::AutoStabilizerService::GaitGeneratorParam& i_param){
+  std::lock_guard<std::mutex> guard(this->mutex_);
   return true;
 }
 bool AutoStabilizer::getGaitGeneratorParam(OpenHRP::AutoStabilizerService::GaitGeneratorParam& i_param){
+  std::lock_guard<std::mutex> guard(this->mutex_);
   return true;
 }
 bool AutoStabilizer::setAutoBalancerParam(const OpenHRP::AutoStabilizerService::AutoBalancerParam& i_param){
+  std::lock_guard<std::mutex> guard(this->mutex_);
   this->mode_.abc_transition_time = i_param.transition_time;
   return true;
 }
 bool AutoStabilizer::getAutoBalancerParam(OpenHRP::AutoStabilizerService::AutoBalancerParam& i_param){
+  std::lock_guard<std::mutex> guard(this->mutex_);
   i_param.transition_time = this->mode_.abc_transition_time;
+  // i_param.leg_names // refFootOriginWeightとautoControlRatioが必要
   return true;
 }
 void AutoStabilizer::setStabilizerParam(const OpenHRP::AutoStabilizerService::StabilizerParam& i_param){
+  std::lock_guard<std::mutex> guard(this->mutex_);
   this->mode_.st_transition_time = i_param.transition_time;
   return;
 }
 void AutoStabilizer::getStabilizerParam(OpenHRP::AutoStabilizerService::StabilizerParam& i_param){
+  std::lock_guard<std::mutex> guard(this->mutex_);
   i_param.transition_time = this->mode_.st_transition_time;
   return;
 }
