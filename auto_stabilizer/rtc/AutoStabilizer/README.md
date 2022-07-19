@@ -241,6 +241,6 @@ $$
 
 以上より、
 
-$$u(T_0) = u^r(T_0)+\frac{2}{(1-e^{-2w(T_n-T_0)})}\sum^n_{j=0} e^{-w(T_j-T_0)}\left[ (b_j-b_{j+1}) +(a_j-a_{j+1})(\frac{1}{w}+T_j)\right]$$
+$$u(T_0) = u^r(T_0)+\frac{2}{(1-e^{-2w(T_n-T_0)})}\sum^n_{j=0} e^{-w(T_j-T_0)}\left[ u^r_j(T_j)-u^r_{j+1}(T_j)+\frac{a_j-a_{j+1}}{w}\right]$$
 
 (ただし$b_0=x_0-l$,$b_{n+1}=x_f-l$,$a_0=0$,$a_{n+1}=0$)
