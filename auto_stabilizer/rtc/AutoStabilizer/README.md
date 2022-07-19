@@ -13,7 +13,7 @@
 
 Capture Pointを$x$、重心を$c$、ZMPを$z$と表すと、
 $$x = c + \sqrt{\frac{h}{g}}\dot{c}$$
-$$\ddot{c} = \frac{h}{g}(c-z)$$
+$$\ddot{c} = \frac{g}{h}(c-z)$$
 であるから、
 
 $$
