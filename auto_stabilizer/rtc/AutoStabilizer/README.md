@@ -183,7 +183,7 @@ $$
   = D_i e^{wT_i} + \frac{a_i}{w}+a_i T_i + b_i + \frac{1}{2}wCe^{-wT_i}+l\\
   \Leftrightarrow (D_{i+1}-D_i) e^{wT_i} = (a_i-a_{i+1})(\frac{1}{w}+T_i)+(b_i-b_{i+1})\\
   \Leftrightarrow (D_{i+1}-D_i) e^{wT_i} = u^r_i(T_i)-u^r_{i+1}(T_i)+\frac{a_i-a_{i+1}}{w}\\
-  \Leftrightarrow D_i = D_1 + \sum^{i-1}_{j=1}e^{-wT_j}\left[ u^r_j(T_j)-u^r_{j+1}(T_j)+\frac{a_j-a_{j+1}}{w} \right]
+  \Leftrightarrow D_i = D_1 + \sum_{j=1}^{i-1}e^{-wT_j}\left[ u^r_j(T_j)-u^r_{j+1}(T_j)+\frac{a_j-a_{j+1}}{w} \right]
 \end{eqnarray}
 $$
 
@@ -204,7 +204,7 @@ $$
 
 $$
 \begin{eqnarray}
-  D_i = e^{-wT_0}(x_0-b_1-\frac{a_1}{w}-a_1T_0-l)-\frac{1}{2}wCe^{-2wT_0} +\sum^{i-1}_{j=1}e^{-wT_j}\left [ u^r_j(T_j)-u^r_{j+1}(T_j)+\frac{a_j-a_{j+1}}{w} \right]
+  D_i = e^{-wT_0}(x_0-b_1-\frac{a_1}{w}-a_1T_0-l)-\frac{1}{2}wCe^{-2wT_0} +\sum_{j=1}^{i-1}e^{-wT_j}\left [ u^r_j(T_j)-u^r_{j+1}(T_j)+\frac{a_j-a_{j+1}}{w} \right]
 \end{eqnarray}
 $$
 
