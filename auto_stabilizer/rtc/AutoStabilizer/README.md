@@ -94,8 +94,6 @@ $$H(x,u,\lambda,\rho,t) = L(x,u,t)+\lambda^Tf(x,u,t)$$
 $$
 \begin{eqnarray}
   \dot\lambda = - \left(\frac{\partial{H}}{\partial{x}}\right)^T,\\
-  \lambda(t_0)=0,\\
-  \lambda(t_f)=0,\\
   \frac{\partial H}{\partial u}(x,u,\lambda,\rho,t)=0
 \end{eqnarray}
 $$
