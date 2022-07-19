@@ -19,8 +19,8 @@ $$\ddot{c} = \frac{h}{g}(c-z)$$
 $$
 \begin{eqnarray}
   \dot{x} &=& \dot{c} + \sqrt{\frac{h}{g}}\ddot{c} \\
-  &=& \dot{c} + \sqrt{\frac{h}{g}}(c-z) \\
-  &=& \sqrt{\frac{h}{g}}(x-z) \\
+  &=& \dot{c} + \sqrt{\frac{g}{h}}(c-z) \\
+  &=& \sqrt{\frac{g}{h}}(x-z) \\
 \end{eqnarray}
 $$
 
@@ -28,7 +28,7 @@ $$
 
 $$\dot{x} = w(x-u-l)$$
 
-($w$, $l$はconst. 例えば$w=\sqrt{\frac{h}{g}}$, $l=h$)が成り立つような系において、次のような最適制御問題を考える.
+($w$, $l$はconst. 例えば$w=\sqrt{\frac{g}{h}}$, $l=h$)が成り立つような系において、次のような最適制御問題を考える.
 
 $$ u(t) = \mathrm{argmin} \frac{1}{2} \int^{T_n}_{T_0} (u(t) - u^r(t))^2 dt $$
 
