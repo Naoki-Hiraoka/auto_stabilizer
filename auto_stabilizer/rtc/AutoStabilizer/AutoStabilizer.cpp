@@ -410,7 +410,7 @@ void AutoStabilizer::moveCoords(cnoid::BodyPtr robot, const cnoid::Position& tar
 }
 
 // static function
-bool AutoStabilizer::calcReferenceParameters(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, std::vector<AutoStabilizer::LegParam>& legParams, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, AutoStabilizer::RobotState& robotState) {
+bool AutoStabilizer::calcReferenceParameters(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, std::vector<AutoStabilizer::LegParam>& legParams, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, AutoStabilizer::FullbodyState& fullbodyState) {
   {
     // FootOrigin座標系を用いてrefRobotをgenerate frameに投影しrefRobotOriginとする
     if(mode.isABCInit()){ // startAutoBalancer直後の初回
@@ -421,8 +421,8 @@ bool AutoStabilizer::calcReferenceParameters(const AutoStabilizer::ControlMode& 
       }
       refRobotOrigin->calcForwardKinematics();
       cnoid::Position refFootMidCoords = AutoStabilizer::calcRefFootMidCoords(refRobotOrigin, legParams, endEffectorParams);
-      robotState.footMidCoords = mathutil::orientCoordToAxis(refFootMidCoords, cnoid::Vector3::UnitZ()); // 初期化
-      AutoStabilizer::moveCoords(refRobotOrigin, robotState.footMidCoords, refFootMidCoords);
+      fullbodyState.footMidCoords = mathutil::orientCoordToAxis(refFootMidCoords, cnoid::Vector3::UnitZ()); // 初期化
+      AutoStabilizer::moveCoords(refRobotOrigin, fullbodyState.footMidCoords, refFootMidCoords);
       for(int i=0;i<refRobotOrigin->numJoints();i++){
         refRobotOrigin->joint(i)->q() = refRobot->joint(i)->q();
       }
@@ -440,7 +440,7 @@ bool AutoStabilizer::calcReferenceParameters(const AutoStabilizer::ControlMode& 
     }
     refRobotOrigin->calcForwardKinematics();
     cnoid::Position refFootMidCoords = AutoStabilizer::calcRefFootMidCoords(refRobotOrigin, legParams, endEffectorParams);
-    AutoStabilizer::moveCoords(refRobotOrigin, robotState.footMidCoords, refFootMidCoords); // 1周期前のrobotState.footMidCoordsを使っているが、robotState.footMidCoordsは不連続に変化するものではないのでよい
+    AutoStabilizer::moveCoords(refRobotOrigin, fullbodyState.footMidCoords, refFootMidCoords); // 1周期前のfullbodyState.footMidCoordsを使っているが、fullbodyState.footMidCoordsは不連続に変化するものではないのでよい
     refRobotOrigin->calcForwardKinematics();
     refRobotOrigin->calcCenterOfMass();
   }
@@ -449,8 +449,8 @@ bool AutoStabilizer::calcReferenceParameters(const AutoStabilizer::ControlMode& 
     // 各エンドエフェクタのreferenceの位置・力を計算
     for(int i=0;i<endEffectorParams.size(); i++){
       endEffectorParams[i].refPose = refRobotOrigin->link(endEffectorParams[i].parentLink)->T() * endEffectorParams[i].localT;
-      endEffectorParams[i].refWrench.head<3>() = robotState.footMidCoords.linear() * endEffectorParams[i].refWrenchOrigin.head<3>();
-      endEffectorParams[i].refWrench.tail<3>() = robotState.footMidCoords.linear() * endEffectorParams[i].refWrenchOrigin.tail<3>();
+      endEffectorParams[i].refWrench.head<3>() = fullbodyState.footMidCoords.linear() * endEffectorParams[i].refWrenchOrigin.head<3>();
+      endEffectorParams[i].refWrench.tail<3>() = fullbodyState.footMidCoords.linear() * endEffectorParams[i].refWrenchOrigin.tail<3>();
     }
   }
   return true;
@@ -498,10 +498,15 @@ bool AutoStabilizer::calcActualParameters(const AutoStabilizer::ControlMode& mod
     for(int i=0;i<endEffectorParams.size(); i++){
       endEffectorParams[i].actPose = actRobotOrigin->link(endEffectorParams[i].parentLink)->T() * endEffectorParams[i].localT;
       if(endEffectorParams[i].forceSensor != ""){
-        cnoid::Vector6 senF = actRobotOrigin->findDevice<cnoid::ForceSensor>(endEffectorParams[i].forceSensor)->F();
-        // endEffectorParams[i].actWrench.head<3>() = robotState.footMidCoords.linear() * endEffectorParams[i].refWrenchOrigin.head<3>();
-        // endEffectorParams[i].actWrench.tail<3>() = robotState.footMidCoords.linear() * endEffectorParams[i].refWrenchOrigin.tail<3>();
-        // TODO ここから
+        cnoid::ForceSensorPtr sensor = actRobotOrigin->findDevice<cnoid::ForceSensor>(endEffectorParams[i].forceSensor);
+        cnoid::Vector6 senF = sensor->F();
+        cnoid::Position senPose = sensor->link()->T() * sensor->T_local();
+        cnoid::Position eefTosenPose = endEffectorParams[i].actPose.inverse() * senPose;
+        cnoid::Vector6 eefF; // endeffector frame. endeffector origin.
+        eefF.head<3>() = eefTosenPose.linear() * senF.head<3>();
+        eefF.tail<3>() = eefTosenPose.linear() * senF.tail<3>() + eefTosenPose.translation().cross(eefF.head<3>());
+        endEffectorParams[i].actWrench.head<3>() = endEffectorParams[i].actPose.linear() * eefF.head<3>();
+        endEffectorParams[i].actWrench.tail<3>() = endEffectorParams[i].actPose.linear() * eefF.tail<3>();
       }
     }
   }
@@ -509,8 +514,8 @@ bool AutoStabilizer::calcActualParameters(const AutoStabilizer::ControlMode& mod
 }
 
 // static function
-bool AutoStabilizer::execAutoBalancer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, std::vector<AutoStabilizer::LegParam>& legParams, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, AutoStabilizer::RobotState& robotState) {
-  AutoStabilizer::calcReferenceParameters(mode, refRobot, refRobotOrigin, legParams, endEffectorParams, robotState);
+bool AutoStabilizer::execAutoBalancer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, std::vector<AutoStabilizer::LegParam>& legParams, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, AutoStabilizer::FullbodyState& fullbodyState) {
+  AutoStabilizer::calcReferenceParameters(mode, refRobot, refRobotOrigin, legParams, endEffectorParams, fullbodyState);
   
   return true;
 }
@@ -645,7 +650,7 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
   if(!this->mode_.isABCRunning()) {
     AutoStabilizer::passThroughReference(this->refRobot_, this->genRobot_);
   }else{
-    AutoStabilizer::execAutoBalancer(this->mode_, this->refRobot_, this->refRobotOrigin_, this->legParams_, this->endEffectorParams_, this->robotState_);
+    AutoStabilizer::execAutoBalancer(this->mode_, this->refRobot_, this->refRobotOrigin_, this->legParams_, this->endEffectorParams_, this->fullbodyState_);
     if(!this->mode_.isSTRunning()) {
       AutoStabilizer::execStabilizer();
     }
