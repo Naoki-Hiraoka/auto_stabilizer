@@ -5,7 +5,7 @@
 #include <iostream>
 #include <Eigen/Eigen>
 
-namespace footguided{
+namespace footguidedcontroller{
   template <typename T>
   class LinearTrajectory
   {
@@ -16,7 +16,8 @@ namespace footguided{
     LinearTrajectory(const T& _start, const T& _goal, const double _t)
       : start(_start), goal(_goal) {
       time = std::max(_t, 0.0);
-      a = (time==0)? 0.0 : (_goal - _start) / time;
+      if(time==0) a = _start*0.0;
+      else a = (_goal - _start) / time;
     };
     const T& getSlope() const { return a; };
     const T& getStart() const { return start; };
@@ -31,8 +32,8 @@ namespace footguided{
     x(T) = u^r(T) + l
     u^r = std::vector<LinearTrajectory>
   */
-  template <typename T> T calcFootGuidedControl(const T& w, const T& l, const T& x0, const std::vector<LinearTrajectory<T> >& ur_) {
-    // ur_のサイズは1以上でなければならない
+  // ur_のサイズは1以上でなければならない. ur_にtime=0の要素があっても、startとgoalが同じなら破綻しない
+  template <typename T> T calcFootGuidedControl(const double& w, const T& l, const T& x0, const std::vector<LinearTrajectory<T> >& ur_) {
     const int n = ur_.size();
 
     std::vector<LinearTrajectory<T> > ur;
@@ -41,7 +42,7 @@ namespace footguided{
     std::copy(ur_.begin(), ur_.end(), std::back_inserter(ur)); // j=1 ~ j=n
     ur.push_back(LinearTrajectory<T>(ur_.back().getGoal(),ur_.back().getGoal(), 0.0)); // j=n+1
 
-    T u = w*0.0;
+    T u = x0*0.0;
     double Tj = 0.0;
     for(int j=0;j<=n;j++){
       Tj += ur.at(j).getTime();
@@ -51,7 +52,7 @@ namespace footguided{
     return ur[1].getStart() + 2 / (1 - exp(-2 * w * Tj)) * u;
   };
 
-  template <typename T> void updateState(const T& w, const T& l, const T& c, const T& dc, const T& u, double m, double dt,
+  template <typename T> void updateState(const double& w, const T& l, const T& c, const T& dc, const T& u, double m, double dt,
                                          T& o_c, T& o_dc, T& o_f/*uから受ける力*/) {
     o_c = c + dc * dt;
     o_dc = dc + w * w * (c - u - l) * dt;

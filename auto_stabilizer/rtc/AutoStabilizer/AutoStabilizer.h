@@ -31,6 +31,7 @@
 
 #include "AutoStabilizerService_impl.h"
 #include "FootGuidedController.h"
+#include "LegCoordsGenerator.h"
 
 class AutoStabilizer : public RTC::DataFlowComponentBase{
 public:

@@ -27,6 +27,7 @@ include_directories(
 add_library(AutoStabilizer SHARED
   AutoStabilizer.cpp
   AutoStabilizerService_impl.cpp
+  LegCoordsGenerator.cpp
   )
 target_link_libraries(AutoStabilizer
   ${catkin_LIBRARIES}
