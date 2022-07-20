@@ -25,10 +25,32 @@ namespace mathutil {
     return ret;
   }
 
+  inline Eigen::Vector3d calcMidPos(const std::vector<Eigen::Vector3d>& coords, const std::vector<double>& weights){
+    // coordsとweightsのサイズは同じでなければならない
+    double sumWeight = 0.0;
+    Eigen::Vector3d midpos = Eigen::Vector3d::Zero();
+
+    for(int i=0;i<coords.size();i++){
+      midpos = (midpos*sumWeight + coords[i]*weights[i]).eval();
+      sumWeight += weights[i];
+    }
+    return midpos;
+  }
+  inline Eigen::Matrix3d calcMidRot(const std::vector<Eigen::Matrix3d>& coords, const std::vector<double>& weights){
+    // coordsとweightsのサイズは同じでなければならない
+    double sumWeight = 0.0;
+    Eigen::Quaterniond midrot = Eigen::Quaterniond::Identity();
+
+    for(int i=0;i<coords.size();i++){
+      midrot = midrot.slerp(weights[i]/(sumWeight+weights[i]),Eigen::Quaterniond(coords[i]));
+      sumWeight += weights[i];
+    }
+    return midrot.toRotationMatrix();
+  }
   inline Eigen::Transform<double, 3, Eigen::AffineCompact> calcMidCoords(const std::vector<Eigen::Transform<double, 3, Eigen::AffineCompact>>& coords, const std::vector<double>& weights){
     // coordsとweightsのサイズは同じでなければならない
     double sumWeight = 0.0;
-    cnoid::Position midCoords = cnoid::Position::Identity();
+    Eigen::Transform<double, 3, Eigen::AffineCompact> midCoords = Eigen::Transform<double, 3, Eigen::AffineCompact>::Identity();
 
     for(int i=0;i<coords.size();i++){
       midCoords.translation() = (midCoords.translation()*sumWeight + coords[i].translation()*weights[i]).eval();
