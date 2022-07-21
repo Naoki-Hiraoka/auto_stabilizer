@@ -28,6 +28,7 @@ add_library(AutoStabilizer SHARED
   AutoStabilizer.cpp
   AutoStabilizerService_impl.cpp
   LegCoordsGenerator.cpp
+  FootStepGenerator.cpp
   )
 target_link_libraries(AutoStabilizer
   ${catkin_LIBRARIES}

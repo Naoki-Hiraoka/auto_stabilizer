@@ -252,14 +252,14 @@ protected:
   // utility functions
   bool getProperty(const std::string& key, std::string& ret);
 
-  static bool readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobot, cnoid::BodyPtr actRobot, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams);
-  static bool passThroughReference(cnoid::BodyPtr refRobot, cnoid::BodyPtr genRobot);
-  static cnoid::Position calcRefFootMidCoords(const cnoid::BodyPtr refRobotOrigin, const std::vector<AutoStabilizer::LegParam>& legParams, const std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams);
+  static bool copyRobotState(cnoid::BodyPtr inRobot, cnoid::BodyPtr outRobot);
   static void moveCoords(cnoid::BodyPtr robot, const cnoid::Position& target, const cnoid::Position& at);
-  static bool calcReferenceParameters(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, std::vector<AutoStabilizer::LegParam>& legParams, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, AutoStabilizer::FullbodyState& fullbodyState);
-  static bool calcActualParameters(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, std::vector<AutoStabilizer::LegParam>& legParams, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams);
-  static bool calcFootSteps(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobotOrigin, const cnoid::BodyPtr& actRobotOrigin, cnoid::BodyPtr& genRobot, std::vector<AutoStabilizer::LegParam>& legParams, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, AutoStabilizer::FullbodyState& fullbodyState, GaitParam& gaitParam);
-  static bool execAutoBalancer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, std::vector<AutoStabilizer::LegParam>& legParams, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, AutoStabilizer::FullbodyState& fullbodyState, GaitParam& gaitParam);
+
+  static bool readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobot, cnoid::BodyPtr actRobot, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams);
+  static cnoid::Position calcRefFootMidCoords(const cnoid::BodyPtr refRobotOrigin, const std::vector<AutoStabilizer::LegParam>& legParams, const std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams);
+  static bool calcReferenceParameters(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, cnoid::BodyPtr& genRobot, std::vector<AutoStabilizer::LegParam>& legParams, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, AutoStabilizer::FullbodyState& fullbodyState);
+  static bool calcActualParameters(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, std::vector<AutoStabilizer::LegParam>& legParams, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, GaitParam& gaitParam, double dt);
+  static bool execAutoBalancer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, cnoid::BodyPtr& genRobot, std::vector<AutoStabilizer::LegParam>& legParams, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, AutoStabilizer::FullbodyState& fullbodyState, GaitParam& gaitParam, double dt);
   static bool execStabilizer();
   class FullbodyIKParam {
   public:
@@ -273,8 +273,7 @@ protected:
   static bool solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::BodyPtr& refRobot, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, AutoStabilizer::FullbodyIKParam& fullbodyIKParam, const std::vector<cnoid::LinkPtr>& controllableJoints, double dt);
   class OutputOffsetInterpolators {
   public:
-    cpp_filters::TwoPointInterpolator<cnoid::Vector3> genBasePosInterpolator = cpp_filters::TwoPointInterpolator<cnoid::Vector3>(cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::HOFFARBIB);
-    cpp_filters::TwoPointInterpolatorSO3 genBaseRInterpolator = cpp_filters::TwoPointInterpolatorSO3(cnoid::Matrix3::Identity(),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::HOFFARBIB);
+    cpp_filters::TwoPointInterpolatorSE3 genBasePoseInterpolator = cpp_filters::TwoPointInterpolatorSE3(cnoid::Position::Identity(),cnoid::Vector6::Zero(),cnoid::Vector6::Zero(),cpp_filters::HOFFARBIB);
     std::vector<cpp_filters::TwoPointInterpolator<double> > qInterpolator; // 要素数はrobot->numJoints(). jointIdの順
     std::vector<cpp_filters::TwoPointInterpolator<double> > genTauInterpolator; // 要素数はrobot->numJoints(). jointIdの順
   };

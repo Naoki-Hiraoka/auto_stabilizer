@@ -82,7 +82,7 @@ namespace legcoordsgenerator{
     }
 
     // genCoordsを進める
-    for(int i=0;i<2;i++){
+    for(int i=0;i<NUM_LEGS;i++){
       if(gaitParam.footstepNodesList[0].remainTime <= gaitParam.footstepNodesList[0].supportTime[i]) { // 支持脚
         cnoid::Position nextCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{gaitParam.genCoords[i].value(),gaitParam.footstepNodesList[0].dstCoords[i]},
                                              std::vector<double>{std::max(0.0,gaitParam.footstepNodesList[0].remainTime - dt), dt}); // このfootstepNode終了時にdstCoordsに行くように線形補間
@@ -129,7 +129,7 @@ namespace legcoordsgenerator{
     // footstepNodesListを進める
     gaitParam.footstepNodesList[0].remainTime = std::max(0.0, gaitParam.footstepNodesList[0].remainTime - dt);
     if(gaitParam.footstepNodesList[0].remainTime <= 0.0 && gaitParam.footstepNodesList.size() > 1){
-      for(int i=0;i<2;i++){
+      for(int i=0;i<NUM_LEGS;i++){
         gaitParam.srcCoords[i] = gaitParam.genCoords[i].value();
       }
       gaitParam.footstepNodesList.erase(gaitParam.footstepNodesList.begin()); // vectorではなくlistにするべき?
