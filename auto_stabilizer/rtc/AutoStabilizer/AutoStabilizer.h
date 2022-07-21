@@ -259,18 +259,18 @@ protected:
   static cnoid::Position calcRefFootMidCoords(const cnoid::BodyPtr refRobotOrigin, const std::vector<AutoStabilizer::LegParam>& legParams, const std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams);
   static bool calcReferenceParameters(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, cnoid::BodyPtr& genRobot, std::vector<AutoStabilizer::LegParam>& legParams, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, AutoStabilizer::FullbodyState& fullbodyState);
   static bool calcActualParameters(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, std::vector<AutoStabilizer::LegParam>& legParams, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, GaitParam& gaitParam, double dt);
-  static bool execAutoBalancer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, cnoid::BodyPtr& genRobot, std::vector<AutoStabilizer::LegParam>& legParams, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, AutoStabilizer::FullbodyState& fullbodyState, GaitParam& gaitParam, double dt);
-  static bool execStabilizer();
+  static bool execAutoBalancer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, cnoid::BodyPtr& genRobot, std::vector<AutoStabilizer::LegParam>& legParams, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, AutoStabilizer::FullbodyState& fullbodyState, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams);
+  static bool execStabilizer(std::vector<EndEffectorParam>& endEffectorParams);
   class FullbodyIKParam {
   public:
-    cnoid::VectorX jlim_avoid_weight_old;
-    std::unordered_map<cnoid::LinkPtr,std::shared_ptr<IK::JointAngleConstraint> > refJointAngleConstraint;
-    std::shared_ptr<IK::PositionConstraint> rootPositionConstraint;
-    std::shared_ptr<IK::COMConstraint> comConstraint;
-    std::shared_ptr<IK::AngularMomentumConstraint> angularMomentumConstraint;
+    cnoid::VectorX jlim_avoid_weight;
+    std::vector<std::shared_ptr<IK::JointAngleConstraint> > refJointAngleConstraint;
+    std::shared_ptr<IK::PositionConstraint> rootPositionConstraint = std::make_shared<IK::PositionConstraint>();
+    std::shared_ptr<IK::COMConstraint> comConstraint = std::make_shared<IK::COMConstraint>();
+    std::shared_ptr<IK::AngularMomentumConstraint> angularMomentumConstraint = std::make_shared<IK::AngularMomentumConstraint>();
   };
   FullbodyIKParam fullbodyIKParam_;
-  static bool solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::BodyPtr& refRobot, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, AutoStabilizer::FullbodyIKParam& fullbodyIKParam, const std::vector<cnoid::LinkPtr>& controllableJoints, double dt);
+  static bool solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::BodyPtr& refRobotOrigin, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, AutoStabilizer::FullbodyIKParam& fullbodyIKParam, double dt, const std::vector<JointParam>& jointParams, const GaitParam& gaitParam);
   class OutputOffsetInterpolators {
   public:
     cpp_filters::TwoPointInterpolatorSE3 genBasePoseInterpolator = cpp_filters::TwoPointInterpolatorSE3(cnoid::Position::Identity(),cnoid::Vector6::Zero(),cnoid::Vector6::Zero(),cpp_filters::HOFFARBIB);

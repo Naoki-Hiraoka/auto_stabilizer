@@ -203,6 +203,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
       double climit = 0.0, gearRatio = 0.0, torqueConst = 0.0;
       joint->info()->read("climit",climit); joint->info()->read("gearRatio",gearRatio); joint->info()->read("torqueConst",torqueConst);
       param.maxTorque = climit * gearRatio * torqueConst;
+      param.controllable = true;
       this->jointParams_.push_back(param);
     }
 
@@ -543,7 +544,7 @@ bool AutoStabilizer::calcActualParameters(const AutoStabilizer::ControlMode& mod
 }
 
 // static function
-bool AutoStabilizer::execAutoBalancer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, cnoid::BodyPtr& genRobot, std::vector<AutoStabilizer::LegParam>& legParams, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, AutoStabilizer::FullbodyState& fullbodyState, GaitParam& gaitParam, double dt) {
+bool AutoStabilizer::execAutoBalancer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, cnoid::BodyPtr& genRobot, std::vector<AutoStabilizer::LegParam>& legParams, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, AutoStabilizer::FullbodyState& fullbodyState, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams) {
   AutoStabilizer::calcReferenceParameters(mode, refRobot, refRobotOrigin, genRobot, legParams, endEffectorParams, fullbodyState);
 
   if(mode.isABCInit()){ // startAutoBalancer直後の初回
@@ -589,12 +590,105 @@ bool AutoStabilizer::execAutoBalancer(const AutoStabilizer::ControlMode& mode, c
 }
 
 // static function
-bool AutoStabilizer::execStabilizer() {
+bool AutoStabilizer::execStabilizer(std::vector<EndEffectorParam>& endEffectorParams) {
+  // TODO
+  for(int i=0;i<endEffectorParams.size();i++){
+   endEffectorParams[i].stTargetPose = endEffectorParams[i].abcTargetPose;
+  }
+
   return true;
 }
 
 // static function
-bool AutoStabilizer::solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::BodyPtr& refRobot, std::vector<EndEffectorParam>& endEffectorParams, FullbodyIKParam& fullbodyIKParam, const std::vector<cnoid::LinkPtr>& controllableJoints, double dt) {
+bool AutoStabilizer::solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::BodyPtr& refRobotOrigin, std::vector<EndEffectorParam>& endEffectorParams, AutoStabilizer::FullbodyIKParam& fullbodyIKParam, double dt, const std::vector<JointParam>& jointParams, const GaitParam& gaitParam) {
+  if(fullbodyIKParam.jlim_avoid_weight.size() != 6+genRobot->numJoints()) fullbodyIKParam.jlim_avoid_weight = cnoid::VectorX::Zero(6+genRobot->numJoints());
+  cnoid::VectorX dq_weight_all = cnoid::VectorX::Zero(6+genRobot->numJoints());
+  for(int i=0;i<6;i++) dq_weight_all[i] = 1.0;
+  for(int i=0;i<jointParams.size();i++){
+    if(jointParams[i].controllable) dq_weight_all[6+i] = 1.0;
+  }
+
+  std::vector<std::shared_ptr<IK::IKConstraint> > ikConstraint;
+
+  // EEF
+  for(int i=0;i<endEffectorParams.size();i++){
+    endEffectorParams[i].ikPositionConstraint->A_link() = genRobot->link(endEffectorParams[i].parentLink);
+    endEffectorParams[i].ikPositionConstraint->A_localpos() = endEffectorParams[i].localT;
+    endEffectorParams[i].ikPositionConstraint->B_link() = nullptr;
+    endEffectorParams[i].ikPositionConstraint->B_localpos() = endEffectorParams[i].stTargetPose;
+    endEffectorParams[i].ikPositionConstraint->maxError() << 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt;
+    endEffectorParams[i].ikPositionConstraint->precision() << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0; // 強制的にIKをmax loopまで回す
+    if(i<NUM_LEGS) endEffectorParams[i].ikPositionConstraint->weight() << 9.0, 9.0, 9.0, 9.0, 9.0, 9.0;
+    else endEffectorParams[i].ikPositionConstraint->weight() << 1.0, 1.0, 1.0, 1.0, 1.0, 1.0;
+    endEffectorParams[i].ikPositionConstraint->eval_link() = nullptr;
+    endEffectorParams[i].ikPositionConstraint->eval_localR() = endEffectorParams[i].ikPositionConstraint->B_localpos().linear();
+    ikConstraint.push_back(endEffectorParams[i].ikPositionConstraint);
+  }
+
+  // COM
+  {
+    fullbodyIKParam.comConstraint->A_robot() = genRobot;
+    fullbodyIKParam.comConstraint->A_localp() = cnoid::Vector3::Zero();
+    fullbodyIKParam.comConstraint->B_robot() = nullptr;
+    fullbodyIKParam.comConstraint->B_localp() = gaitParam.genCog;
+    fullbodyIKParam.comConstraint->maxError() << 10.0*dt, 10.0*dt, 10.0*dt;
+    fullbodyIKParam.comConstraint->precision() << 0.0, 0.0, 0.0; // 強制的にIKをmax loopまで回す
+    fullbodyIKParam.comConstraint->weight() << 3.0, 3.0, 3.0;
+    fullbodyIKParam.comConstraint->eval_R() = cnoid::Matrix3::Identity();
+    ikConstraint.push_back(fullbodyIKParam.comConstraint);
+  }
+
+  // Angular Momentum
+  {
+    fullbodyIKParam.angularMomentumConstraint->robot() = genRobot;
+    fullbodyIKParam.angularMomentumConstraint->targetAngularMomentum() = cnoid::Vector3::Zero(); // TODO
+    fullbodyIKParam.angularMomentumConstraint->maxError() << 1.0*dt, 1.0*dt, 1.0*dt;
+    fullbodyIKParam.angularMomentumConstraint->precision() << 0.0, 0.0, 0.0; // 強制的にIKをmax loopまで回す
+    fullbodyIKParam.angularMomentumConstraint->weight() << 1e-4, 1e-4, 0.0; // TODO
+    fullbodyIKParam.angularMomentumConstraint->dt() = dt;
+    fullbodyIKParam.comConstraint->eval_R() = cnoid::Matrix3::Identity();
+    ikConstraint.push_back(fullbodyIKParam.angularMomentumConstraint);
+  }
+
+  // root
+  {
+    fullbodyIKParam.rootPositionConstraint->A_link() = genRobot->rootLink();
+    fullbodyIKParam.rootPositionConstraint->A_localpos() = cnoid::Position::Identity();
+    fullbodyIKParam.rootPositionConstraint->B_link() = nullptr;
+    fullbodyIKParam.rootPositionConstraint->B_localpos() = refRobotOrigin->rootLink()->T();
+    fullbodyIKParam.rootPositionConstraint->maxError() << 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt;
+    fullbodyIKParam.rootPositionConstraint->precision() << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0; // 強制的にIKをmax loopまで回す
+    fullbodyIKParam.rootPositionConstraint->weight() << 0.0, 0.0, 0.0, 1e-1, 1e-1, 1e-1;
+    fullbodyIKParam.rootPositionConstraint->eval_link() = nullptr;
+    fullbodyIKParam.rootPositionConstraint->eval_localR() = cnoid::Matrix3::Identity();
+    ikConstraint.push_back(fullbodyIKParam.rootPositionConstraint);
+  }
+
+  // reference angle
+  {
+    if(fullbodyIKParam.refJointAngleConstraint.size() != genRobot->numJoints()) { // 初回
+      fullbodyIKParam.refJointAngleConstraint.clear();
+      for(size_t i=0;i<genRobot->numJoints();i++) fullbodyIKParam.refJointAngleConstraint.push_back(std::make_shared<IK::JointAngleConstraint>());
+    }
+    for(size_t i=0;i<genRobot->numJoints();i++){
+      if(!jointParams[i].controllable) continue;
+      fullbodyIKParam.refJointAngleConstraint[i]->joint() = genRobot->joint(i);
+      fullbodyIKParam.refJointAngleConstraint[i]->maxError() = 10.0 * dt; // 高優先度のmaxError以下にしないと優先度逆転するおそれ
+      fullbodyIKParam.refJointAngleConstraint[i]->weight() = 1e-1; // 小さい値すぎると、qp終了判定のtoleranceによって無視されてしまう
+      fullbodyIKParam.refJointAngleConstraint[i]->targetq() = refRobotOrigin->joint(i)->q();
+      ikConstraint.push_back(fullbodyIKParam.refJointAngleConstraint[i]);
+    }
+  }
+
+  for(int i=0;i<ikConstraint.size();i++) ikConstraint[i]->debuglevel() = 0; //debuglevel
+  fik::solveFullbodyIKLoopFast(genRobot,
+                               ikConstraint,
+                               fullbodyIKParam.jlim_avoid_weight,
+                               dq_weight_all,
+                               1,//loop
+                               1e-6,
+                               0 //debug
+                               );
   return true;
 }
 
@@ -715,11 +809,9 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
   if(!this->mode_.isABCRunning()) {
     AutoStabilizer::copyRobotState(this->refRobot_, this->genRobot_);
   }else{
-    AutoStabilizer::execAutoBalancer(this->mode_, this->refRobot_, this->refRobotOrigin_, this->actRobot_, this->actRobotOrigin_, this->genRobot_, this->legParams_, this->endEffectorParams_, this->fullbodyState_, this->gaitParam_, this->dt_);
-    if(!this->mode_.isSTRunning()) {
-      AutoStabilizer::execStabilizer();
-    }
-    //AutoStabilizer::solveFullbodyIK();
+    AutoStabilizer::execAutoBalancer(this->mode_, this->refRobot_, this->refRobotOrigin_, this->actRobot_, this->actRobotOrigin_, this->genRobot_, this->legParams_, this->endEffectorParams_, this->fullbodyState_, this->gaitParam_, this->dt_, this->jointParams_);
+    AutoStabilizer::execStabilizer(this->endEffectorParams_);
+    AutoStabilizer::solveFullbodyIK(this->genRobot_, this->refRobotOrigin_, this->endEffectorParams_, this->fullbodyIKParam_, this->dt_, this->jointParams_, this->gaitParam_);
   }
 
   AutoStabilizer::writeOutPortData(this->ports_, this->genRobot_, this->mode_, this->outputOffsetInterpolators_, this->dt_);
