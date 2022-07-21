@@ -32,7 +32,7 @@ namespace footguidedcontroller{
     x(T) = u^r(T) + l
     u^r = std::vector<LinearTrajectory>
   */
-  // ur_のサイズは1以上でなければならない. ur_にtime=0の要素があっても、startとgoalが同じなら破綻しない
+  // ur_のサイズは1以上でなければならない. ur_にtime=0の要素があっても、その要素のstartとgoalが同じなら破綻しない. ただし、ur_のtimeの和が0だと破綻する
   template <typename T> T calcFootGuidedControl(const double& w, const T& l, const T& x0, const std::vector<LinearTrajectory<T> >& ur_) {
     const int n = ur_.size();
 

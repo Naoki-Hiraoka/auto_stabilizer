@@ -10,8 +10,7 @@
 #include "FootStepGenerator.h"
 #include <limits>
 
-#define DEBUGP (loop%200==0)
-#define DEBUGP_ONCE (loop==0)
+#define DEBUG false
 
 static const char* AutoStabilizer_spec[] = {
   "implementation_id", "AutoStabilizer",
@@ -415,7 +414,7 @@ void AutoStabilizer::moveCoords(cnoid::BodyPtr robot, const cnoid::Position& tar
 }
 
 // static function
-bool AutoStabilizer::calcReferenceParameters(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, cnoid::BodyPtr& genRobot, std::vector<AutoStabilizer::LegParam>& legParams, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, AutoStabilizer::FullbodyState& fullbodyState) {
+bool AutoStabilizer::calcReferenceParameters(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, cnoid::BodyPtr& genRobot, std::vector<AutoStabilizer::LegParam>& legParams, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, AutoStabilizer::FullbodyState& fullbodyState, GaitParam& gaitParam) {
   // FootOrigin座標系を用いてrefRobotをgenerate frameに投影しrefRobotOriginとする
   {
     if(mode.isABCInit()){ // startAutoBalancer直後の初回
@@ -460,13 +459,21 @@ bool AutoStabilizer::calcReferenceParameters(const AutoStabilizer::ControlMode& 
     }
   }
 
+  {
+    // 重心高さ
+    gaitParam.dz = refRobotOrigin->centerOfMass()[2] - fullbodyState.footMidCoords.value().translation()[2];
+  }
+
   if(mode.isABCInit()){ // startAutoBalancer直後の初回
     // genRobotの姿勢を初期化する
     AutoStabilizer::copyRobotState(refRobotOrigin, genRobot);
     for(int i=0;i<endEffectorParams.size();i++){
       endEffectorParams[i].abcTargetPose = genRobot->link(endEffectorParams[i].parentLink)->T()*endEffectorParams[i].localT;
     }
+    gaitParam.genCog = genRobot->centerOfMass();
+    gaitParam.genCogVel = cnoid::Vector3::Zero();
   }
+
   return true;
 }
 
@@ -545,7 +552,7 @@ bool AutoStabilizer::calcActualParameters(const AutoStabilizer::ControlMode& mod
 
 // static function
 bool AutoStabilizer::execAutoBalancer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, cnoid::BodyPtr& genRobot, std::vector<AutoStabilizer::LegParam>& legParams, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, AutoStabilizer::FullbodyState& fullbodyState, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams) {
-  AutoStabilizer::calcReferenceParameters(mode, refRobot, refRobotOrigin, genRobot, legParams, endEffectorParams, fullbodyState);
+  AutoStabilizer::calcReferenceParameters(mode, refRobot, refRobotOrigin, genRobot, legParams, endEffectorParams, fullbodyState, gaitParam);
 
   if(mode.isABCInit()){ // startAutoBalancer直後の初回
     {
@@ -680,7 +687,7 @@ bool AutoStabilizer::solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::Body
     }
   }
 
-  for(int i=0;i<ikConstraint.size();i++) ikConstraint[i]->debuglevel() = 0; //debuglevel
+  for(int i=0;i<ikConstraint.size();i++) ikConstraint[i]->debuglevel() = 0.0; //debuglevel
   fik::solveFullbodyIKLoopFast(genRobot,
                                ikConstraint,
                                fullbodyIKParam.jlim_avoid_weight,

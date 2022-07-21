@@ -1,6 +1,8 @@
 #include "LegCoordsGenerator.h"
 #include "MathUtil.h"
 
+#define DEBUG true
+
 namespace legcoordsgenerator{
 
   void calcLegCoords(GaitParam& gaitParam, double dt){
@@ -72,6 +74,8 @@ namespace legcoordsgenerator{
           remainTime = 0.0;
         }
       }
+      // 末尾に1sぶん加える. そうしないと終端条件が厳しすぎる
+      gaitParam.refZmpTraj.push_back(footguidedcontroller::LinearTrajectory<cnoid::Vector3>(gaitParam.refZmpTraj.back().getGoal(),gaitParam.refZmpTraj.back().getGoal(), 1.0));
       // dtだけ進める
       if(gaitParam.refZmpTraj[0].getTime() <= dt){
         if(gaitParam.refZmpTraj.size() > 1) gaitParam.refZmpTraj.erase(gaitParam.refZmpTraj.begin());
@@ -85,7 +89,7 @@ namespace legcoordsgenerator{
     for(int i=0;i<NUM_LEGS;i++){
       if(gaitParam.footstepNodesList[0].remainTime <= gaitParam.footstepNodesList[0].supportTime[i]) { // 支持脚
         cnoid::Position nextCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{gaitParam.genCoords[i].value(),gaitParam.footstepNodesList[0].dstCoords[i]},
-                                             std::vector<double>{std::max(0.0,gaitParam.footstepNodesList[0].remainTime - dt), dt}); // このfootstepNode終了時にdstCoordsに行くように線形補間
+                                                             std::vector<double>{std::max(0.0,gaitParam.footstepNodesList[0].remainTime - dt), dt}); // このfootstepNode終了時にdstCoordsに行くように線形補間
         gaitParam.genCoords[i].reset(nextCoords);
       }else{ // 遊脚
         double swingTime = gaitParam.footstepNodesList[0].remainTime - gaitParam.footstepNodesList[0].supportTime[i];

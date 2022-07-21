@@ -27,9 +27,9 @@ public:
   }
 
   // param
-  std::vector<cnoid::Vector3> copOffset; // 要素数2. rleg: 0. lleg: 1. leg frame. 足裏COPの目標位置. 幾何的な位置はcopOffset無しで考えるが、目標COPを考えるときはcopOffsetを考慮する
+  std::vector<cnoid::Vector3> copOffset = std::vector<cnoid::Vector3>{cnoid::Vector3::Zero(),cnoid::Vector3::Zero()}; // 要素数2. rleg: 0. lleg: 1. leg frame. 足裏COPの目標位置. 幾何的な位置はcopOffset無しで考えるが、目標COPを考えるときはcopOffsetを考慮する
   std::vector<std::vector<cnoid::Vector2> > legPolygon; // 要素数2. rleg: 0. lleg: 1. leg frame.
-  double dz; // generate frame. 支持脚からのCogの目標高さ. 0より大きい
+  double dz = 1.0; // generate frame. 支持脚からのCogの目標高さ. 0より大きい
 
   cnoid::Vector3 actCog; // generate frame.  現在のCOM
   cpp_filters::FirstOrderLowPassFilter<cnoid::Vector3> actCogVel = cpp_filters::FirstOrderLowPassFilter<cnoid::Vector3>(4.0, cnoid::Vector3::Zero());  // generate frame.  現在のCOM速度
@@ -37,8 +37,8 @@ public:
   cnoid::Vector3 genCogVel;  // generate frame.  現在のCOM速度
 
   // 遊脚軌道用パラメータ
-  double delayTimeOffset; // 0以上. swing期は、remainTime - supportTime - delayTimeOffset後にdstCoordsに到達するようなrectangle軌道を生成し、その軌道にdelayTimeOffset遅れで滑らかに追従するような軌道を生成する
-  double touchVel; // 0より大きい. 足を下ろすときの速さ
+  double delayTimeOffset = 0.2; // 0以上. swing期は、remainTime - supportTime - delayTimeOffset後にdstCoordsに到達するようなrectangle軌道を生成し、その軌道にdelayTimeOffset遅れで滑らかに追従するような軌道を生成する
+  double touchVel = 0.5; // 0より大きい. 足を下ろすときの速さ
   //cnoid::Vector3 goal_off; // TODO
 
   // 足配置決定用パラメータ

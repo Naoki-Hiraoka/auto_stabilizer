@@ -31,7 +31,8 @@ namespace mathutil {
     Eigen::Vector3d midpos = Eigen::Vector3d::Zero();
 
     for(int i=0;i<coords.size();i++){
-      midpos = (midpos*sumWeight + coords[i]*weights[i]).eval();
+      if(weights[i]<=0) continue;
+      midpos = ((midpos*sumWeight + coords[i]*weights[i])/(sumWeight+weights[i])).eval();
       sumWeight += weights[i];
     }
     return midpos;
@@ -42,6 +43,7 @@ namespace mathutil {
     Eigen::Quaterniond midrot = Eigen::Quaterniond::Identity();
 
     for(int i=0;i<coords.size();i++){
+      if(weights[i]<=0) continue;
       midrot = midrot.slerp(weights[i]/(sumWeight+weights[i]),Eigen::Quaterniond(coords[i]));
       sumWeight += weights[i];
     }
@@ -53,7 +55,8 @@ namespace mathutil {
     Eigen::Transform<double, 3, Eigen::AffineCompact> midCoords = Eigen::Transform<double, 3, Eigen::AffineCompact>::Identity();
 
     for(int i=0;i<coords.size();i++){
-      midCoords.translation() = (midCoords.translation()*sumWeight + coords[i].translation()*weights[i]).eval();
+      if(weights[i]<=0) continue;
+      midCoords.translation() = ((midCoords.translation()*sumWeight + coords[i].translation()*weights[i])/(sumWeight+weights[i])).eval();
       midCoords.linear() = Eigen::Quaterniond(midCoords.linear()).slerp(weights[i]/(sumWeight+weights[i]),Eigen::Quaterniond(coords[i].linear())).toRotationMatrix();
       sumWeight += weights[i];
     }
