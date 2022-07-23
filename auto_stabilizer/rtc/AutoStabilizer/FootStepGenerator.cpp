@@ -21,7 +21,7 @@ bool FootStepGenerator::setFootSteps(const GaitParam& gaitParam, const std::vect
   // footstepNodesList[0]終了時にswing状態の足をfootstepNodesList[1]開始時にsupportにする必要がある場合は、footstepNodesList[0]の直後に両脚が横に並ぶ位置に一歩歩いてその足を下ろすnodeが挿入される.
   if((!GaitParam::isSupportPhaseEnd(footstepNodesList[0],RLEG) && footsteps[1].l_r == LLEG) || // RLEGを下ろす必要がある
      (!GaitParam::isSupportPhaseEnd(footstepNodesList[0],LLEG) && footsteps[1].l_r == RLEG)) { // LLEGを下ろす必要がある.
-    GaitParam::FootStepNodes fs = this->calcDefaultNextStep(footstepNodesList[0]);
+    GaitParam::FootStepNodes fs = this->calcDefaultNextStep(footstepNodesList[0], gaitParam.defaultTranslatePos);
     footstepNodesList.push_back(fs);
   }
 
@@ -78,7 +78,7 @@ bool FootStepGenerator::goStop(const GaitParam& gaitParam,
 
   // 両脚が横に並ぶ位置に2歩歩く.
   for(int i=0;i<2;i++){
-    GaitParam::FootStepNodes fs = this->calcDefaultNextStep(footstepNodesList.back());
+    GaitParam::FootStepNodes fs = this->calcDefaultNextStep(footstepNodesList.back(), gaitParam.defaultTranslatePos);
     footstepNodesList.push_back(fs);
   }
 
@@ -88,7 +88,7 @@ bool FootStepGenerator::goStop(const GaitParam& gaitParam,
 }
 
 bool FootStepGenerator::calcFootSteps(const GaitParam& gaitParam, const double& dt,
-                                      std::vector<GaitParam::FootStepNodes>& o_footstepNodesList) const{
+                                      std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords) const{
   std::vector<GaitParam::FootStepNodes> footstepNodesList;
   footstepNodesList.push_back(gaitParam.footstepNodesList[0]);
 
@@ -99,13 +99,6 @@ bool FootStepGenerator::calcFootSteps(const GaitParam& gaitParam, const double& 
     }
   }
 
-  if(this->modifyFootSteps){
-    if(this->isEmergencyStepMode){
-      // TODO
-    }
-    // TODO
-  }
-
   // goVelocityModeなら、進行方向に向けてfootStepNodesList[1] ~ footStepNodesList[goVelocityStepNum]の要素を機械的に計算してどんどん末尾appendしていく. cmdVelに応じてきまる
   if(this->isGoVelocityMode){
     cnoid::Position offset = cnoid::Position::Identity();
@@ -113,60 +106,76 @@ bool FootStepGenerator::calcFootSteps(const GaitParam& gaitParam, const double& 
     offset.translation()[1] = this->cmdVel[1] * dt;
     offset.linear() = cnoid::Matrix3(Eigen::AngleAxisd(this->cmdVel[2] * dt, cnoid::Vector3::UnitZ()));
     for(int i=footstepNodesList.size();i<=this->goVelocityStepNum; i++){
-      footstepNodesList.push_back(this->calcDefaultNextStep(footstepNodesList.back(), offset));
+      footstepNodesList.push_back(this->calcDefaultNextStep(footstepNodesList.back(), gaitParam.defaultTranslatePos, offset));
     }
   }
 
+  if(this->modifyFootSteps && this->isEmergencyStepMode){
+    // TODO
+  }
+
+  // footstepNodesList[0].remainTimeが0で、後ろにfootstepNodesが追加されたなら消す
+  std::vector<cnoid::Position> srcCoords = gaitParam.srcCoords;
+  if(footstepNodesList[0].remainTime <= 0.0 && footstepNodesList.size() > 1){
+    for(int i=0;i<NUM_LEGS;i++) srcCoords[i] = gaitParam.genCoords[i].value();
+    footstepNodesList.erase(footstepNodesList.begin()); // vectorではなくlistにするべき?
+  }
+
+  if(this->modifyFootSteps){
+    // TODO
+  }
+
   o_footstepNodesList = footstepNodesList;
+  o_srcCoords = srcCoords;
   return true;
 }
 
 
-GaitParam::FootStepNodes FootStepGenerator::calcDefaultNextStep(const GaitParam::FootStepNodes& footstepNodes, const cnoid::Position& offset) const{
+GaitParam::FootStepNodes FootStepGenerator::calcDefaultNextStep(const GaitParam::FootStepNodes& footstepNodes, const std::vector<cnoid::Vector3>& defaultTranslatePos, const cnoid::Position& offset) const{
   GaitParam::FootStepNodes fs;
   fs.remainTime = this->defaultStepTime;
   if(!GaitParam::isSupportPhaseEnd(footstepNodes, RLEG)){ // ラストのstepで右脚が浮いた状態で終わっている
     fs.dstCoords[LLEG] = footstepNodes.dstCoords[LLEG]; // RLEGをswingする
     cnoid::Position prevOrigin = mathutil::orientCoordToAxis(footstepNodes.dstCoords[LLEG], cnoid::Vector3::UnitZ());
-    prevOrigin.translation() -= prevOrigin.linear() * this->defaultTranslatePos[LLEG];
+    prevOrigin.translation() -= prevOrigin.linear() * defaultTranslatePos[LLEG];
     fs.dstCoords[RLEG] = prevOrigin * offset;
-    fs.dstCoords[RLEG].translation() += fs.dstCoords[RLEG].linear() * this->defaultTranslatePos[RLEG];
+    fs.dstCoords[RLEG].translation() += fs.dstCoords[RLEG].linear() * defaultTranslatePos[RLEG];
     fs.supportTime[LLEG] = std::numeric_limits<double>::max();
     fs.supportTime[RLEG] = this->defaultDoubleSupportTime;
     fs.stepHeight[RLEG] = {0.0,this->defaultStepHeight}; // はじめを上げない
   }else if(!GaitParam::isSupportPhaseEnd(footstepNodes, LLEG)){ // ラストのstepで左脚が浮いた状態で終わっている
     fs.dstCoords[RLEG] = footstepNodes.dstCoords[RLEG]; // LLEGをswingする
     cnoid::Position prevOrigin = mathutil::orientCoordToAxis(footstepNodes.dstCoords[RLEG], cnoid::Vector3::UnitZ());
-    prevOrigin.translation() -= prevOrigin.linear() * this->defaultTranslatePos[RLEG];
+    prevOrigin.translation() -= prevOrigin.linear() * defaultTranslatePos[RLEG];
     fs.dstCoords[LLEG] = prevOrigin * offset;
-    fs.dstCoords[LLEG].translation() += fs.dstCoords[LLEG].linear() * this->defaultTranslatePos[LLEG];
+    fs.dstCoords[LLEG].translation() += fs.dstCoords[LLEG].linear() * defaultTranslatePos[LLEG];
     fs.supportTime[RLEG] = std::numeric_limits<double>::max();
     fs.supportTime[LLEG] = this->defaultDoubleSupportTime;
     fs.stepHeight[LLEG] = {0.0,this->defaultStepHeight}; // はじめを上げない
   }else if((footstepNodes.remainTime <= footstepNodes.supportTime[RLEG]) && (footstepNodes.remainTime <= footstepNodes.supportTime[LLEG])){ // ラストのstepで両脚ともswingしていない
     fs.dstCoords[LLEG] = footstepNodes.dstCoords[LLEG]; // どっちをswingしてもいい. RLEGをswingする
     cnoid::Position prevOrigin = mathutil::orientCoordToAxis(footstepNodes.dstCoords[LLEG], cnoid::Vector3::UnitZ());
-    prevOrigin.translation() -= prevOrigin.linear() * this->defaultTranslatePos[LLEG];
+    prevOrigin.translation() -= prevOrigin.linear() * defaultTranslatePos[LLEG];
     fs.dstCoords[RLEG] = prevOrigin * offset;
-    fs.dstCoords[RLEG].translation() += fs.dstCoords[RLEG].linear() * this->defaultTranslatePos[RLEG];
+    fs.dstCoords[RLEG].translation() += fs.dstCoords[RLEG].linear() * defaultTranslatePos[RLEG];
     fs.supportTime[LLEG] = std::numeric_limits<double>::max();
     fs.supportTime[RLEG] = this->defaultDoubleSupportTime;
     fs.stepHeight[RLEG] = {this->defaultStepHeight,this->defaultStepHeight};
   }else if(footstepNodes.supportTime[LLEG] < footstepNodes.supportTime[RLEG]){ //ラストのstepで最後に右足をtouch groundした
     fs.dstCoords[RLEG] = footstepNodes.dstCoords[RLEG]; // LLEGをswingする
     cnoid::Position prevOrigin = mathutil::orientCoordToAxis(footstepNodes.dstCoords[RLEG], cnoid::Vector3::UnitZ());
-    prevOrigin.translation() -= prevOrigin.linear() * this->defaultTranslatePos[RLEG];
+    prevOrigin.translation() -= prevOrigin.linear() * defaultTranslatePos[RLEG];
     fs.dstCoords[LLEG] = prevOrigin * offset;
-    fs.dstCoords[LLEG].translation() += fs.dstCoords[LLEG].linear() * this->defaultTranslatePos[LLEG];
+    fs.dstCoords[LLEG].translation() += fs.dstCoords[LLEG].linear() * defaultTranslatePos[LLEG];
     fs.supportTime[RLEG] = std::numeric_limits<double>::max();
     fs.supportTime[LLEG] = this->defaultDoubleSupportTime;
     fs.stepHeight[LLEG] = {this->defaultStepHeight,this->defaultStepHeight};
   }else{  //ラストのstepで最後に左足をtouch groundした. または両足同時.
     fs.dstCoords[LLEG] = footstepNodes.dstCoords[LLEG]; // RLEGをswingする
     cnoid::Position prevOrigin = mathutil::orientCoordToAxis(footstepNodes.dstCoords[LLEG], cnoid::Vector3::UnitZ());
-    prevOrigin.translation() -= prevOrigin.linear() * this->defaultTranslatePos[LLEG];
+    prevOrigin.translation() -= prevOrigin.linear() * defaultTranslatePos[LLEG];
     fs.dstCoords[RLEG] = prevOrigin * offset;
-    fs.dstCoords[RLEG].translation() += fs.dstCoords[RLEG].linear() * this->defaultTranslatePos[RLEG];
+    fs.dstCoords[RLEG].translation() += fs.dstCoords[RLEG].linear() * defaultTranslatePos[RLEG];
     fs.supportTime[LLEG] = std::numeric_limits<double>::max();
     fs.supportTime[RLEG] = this->defaultDoubleSupportTime;
     fs.stepHeight[RLEG] = {this->defaultStepHeight,this->defaultStepHeight};

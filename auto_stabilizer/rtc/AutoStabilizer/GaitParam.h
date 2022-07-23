@@ -24,10 +24,12 @@ public:
   std::vector<cnoid::Position> srcCoords = std::vector<cnoid::Position>(2,cnoid::Position::Identity()); // 要素数2. rleg: 0. lleg: 1. generate frame. footstepNodesList[0]開始時の位置を保持する. 基本的にはfootstepNodesList[-1]のdstCoordsと同じ
   std::vector<cpp_filters::TwoPointInterpolatorSE3> genCoords; // 要素数2. rleg: 0. lleg: 1. generate frame. 現在の位置
   std::vector<footguidedcontroller::LinearTrajectory<cnoid::Vector3> > refZmpTraj; // 要素数1以上. generate frame. footstepNodesListを単純に線形補間して計算される現在の目標zmp軌道
+  cpp_filters::TwoPointInterpolatorSE3 footMidCoords = cpp_filters::TwoPointInterpolatorSE3(cnoid::Position::Identity(),cnoid::Vector6::Zero(),cnoid::Vector6::Zero(),cpp_filters::HOFFARBIB); // generate frame. footstepNodesListの各要素終了時の支持脚の位置姿勢にdefaultTranslatePosを適用したものの間をつなぐ. interpolatorによって連続的に変化する. reference frameとgenerate frameの対応付けに用いられる
 
   // param
   std::vector<cnoid::Vector3> copOffset = std::vector<cnoid::Vector3>{cnoid::Vector3::Zero(),cnoid::Vector3::Zero()}; // 要素数2. rleg: 0. lleg: 1. leg frame. 足裏COPの目標位置. 幾何的な位置はcopOffset無しで考えるが、目標COPを考えるときはcopOffsetを考慮する
   std::vector<std::vector<cnoid::Vector2> > legPolygon; // 要素数2. rleg: 0. lleg: 1. leg frame.
+  std::vector<cnoid::Vector3> defaultTranslatePos = std::vector<cnoid::Vector3>(2,cnoid::Vector3::Zero()); // goPos, goVelocity, その場足踏みをするときの右脚と左脚の中心からの相対位置. あるいは、reference frameとgenerate frameの対応付けに用いられる. (Z軸は鉛直).
   double dz = 1.0; // generate frame. 支持脚からのCogの目標高さ. 0より大きい
 
   cnoid::Vector3 actCog; // generate frame.  現在のCOM

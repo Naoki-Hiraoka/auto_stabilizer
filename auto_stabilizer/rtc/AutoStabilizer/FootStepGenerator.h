@@ -10,7 +10,6 @@ public:
   double defaultStepTime = 0.8; // [s]
   double defaultDoubleSupportTime = 0.12; // [s]. defaultStepTime未満である必要がある.
   double defaultStepHeight = 0.07; // [s].
-  std::vector<cnoid::Vector3> defaultTranslatePos = std::vector<cnoid::Vector3>(2,cnoid::Vector3::Zero()); // goPos, goVelocity, その場足踏みをするときの右脚と左脚の中心からの相対位置(Z軸は鉛直)
   bool isGoVelocityMode = false; // 進行方向に向けてfootStepNodesList[1] ~ footStepNodesList[goVelocityStepNum]の要素をfootstepNodesList[0]から機械的に計算してどんどん位置修正&末尾appendしていく.
   unsigned int goVelocityStepNum = 3;
   cnoid::Vector3 cmdVel = cnoid::Vector3::Zero(); // X[m/s] Y[m/s] theta[rad/s]. Z軸はgenerate frame鉛直
@@ -83,12 +82,12 @@ public:
 
   */
   bool calcFootSteps(const GaitParam& gaitParam, const double& dt,
-                     std::vector<GaitParam::FootStepNodes>& o_footstepNodesList) const;
+                     std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords) const;
 
 
 protected:
   // footstepNodesの次の一歩を作る. 両脚が地面についた状態で終わる
-  GaitParam::FootStepNodes calcDefaultNextStep(const GaitParam::FootStepNodes& footstepNodes, const cnoid::Position& offset = cnoid::Position::Identity()) const;
+  GaitParam::FootStepNodes calcDefaultNextStep(const GaitParam::FootStepNodes& footstepNodes, const std::vector<cnoid::Vector3>& defaultTranslatePos, const cnoid::Position& offset = cnoid::Position::Identity()) const;
 
   // footstepNodesListの終了時の状態が両脚支持でかつその期間の時間がdefaultDoubleSupportTimeよりも短いなら延長する
   void extendDoubleSupportTime(GaitParam::FootStepNodes& footstepNodes) const;

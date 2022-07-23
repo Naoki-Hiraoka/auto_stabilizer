@@ -4,7 +4,7 @@
 #define DEBUG true
 
 void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt,
-                                       std::vector<footguidedcontroller::LinearTrajectory<cnoid::Vector3> >& o_refZmpTraj, std::vector<cpp_filters::TwoPointInterpolatorSE3>& o_genCoords, std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords) const{
+                                       std::vector<footguidedcontroller::LinearTrajectory<cnoid::Vector3> >& o_refZmpTraj, std::vector<cpp_filters::TwoPointInterpolatorSE3>& o_genCoords, std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, cpp_filters::TwoPointInterpolatorSE3& o_footMidCoords) const{
   // swing期は、remainTime - supportTime - delayTimeOffset後にdstCoordsに到達するようなantececdent軌道を生成し(genCoords.getGoal()の値)、その軌道にdelayTimeOffset遅れで滑らかに追従するような軌道(genCoords.value()の値)を生成する.
   //   rectangle以外の軌道タイプや跳躍についてはひとまず考えない TODO
   //   srcCoordsとdstCoordsを結ぶ軌道を生成する. srcCoordsの高さ+[0]とdstCoordsの高さ+[1]の高い方(heightとおく)に上げるようなrectangle軌道を生成する
@@ -132,14 +132,29 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt,
     }
   }
 
+  // footMidCoordsを進める
+  cpp_filters::TwoPointInterpolatorSE3 footMidCoords = gaitParam.footMidCoords;
+  {
+    cnoid::Position rleg = mathutil::orientCoordToAxis(gaitParam.footstepNodesList[0].dstCoords[RLEG], cnoid::Vector3::UnitZ());
+    cnoid::Position lleg = mathutil::orientCoordToAxis(gaitParam.footstepNodesList[0].dstCoords[LLEG], cnoid::Vector3::UnitZ());
+    cnoid::Position midCoords;
+    if(GaitParam::isSupportPhaseEnd(gaitParam.footstepNodesList[0], RLEG) && GaitParam::isSupportPhaseEnd(gaitParam.footstepNodesList[0], LLEG)){ // 両足支持で終わる
+      midCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{rleg, lleg}, std::vector<double>{1.0, 1.0});
+    }else if(GaitParam::isSupportPhaseEnd(gaitParam.footstepNodesList[0], RLEG)){ // 右足支持で終わる
+      midCoords = rleg; midCoords.translation() -= midCoords.linear() * gaitParam.defaultTranslatePos[RLEG];
+    }else{ // 左足支持で終わる
+      midCoords = lleg; midCoords.translation() -= midCoords.linear() * gaitParam.defaultTranslatePos[LLEG];
+    } // footstepNodesの定義より、両方の足が遊脚の状態で終わることはない
+    footMidCoords.setGoal(midCoords, gaitParam.footstepNodesList[0].remainTime);
+    footMidCoords.interpolate(dt);
+  }
+
   // footstepNodesListを進める
   std::vector<GaitParam::FootStepNodes> footstepNodesList = gaitParam.footstepNodesList;
   std::vector<cnoid::Position> srcCoords = gaitParam.srcCoords;
   footstepNodesList[0].remainTime = std::max(0.0, footstepNodesList[0].remainTime - dt);
   if(footstepNodesList[0].remainTime <= 0.0 && footstepNodesList.size() > 1){
-    for(int i=0;i<NUM_LEGS;i++){
-      srcCoords[i] = gaitParam.genCoords[i].value();
-    }
+    for(int i=0;i<NUM_LEGS;i++) srcCoords[i] = gaitParam.genCoords[i].value();
     footstepNodesList.erase(footstepNodesList.begin()); // vectorではなくlistにするべき?
   }
 
@@ -147,6 +162,7 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt,
   o_genCoords = genCoords;
   o_footstepNodesList = footstepNodesList;
   o_srcCoords = srcCoords;
+  o_footMidCoords = footMidCoords;
 }
 
 void LegCoordsGenerator::calcCOMCoords(const GaitParam& gaitParam, double dt, double g, double mass, cnoid::Vector3& o_genNextCog, cnoid::Vector3& o_genNextCogVel) const{
