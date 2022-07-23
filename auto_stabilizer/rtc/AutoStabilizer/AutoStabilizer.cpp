@@ -833,6 +833,7 @@ RTC::ReturnCode_t AutoStabilizer::onActivated(RTC::UniqueId ec_id){
   std::cerr << "[" << m_profile.instance_name << "] "<< "onActivated(" << ec_id << ")" << std::endl;
   // 各種処理を初期化する TODO
   this->mode_.reset();
+  this->footStepGenerator_.reset();
   return RTC::RTC_OK;
 }
 RTC::ReturnCode_t AutoStabilizer::onDeactivated(RTC::UniqueId ec_id){
@@ -848,6 +849,14 @@ bool AutoStabilizer::goPos(const double& x, const double& y, const double& th){
 }
 bool AutoStabilizer::goVelocity(const double& vx, const double& vy, const double& vth){
   std::lock_guard<std::mutex> guard(this->mutex_);
+  if(this->mode_.isABCRunning()){
+    this->footStepGenerator_.isGoVelocityMode = true;
+    this->footStepGenerator_.cmdVel[0] = vx;
+    this->footStepGenerator_.cmdVel[1] = vy;
+    this->footStepGenerator_.cmdVel[2] = vx / 180.0 * M_PI;
+  }else{
+    return false;
+  }
   return true;
 }
 bool AutoStabilizer::goStop(){

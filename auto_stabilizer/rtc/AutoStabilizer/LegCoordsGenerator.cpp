@@ -163,6 +163,7 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt,
   o_footstepNodesList = footstepNodesList;
   o_srcCoords = srcCoords;
   o_footMidCoords = footMidCoords;
+
 }
 
 void LegCoordsGenerator::calcCOMCoords(const GaitParam& gaitParam, double dt, double g, double mass, cnoid::Vector3& o_genNextCog, cnoid::Vector3& o_genNextCogVel) const{
@@ -177,5 +178,6 @@ void LegCoordsGenerator::calcCOMCoords(const GaitParam& gaitParam, double dt, do
                                     genNextCog, genNextCogVel, genNextForce);
   o_genNextCog = genNextCog;
   o_genNextCogVel = genNextCogVel;
+  std::cerr << gaitParam.refZmpTraj[0].getStart().transpose() << " : " << genNextCog.transpose() << std::endl;
   return;
 }

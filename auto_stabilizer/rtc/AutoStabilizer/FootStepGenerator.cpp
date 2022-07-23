@@ -89,22 +89,21 @@ bool FootStepGenerator::goStop(const GaitParam& gaitParam,
 
 bool FootStepGenerator::calcFootSteps(const GaitParam& gaitParam, const double& dt,
                                       std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords) const{
-  std::vector<GaitParam::FootStepNodes> footstepNodesList;
-  footstepNodesList.push_back(gaitParam.footstepNodesList[0]);
-
-  // footstepNodesList[1]開始時のsupport/swingの状態を上書きによって変更する場合は、footstepNodesList[0]の終了時の状態が両脚支持でかつその期間の時間がdefaultDoubleSupportTimeよりも短いなら延長する
-  if(footstepNodesList.size() == 1){
-    if(GaitParam::isSupportPhaseEnd(footstepNodesList[0],RLEG) && GaitParam::isSupportPhaseEnd(footstepNodesList[0],LLEG)) { // footstepNodesList[0]の終了時の状態が両脚支持
-      this->extendDoubleSupportTime(footstepNodesList[0]);
-    }
-  }
+  std::vector<GaitParam::FootStepNodes> footstepNodesList = gaitParam.footstepNodesList;
 
   // goVelocityModeなら、進行方向に向けてfootStepNodesList[1] ~ footStepNodesList[goVelocityStepNum]の要素を機械的に計算してどんどん末尾appendしていく. cmdVelに応じてきまる
   if(this->isGoVelocityMode){
+    // footstepNodesList[1]開始時のsupport/swingの状態を上書きによって変更する場合は、footstepNodesList[0]の終了時の状態が両脚支持でかつその期間の時間がdefaultDoubleSupportTimeよりも短いなら延長する
+    if(footstepNodesList.size() == 1){
+      if(GaitParam::isSupportPhaseEnd(footstepNodesList[0],RLEG) && GaitParam::isSupportPhaseEnd(footstepNodesList[0],LLEG)) { // footstepNodesList[0]の終了時の状態が両脚支持
+        this->extendDoubleSupportTime(footstepNodesList[0]);
+      }
+    }
+
     cnoid::Position offset = cnoid::Position::Identity();
-    offset.translation()[0] = this->cmdVel[0] * dt;
-    offset.translation()[1] = this->cmdVel[1] * dt;
-    offset.linear() = cnoid::Matrix3(Eigen::AngleAxisd(this->cmdVel[2] * dt, cnoid::Vector3::UnitZ()));
+    offset.translation()[0] = this->cmdVel[0] * this->defaultStepTime;
+    offset.translation()[1] = this->cmdVel[1] * this->defaultStepTime;
+    offset.linear() = cnoid::Matrix3(Eigen::AngleAxisd(this->cmdVel[2] * this->defaultStepTime, cnoid::Vector3::UnitZ()));
     for(int i=footstepNodesList.size();i<=this->goVelocityStepNum; i++){
       footstepNodesList.push_back(this->calcDefaultNextStep(footstepNodesList.back(), gaitParam.defaultTranslatePos, offset));
     }
@@ -161,7 +160,7 @@ GaitParam::FootStepNodes FootStepGenerator::calcDefaultNextStep(const GaitParam:
     fs.supportTime[LLEG] = std::numeric_limits<double>::max();
     fs.supportTime[RLEG] = this->defaultDoubleSupportTime;
     fs.stepHeight[RLEG] = {this->defaultStepHeight,this->defaultStepHeight};
-  }else if(footstepNodes.supportTime[LLEG] < footstepNodes.supportTime[RLEG]){ //ラストのstepで最後に右足をtouch groundした
+  }else if(footstepNodes.supportTime[LLEG] > footstepNodes.supportTime[RLEG]){ //ラストのstepで最後に右足をtouch groundした
     fs.dstCoords[RLEG] = footstepNodes.dstCoords[RLEG]; // LLEGをswingする
     cnoid::Position prevOrigin = mathutil::orientCoordToAxis(footstepNodes.dstCoords[RLEG], cnoid::Vector3::UnitZ());
     prevOrigin.translation() -= prevOrigin.linear() * defaultTranslatePos[RLEG];
@@ -180,6 +179,8 @@ GaitParam::FootStepNodes FootStepGenerator::calcDefaultNextStep(const GaitParam:
     fs.supportTime[RLEG] = this->defaultDoubleSupportTime;
     fs.stepHeight[RLEG] = {this->defaultStepHeight,this->defaultStepHeight};
   }
+
+  // limit stride. TODO
   return fs;
 }
 
