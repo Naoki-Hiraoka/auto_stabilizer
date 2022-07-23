@@ -170,7 +170,7 @@ void LegCoordsGenerator::calcCOMCoords(const GaitParam& gaitParam, double dt, do
   double w = std::sqrt(g/gaitParam.dz); // TODO refforceZ
   cnoid::Vector3 l = cnoid::Vector3::Zero();
   l[2] = gaitParam.dz;
-  cnoid::Vector3 genDCM = gaitParam.genCog + w * gaitParam.genCogVel;
+  cnoid::Vector3 genDCM = gaitParam.genCog + gaitParam.genCogVel / w;
   cnoid::Vector3 genZmp = footguidedcontroller::calcFootGuidedControl(w,l,genDCM,gaitParam.refZmpTraj);
   // check zmp in polygon TODO
   cnoid::Vector3 genNextCog,genNextCogVel,genNextForce;
@@ -178,6 +178,6 @@ void LegCoordsGenerator::calcCOMCoords(const GaitParam& gaitParam, double dt, do
                                     genNextCog, genNextCogVel, genNextForce);
   o_genNextCog = genNextCog;
   o_genNextCogVel = genNextCogVel;
-  std::cerr << gaitParam.refZmpTraj[0].getStart().transpose() << " : " << genNextCog.transpose() << std::endl;
+
   return;
 }

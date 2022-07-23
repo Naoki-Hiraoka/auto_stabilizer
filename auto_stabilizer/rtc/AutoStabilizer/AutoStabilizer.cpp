@@ -853,7 +853,7 @@ bool AutoStabilizer::goVelocity(const double& vx, const double& vy, const double
     this->footStepGenerator_.isGoVelocityMode = true;
     this->footStepGenerator_.cmdVel[0] = vx;
     this->footStepGenerator_.cmdVel[1] = vy;
-    this->footStepGenerator_.cmdVel[2] = vx / 180.0 * M_PI;
+    this->footStepGenerator_.cmdVel[2] = vth / 180.0 * M_PI;
   }else{
     return false;
   }

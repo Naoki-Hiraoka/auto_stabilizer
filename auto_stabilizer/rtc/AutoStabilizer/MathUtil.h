@@ -16,7 +16,7 @@ namespace mathutil {
     }else{
       double angle = std::acos(dot); // 0~pi
       cnoid::Vector3 axis = cross.normalized(); // include sign
-      return Eigen::Matrix3d(Eigen::AngleAxisd(angle, axis));
+      return Eigen::Matrix3d(Eigen::AngleAxisd(angle, axis)) * m;
     }
   }
   inline Eigen::Transform<double, 3, Eigen::AffineCompact> orientCoordToAxis(const Eigen::Transform<double, 3, Eigen::AffineCompact>& m, const Eigen::Vector3d& axis, const Eigen::Vector3d& localaxis = Eigen::Vector3d::UnitZ()){
