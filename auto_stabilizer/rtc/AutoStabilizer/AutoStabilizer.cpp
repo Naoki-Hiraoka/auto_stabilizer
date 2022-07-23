@@ -6,7 +6,6 @@
 #include <cnoid/EigenUtil>
 #include "MathUtil.h"
 #include "FootGuidedController.h"
-#include "LegCoordsGenerator.h"
 #include <limits>
 
 #define DEBUG false
@@ -551,7 +550,7 @@ bool AutoStabilizer::calcActualParameters(const AutoStabilizer::ControlMode& mod
 }
 
 // static function
-bool AutoStabilizer::execAutoBalancer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, cnoid::BodyPtr& genRobot, std::vector<AutoStabilizer::LegParam>& legParams, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, AutoStabilizer::FullbodyState& fullbodyState, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams, const FootStepGenerator& footStepGenerator) {
+bool AutoStabilizer::execAutoBalancer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, cnoid::BodyPtr& genRobot, std::vector<AutoStabilizer::LegParam>& legParams, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, AutoStabilizer::FullbodyState& fullbodyState, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator) {
   AutoStabilizer::calcReferenceParameters(mode, refRobot, refRobotOrigin, genRobot, legParams, endEffectorParams, fullbodyState, gaitParam);
 
   if(mode.isABCInit()){ // startAutoBalancer直後の初回
@@ -579,8 +578,12 @@ bool AutoStabilizer::execAutoBalancer(const AutoStabilizer::ControlMode& mode, c
   }
 
   AutoStabilizer::calcActualParameters(mode, actRobot, actRobotOrigin, legParams, endEffectorParams, gaitParam, dt);
-  footStepGenerator.calcFootSteps(gaitParam, dt, gaitParam.footstepNodesList);
-  legcoordsgenerator::calcNextCoords(gaitParam, dt, 9.80665, genRobot->mass());
+  footStepGenerator.calcFootSteps(gaitParam, dt,
+                                  gaitParam.footstepNodesList);
+  legCoordsGenerator.calcLegCoords(gaitParam, dt,
+                                   gaitParam.refZmpTraj, gaitParam.genCoords, gaitParam.footstepNodesList, gaitParam.srcCoords);
+  legCoordsGenerator.calcCOMCoords(gaitParam, dt, 9.80665, genRobot->mass(),
+                                   gaitParam.genCog, gaitParam.genCogVel);
 
   for(int i=0;i<NUM_LEGS;i++){
     legParams[i].genContactStatePrev = legParams[i].genContactState;
@@ -815,7 +818,7 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
   if(!this->mode_.isABCRunning()) {
     AutoStabilizer::copyRobotState(this->refRobot_, this->genRobot_);
   }else{
-    AutoStabilizer::execAutoBalancer(this->mode_, this->refRobot_, this->refRobotOrigin_, this->actRobot_, this->actRobotOrigin_, this->genRobot_, this->legParams_, this->endEffectorParams_, this->fullbodyState_, this->gaitParam_, this->dt_, this->jointParams_, this->footStepGenerator_);
+    AutoStabilizer::execAutoBalancer(this->mode_, this->refRobot_, this->refRobotOrigin_, this->actRobot_, this->actRobotOrigin_, this->genRobot_, this->legParams_, this->endEffectorParams_, this->fullbodyState_, this->gaitParam_, this->dt_, this->jointParams_, this->footStepGenerator_, this->legCoordsGenerator_);
     AutoStabilizer::execStabilizer(this->endEffectorParams_);
     AutoStabilizer::solveFullbodyIK(this->genRobot_, this->refRobotOrigin_, this->endEffectorParams_, this->fullbodyIKParam_, this->dt_, this->jointParams_, this->gaitParam_);
   }

@@ -7,6 +7,8 @@
 #include <cpp_filters/FirstOrderLowPassFilter.h>
 #include "FootGuidedController.h"
 
+enum leg_enum{RLEG=0, LLEG=1, NUM_LEGS=2};
+
 class GaitParam {
 public:
   class FootStepNodes {
@@ -22,6 +24,18 @@ public:
   std::vector<cnoid::Position> srcCoords = std::vector<cnoid::Position>(2,cnoid::Position::Identity()); // 要素数2. rleg: 0. lleg: 1. generate frame. footstepNodesList[0]開始時の位置を保持する. 基本的にはfootstepNodesList[-1]のdstCoordsと同じ
   std::vector<cpp_filters::TwoPointInterpolatorSE3> genCoords; // 要素数2. rleg: 0. lleg: 1. generate frame. 現在の位置
   std::vector<footguidedcontroller::LinearTrajectory<cnoid::Vector3> > refZmpTraj; // 要素数1以上. generate frame. footstepNodesListを単純に線形補間して計算される現在の目標zmp軌道
+
+  // param
+  std::vector<cnoid::Vector3> copOffset = std::vector<cnoid::Vector3>{cnoid::Vector3::Zero(),cnoid::Vector3::Zero()}; // 要素数2. rleg: 0. lleg: 1. leg frame. 足裏COPの目標位置. 幾何的な位置はcopOffset無しで考えるが、目標COPを考えるときはcopOffsetを考慮する
+  std::vector<std::vector<cnoid::Vector2> > legPolygon; // 要素数2. rleg: 0. lleg: 1. leg frame.
+  double dz = 1.0; // generate frame. 支持脚からのCogの目標高さ. 0より大きい
+
+  cnoid::Vector3 actCog; // generate frame.  現在のCOM
+  cpp_filters::FirstOrderLowPassFilter<cnoid::Vector3> actCogVel = cpp_filters::FirstOrderLowPassFilter<cnoid::Vector3>(4.0, cnoid::Vector3::Zero());  // generate frame.  現在のCOM速度
+  cnoid::Vector3 genCog; // generate frame.  現在のCOM
+  cnoid::Vector3 genCogVel;  // generate frame.  現在のCOM速度
+
+public:
   bool isSupportPhase(int leg){ // 今がSupportPhaseかどうか
     return isSupportPhaseStart(this->footstepNodesList[0], leg);
   }
@@ -40,29 +54,6 @@ public:
   bool isStatic() const{ // 現在static状態かどうか
     this->footstepNodesList.size() == 1 && this->footstepNodesList[0].remainTime == 0.0;
   }
-
-  // param
-  std::vector<cnoid::Vector3> copOffset = std::vector<cnoid::Vector3>{cnoid::Vector3::Zero(),cnoid::Vector3::Zero()}; // 要素数2. rleg: 0. lleg: 1. leg frame. 足裏COPの目標位置. 幾何的な位置はcopOffset無しで考えるが、目標COPを考えるときはcopOffsetを考慮する
-  std::vector<std::vector<cnoid::Vector2> > legPolygon; // 要素数2. rleg: 0. lleg: 1. leg frame.
-  double dz = 1.0; // generate frame. 支持脚からのCogの目標高さ. 0より大きい
-
-  cnoid::Vector3 actCog; // generate frame.  現在のCOM
-  cpp_filters::FirstOrderLowPassFilter<cnoid::Vector3> actCogVel = cpp_filters::FirstOrderLowPassFilter<cnoid::Vector3>(4.0, cnoid::Vector3::Zero());  // generate frame.  現在のCOM速度
-  cnoid::Vector3 genCog; // generate frame.  現在のCOM
-  cnoid::Vector3 genCogVel;  // generate frame.  現在のCOM速度
-
-  // 遊脚軌道用パラメータ
-  double delayTimeOffset = 0.2; // 0以上. swing期は、remainTime - supportTime - delayTimeOffset後にdstCoordsに到達するようなrectangle軌道を生成し、その軌道にdelayTimeOffset遅れで滑らかに追従するような軌道を生成する
-  double touchVel = 0.5; // 0より大きい. 足を下ろすときの速さ
-  //cnoid::Vector3 goal_off; // TODO
-
-  // 足配置決定用パラメータ
-  std::vector<std::vector<cnoid::Vector2> > steppable_region; // 要素数任意. generate frame. endCoordsが存在できる領域
-  std::vector<double> steppable_height; // 要素数はsteppable_regionと同じ. generate frame. 各polygonごとのおおよその値. そのpolygonに届くかどうかの判定と、
-  double relLandingHeight; // generate frame. 現在の遊脚のfootstepNodesList[0]のdstCoordsのZ
-  cnoid::Vector3 relLandingNormal; // generate frame. 現在の遊脚のfootstepNodesList[0]のdstCoordsのZ軸の方向
 };
-
-enum leg_enum{RLEG=0, LLEG=1, NUM_LEGS=2};
 
 #endif
