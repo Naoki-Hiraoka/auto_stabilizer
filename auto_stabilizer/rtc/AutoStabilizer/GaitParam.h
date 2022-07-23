@@ -22,20 +22,23 @@ public:
   std::vector<cnoid::Position> srcCoords = std::vector<cnoid::Position>(2,cnoid::Position::Identity()); // 要素数2. rleg: 0. lleg: 1. generate frame. footstepNodesList[0]開始時の位置を保持する. 基本的にはfootstepNodesList[-1]のdstCoordsと同じ
   std::vector<cpp_filters::TwoPointInterpolatorSE3> genCoords; // 要素数2. rleg: 0. lleg: 1. generate frame. 現在の位置
   std::vector<footguidedcontroller::LinearTrajectory<cnoid::Vector3> > refZmpTraj; // 要素数1以上. generate frame. footstepNodesListを単純に線形補間して計算される現在の目標zmp軌道
-  bool isSupportPhase(int leg) const{ // 今がSupportPhaseかどうか
-    return isSupportPhaseStart(leg, 0);
+  bool isSupportPhase(int leg){ // 今がSupportPhaseかどうか
+    return isSupportPhaseStart(this->footstepNodesList[0], leg);
   }
-  bool isSupportPhase(int leg, int footstepNodesindex, double remainTime) const{ // footStepNodesList[footstepNodesindex]のlegは、remainTimeのときにSupportPhaseかどうか
-    assert(0<=leg && leg<NUM_LEGS); assert(0<=footstepNodesindex && footstepNodesindex<footstepNodesList.size()); assert(0<=remainTime && remainTime <= footstepNodesList[footstepNodesindex].remainTime);
-    return remainTime <= footstepNodesList[footstepNodesindex].supportTime[leg];
+  static bool isSupportPhase(const FootStepNodes& footstepNodes, int leg, double remainTime){ // footStepNodesのlegは、remainTimeのときにSupportPhaseかどうか
+    assert(0<=leg && leg<NUM_LEGS); assert(0<=remainTime && remainTime <= footstepNodes.remainTime);
+    return remainTime <= footstepNodes.supportTime[leg];
   }
-  bool isSupportPhaseEnd(int leg, int footstepNodesindex) const{ // footStepNodesList[footstepNodesindex]のlegは、終了時にSupportPhaseかどうか
-    assert(0<=leg && leg<NUM_LEGS); assert(0<=footstepNodesindex && footstepNodesindex<footstepNodesList.size());
-    return isSupportPhase(leg, footstepNodesindex, 0);
+  static bool isSupportPhaseEnd(const FootStepNodes& footstepNodes, int leg){ // footStepNodesのlegは、終了時にSupportPhaseかどうか
+    assert(0<=leg && leg<NUM_LEGS);
+    return isSupportPhase(footstepNodes, leg, 0);
   }
-  bool isSupportPhaseStart(int leg, int footstepNodesindex) const{ // footStepNodesList[footstepNodesindex]のlegは、開始時にSupportPhaseかどうか
-    assert(0<=leg && leg<NUM_LEGS); assert(0<=footstepNodesindex && footstepNodesindex<footstepNodesList.size());
-    return isSupportPhase(leg, footstepNodesindex, footstepNodesList[footstepNodesindex].remainTime);
+  static bool isSupportPhaseStart(const FootStepNodes& footstepNodes, int leg){ // footStepNodesのlegは、開始時にSupportPhaseかどうか
+    assert(0<=leg && leg<NUM_LEGS);
+    return isSupportPhase(footstepNodes, leg, footstepNodes.remainTime);
+  }
+  bool isStatic() const{ // 現在static状態かどうか
+    this->footstepNodesList.size() == 1 && this->footstepNodesList[0].remainTime == 0.0;
   }
 
   // param
