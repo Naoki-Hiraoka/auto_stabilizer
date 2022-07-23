@@ -8,7 +8,7 @@ namespace legcoordsgenerator{
   void calcLegCoords(GaitParam& gaitParam, double dt){
     // swing期は、remainTime - supportTime - delayTimeOffset後にdstCoordsに到達するようなantececdent軌道を生成し(genCoords.getGoal()の値)、その軌道にdelayTimeOffset遅れで滑らかに追従するような軌道(genCoords.value()の値)を生成する.
     //   rectangle以外の軌道タイプや跳躍についてはひとまず考えない TODO
-    //   srcCoordsとdstCoordsのsrcCoordsとdstCoordsの高い方よりもさらにstepHeightだけ高い位置(heightとおく)に上げるようなrectangle軌道を生成する
+    //   srcCoordsとdstCoordsを結ぶ軌道を生成する. srcCoordsの高さ+[0]とdstCoordsの高さ+[1]の高い方(heightとおく)に上げるようなrectangle軌道を生成する
     //     dstに到達するまでの時間が(height-dstCoords)/touchVel以下の場合、dstまで直線で移動する
     //     そうで無い場合、今の位置がheight - eps(ひとまず0)よりも低ければ、heightの高さまで上げてからdstCoordsの上空(XYと回転はdstCoordsと同じ)まで直線で移動する軌道を,残りの自由に使える時間で実行する
     //                     今の位置がheight - eps(ひとまず0)以上であれば、dstCoordsの上空(XYと回転はdstCoordsと同じ)まで直線で移動する軌道を,残りの自由に使える時間で実行する
@@ -93,7 +93,8 @@ namespace legcoordsgenerator{
         gaitParam.genCoords[i].reset(nextCoords);
       }else{ // 遊脚
         double swingTime = gaitParam.footstepNodesList[0].remainTime - gaitParam.footstepNodesList[0].supportTime[i];
-        double height = std::max(gaitParam.srcCoords[i].translation()[2],gaitParam.footstepNodesList[0].dstCoords[i].translation()[2]) + gaitParam.footstepNodesList[0].stepHeight[i]; // 足上げ高さ. generate frame
+        double height = std::max(gaitParam.srcCoords[i].translation()[2] + gaitParam.footstepNodesList[0].stepHeight[i][0],
+                                 gaitParam.footstepNodesList[0].dstCoords[i].translation()[2] + gaitParam.footstepNodesList[0].stepHeight[i][1]); // 足上げ高さ. generate frame
         cnoid::Position srcCoords = gaitParam.srcCoords[i];
         cnoid::Position dstCoords = gaitParam.footstepNodesList[0].dstCoords[i];
         cnoid::Position antecedentCoords = gaitParam.genCoords[i].getGoal(); // 今のantecedent軌道の位置
