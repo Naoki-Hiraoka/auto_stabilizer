@@ -133,7 +133,7 @@ protected:
     bool setNextTransition(const Transition_enum request){
       switch(request){
       case START_ABC:
-        if(current == MODE_IDLE){ next = MODE_SYNC_TO_ABC; remain_time = 0.0; return true; }else{ return false; }
+        if(current == MODE_IDLE){ next = MODE_SYNC_TO_ABC; remain_time = 0.0; return true; }else{ return false; } // TODO. 開始時の指令関節角度が関節上下限外の場合に飛ぶ恐れ
       case STOP_ABC:
         if(current == MODE_ABC){ next = MODE_SYNC_TO_IDLE; remain_time = abc_transition_time; return true; }else{ return false; }
       case START_ST:

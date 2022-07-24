@@ -245,6 +245,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
   this->loop_ = 0;
 
 
+  // TODO
 
   // std::string jointLimitTableStr;
   // if(this->getProperties().hasKey("joint_limit_table")) jointLimitTableStr = std::string(this->getProperties()["joint_limit_table"]);
@@ -667,7 +668,7 @@ bool AutoStabilizer::solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::Body
     fullbodyIKParam.rootPositionConstraint->B_localpos() = refRobotOrigin->rootLink()->T();
     fullbodyIKParam.rootPositionConstraint->maxError() << 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt;
     fullbodyIKParam.rootPositionConstraint->precision() << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0; // 強制的にIKをmax loopまで回す
-    fullbodyIKParam.rootPositionConstraint->weight() << 0.0, 0.0, 0.0, 1e-1, 1e-1, 1e-1;
+    fullbodyIKParam.rootPositionConstraint->weight() << 0.0, 0.0, 0.0, 3e-1, 3e-1, 3e-1;
     fullbodyIKParam.rootPositionConstraint->eval_link() = nullptr;
     fullbodyIKParam.rootPositionConstraint->eval_localR() = cnoid::Matrix3::Identity();
     ikConstraint.push_back(fullbodyIKParam.rootPositionConstraint);
@@ -685,18 +686,20 @@ bool AutoStabilizer::solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::Body
       fullbodyIKParam.refJointAngleConstraint[i]->maxError() = 10.0 * dt; // 高優先度のmaxError以下にしないと優先度逆転するおそれ
       fullbodyIKParam.refJointAngleConstraint[i]->weight() = 1e-1; // 小さい値すぎると、qp終了判定のtoleranceによって無視されてしまう
       fullbodyIKParam.refJointAngleConstraint[i]->targetq() = refRobotOrigin->joint(i)->q();
+      fullbodyIKParam.refJointAngleConstraint[i]->precision() = 0.0; // 強制的にIKをmax loopまで回す
       ikConstraint.push_back(fullbodyIKParam.refJointAngleConstraint[i]);
     }
   }
 
-  for(int i=0;i<ikConstraint.size();i++) ikConstraint[i]->debuglevel() = 0.0; //debuglevel
+  for(int i=0;i<ikConstraint.size();i++) ikConstraint[i]->debuglevel() = 0; //debuglevel
   fik::solveFullbodyIKLoopFast(genRobot,
                                ikConstraint,
                                fullbodyIKParam.jlim_avoid_weight,
                                dq_weight_all,
                                1,//loop
                                1e-6,
-                               0 //debug
+                               0, //debug
+                               dt
                                );
   return true;
 }

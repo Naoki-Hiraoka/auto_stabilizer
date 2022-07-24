@@ -81,10 +81,11 @@ class JAXON_RED_HrpsysConfigurator(ChoreonoidHrpsysConfigurator):
 
     def startABSTIMP (self):
         ### not used on hrpsys
-        self.el_svc.setServoErrorLimit("RARM_F_JOINT0", sys.float_info.max)
-        self.el_svc.setServoErrorLimit("RARM_F_JOINT1", sys.float_info.max)
-        self.el_svc.setServoErrorLimit("LARM_F_JOINT0", sys.float_info.max)
-        self.el_svc.setServoErrorLimit("LARM_F_JOINT1", sys.float_info.max)
+        if self.el:
+            self.el_svc.setServoErrorLimit("RARM_F_JOINT0", sys.float_info.max)
+            self.el_svc.setServoErrorLimit("RARM_F_JOINT1", sys.float_info.max)
+            self.el_svc.setServoErrorLimit("LARM_F_JOINT0", sys.float_info.max)
+            self.el_svc.setServoErrorLimit("LARM_F_JOINT1", sys.float_info.max)
         ###
         #self.startAutoBalancer()
         # Suppress limit over message and behave like real robot that always angle-vector is in seq.

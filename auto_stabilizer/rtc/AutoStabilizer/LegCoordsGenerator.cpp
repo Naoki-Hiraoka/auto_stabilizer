@@ -110,20 +110,27 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt,
           nextCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{antecedentCoords,dstCoords},
                                                std::vector<double>{std::max(0.0,antecedentRemainTime - dt), dt}); // このfootstepNode終了時にdstCoordsに行くように線形補間
         }else{
-          double preTouchDownRemainTime = antecedentRemainTime - touchDownTime; // dstCoords の上空につくまでの時間
           cnoid::Position preTouchCoords = dstCoords; // dstCoords の上空
           preTouchCoords.translation()[2] = height;
-          if(antecedentCoords.translation()[2] >= height){ // dstCoords の上空まで直線で移動する
-            nextCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{antecedentCoords,preTouchCoords},
-                                                 std::vector<double>{std::max(0.0,preTouchDownRemainTime - dt), dt}); // preTouchDownRemainTime後にpreTouchCoordsに行くように線形補間
-          }else{ // heightの高さまで上げてからdstCoords の上空まで直線で移動する. 回転は2つの区間の間一定の速度で動き続ける
-            cnoid::Vector3 viaPos = antecedentCoords.translation(); // heightの高さまで上げた位置
-            viaPos[2] = height;
-            double viaTime = preTouchDownRemainTime * (viaPos - antecedentCoords.translation()).norm() / ((viaPos - antecedentCoords.translation()).norm() + (preTouchCoords.translation() - viaPos).norm()); // viaPosにつくまでの時間
-            nextCoords.translation() = mathutil::calcMidPos(std::vector<cnoid::Vector3>{antecedentCoords.translation(),viaPos},
-                                                            std::vector<double>{std::max(0.0,viaTime - dt), dt}); // viaTime後にviaPosに行くように線形補間
-            nextCoords.linear() =  mathutil::calcMidRot(std::vector<cnoid::Matrix3>{antecedentCoords.linear(),preTouchCoords.linear()},
-                                                        std::vector<double>{std::max(0.0,preTouchDownRemainTime - dt), dt}); // preTouchDownRemainTime後にpreTouchCoordsの傾きになるように線形補間
+          double preTouchDownRemainTime = antecedentRemainTime - (height - dstCoords.translation()[2]) / this->touchVel; // preTouchCoordsにつくまでの時間
+          if(preTouchDownRemainTime <= 0.0) {
+            // 地面に直線的につきにいく
+            nextCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{antecedentCoords,dstCoords},
+                                                 std::vector<double>{std::max(0.0,antecedentRemainTime - dt), dt}); // このfootstepNode終了時にdstCoordsに行くように線形補間
+          }else{
+            // preTouchDownRemainTime の値が小さいときに不安定. delayTimeOffsetでごまかしている. TODO
+            if(antecedentCoords.translation()[2] >= height){ // preTouchCoordsまで直線で移動する
+              nextCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{antecedentCoords,preTouchCoords},
+                                                   std::vector<double>{std::max(0.0,preTouchDownRemainTime - dt), dt}); // preTouchDownRemainTime後にpreTouchCoordsに行くように線形補間
+            }else{ // heightの高さまで上げてからpreTouchCoordsまで直線で移動する. 回転は2つの区間の間一定の速度で動き続ける
+              cnoid::Vector3 viaPos = antecedentCoords.translation(); // heightの高さまで上げた位置
+              viaPos[2] = height;
+              double viaTime = preTouchDownRemainTime * (viaPos - antecedentCoords.translation()).norm() / ((viaPos - antecedentCoords.translation()).norm() + (preTouchCoords.translation() - viaPos).norm()); // viaPosにつくまでの時間
+              nextCoords.translation() = mathutil::calcMidPos(std::vector<cnoid::Vector3>{antecedentCoords.translation(),viaPos},
+                                                              std::vector<double>{std::max(0.0,viaTime - dt), dt}); // viaTime後にviaPosに行くように線形補間
+              nextCoords.linear() =  mathutil::calcMidRot(std::vector<cnoid::Matrix3>{antecedentCoords.linear(),preTouchCoords.linear()},
+                                                          std::vector<double>{std::max(0.0,preTouchDownRemainTime - dt), dt}); // preTouchDownRemainTime後にpreTouchCoordsの傾きになるように線形補間
+            }
           }
         }
         genCoords[i].setGoal(nextCoords, this->delayTimeOffset);
