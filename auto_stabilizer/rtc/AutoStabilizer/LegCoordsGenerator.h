@@ -14,7 +14,7 @@ public:
 
 public:
   void calcLegCoords(const GaitParam& gaitParam, double dt,
-                     std::vector<footguidedcontroller::LinearTrajectory<cnoid::Vector3> >& o_refZmpTraj, std::vector<cpp_filters::TwoPointInterpolatorSE3>& o_genCoords, std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, cpp_filters::TwoPointInterpolatorSE3& o_footMidCoords) const;
+                     std::vector<footguidedcontroller::LinearTrajectory<cnoid::Vector3> >& o_refZmpTraj, std::vector<cpp_filters::TwoPointInterpolatorSE3>& o_genCoords, std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, cpp_filters::TwoPointInterpolatorSE3& o_footMidCoords, std::vector<bool>& o_prevSupportPhase) const;
 
   void calcCOMCoords(const GaitParam& gaitParam, double dt, double g, double mass,
                      cnoid::Vector3& o_genNextCog, cnoid::Vector3& o_genNextCogVel) const;
