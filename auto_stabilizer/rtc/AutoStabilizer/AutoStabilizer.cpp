@@ -385,44 +385,6 @@ bool AutoStabilizer::copyRobotState(cnoid::BodyPtr inRobot, cnoid::BodyPtr outRo
 }
 
 // static function
-bool AutoStabilizer::calcReferenceParameters(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, cnoid::BodyPtr& genRobot, const RefToGenFrameConverter& refToGenFrameConverter, EndEffectorParam& endEffectorParams, GaitParam& gaitParam) {
-  // FootOrigin座標系を用いてrefRobotをgenerate frameに投影しrefRobotOriginとする
-  if(mode.isABCInit()){ // startAutoBalancer直後の初回
-    refToGenFrameConverter.initGenRobot(refRobot, endEffectorParams, gaitParam,
-                                        genRobot, gaitParam.footMidCoords);
-  }
-
-  refToGenFrameConverter.convertFrame(refRobot, endEffectorParams, gaitParam,
-                                      refRobotOrigin);
-
-  {
-    // 各エンドエフェクタのreferenceの位置・力を計算
-    for(int i=0;i<endEffectorParams.name.size(); i++){
-      endEffectorParams.refPose[i] = refRobotOrigin->link(endEffectorParams.parentLink[i])->T() * endEffectorParams.localT[i];
-      endEffectorParams.refWrench[i].head<3>() = gaitParam.footMidCoords.value().linear() * endEffectorParams.refWrenchOrigin[i].head<3>();
-      endEffectorParams.refWrench[i].tail<3>() = gaitParam.footMidCoords.value().linear() * endEffectorParams.refWrenchOrigin[i].tail<3>();
-    }
-  }
-
-  {
-    // 重心高さ
-    gaitParam.dz = refRobotOrigin->centerOfMass()[2] - gaitParam.footMidCoords.value().translation()[2];
-  }
-
-  if(mode.isABCInit()){ // startAutoBalancer直後の初回
-    // genRobotの姿勢を初期化する
-    AutoStabilizer::copyRobotState(refRobotOrigin, genRobot);
-    for(int i=0;i<endEffectorParams.name.size();i++){
-      endEffectorParams.abcTargetPose[i] = genRobot->link(endEffectorParams.parentLink[i])->T()*endEffectorParams.localT[i];
-    }
-    gaitParam.genCog = genRobot->centerOfMass();
-    gaitParam.genCogVel = cnoid::Vector3::Zero();
-  }
-
-  return true;
-}
-
-// static function
 bool AutoStabilizer::calcActualParameters(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, std::vector<AutoStabilizer::LegParam>& legParams, EndEffectorParam& endEffectorParams, GaitParam& gaitParam, double dt) {
 
   {
@@ -497,7 +459,16 @@ bool AutoStabilizer::calcActualParameters(const AutoStabilizer::ControlMode& mod
 
 // static function
 bool AutoStabilizer::execAutoBalancer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, cnoid::BodyPtr& genRobot, std::vector<AutoStabilizer::LegParam>& legParams, EndEffectorParam& endEffectorParams, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter) {
-  AutoStabilizer::calcReferenceParameters(mode, refRobot, refRobotOrigin, genRobot, refToGenFrameConverter, endEffectorParams, gaitParam);
+  if(mode.isABCInit()){ // startAutoBalancer直後の初回
+    // FootOrigin座標系を用いてrefRobotをgenerate frameに投影しgenRoboとする
+    refToGenFrameConverter.initGenRobot(refRobot, endEffectorParams, gaitParam,
+                                        genRobot, gaitParam.footMidCoords, gaitParam.genCog, gaitParam.genCogVel);
+  }
+
+  // FootOrigin座標系を用いてrefRobotをgenerate frameに投影しrefRobotOriginとする
+  refToGenFrameConverter.convertFrame(refRobot, endEffectorParams, gaitParam,
+                                      refRobotOrigin, endEffectorParams.refPose, endEffectorParams.refWrench, gaitParam.dz);
+
 
   if(mode.isABCInit()){ // startAutoBalancer直後の初回
     {

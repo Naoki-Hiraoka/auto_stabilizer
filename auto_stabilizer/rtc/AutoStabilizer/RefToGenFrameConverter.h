@@ -22,10 +22,11 @@ public:
   // startAutoBalancer直後の初回に呼ぶ必要がある.
   // generate frame中のfootMidCoordsの位置がreference frame中のrefRobotのfootMidCoordsの位置と同じで、generate frame中のfootMidCoordsの傾きが水平になるように、genRobotの初期位置を決め、その姿勢でgenRobotを初期化する
   bool initGenRobot(const cnoid::BodyPtr& refRobot, const EndEffectorParam& endEffectorParams, const GaitParam& gaitParam, // input
-                    cnoid::BodyPtr& genRobot, cpp_filters::TwoPointInterpolatorSE3& o_footMidCoords) const; // output
+                    cnoid::BodyPtr& genRobot, cpp_filters::TwoPointInterpolatorSE3& o_footMidCoords, cnoid::Vector3& o_genCog, cnoid::Vector3& o_genCogVel) const; // output
 
+  // reference frameで表現されたrefRobotをgenerate frameに投影しrefRobotOriginとし、各種referencec値をgenerate frameに変換する
   bool convertFrame(const cnoid::BodyPtr& refRobot, const EndEffectorParam& endEffectorParams, const GaitParam& gaitParam, // input
-                    cnoid::BodyPtr& refRobotOrigin) const; // output
+                    cnoid::BodyPtr& refRobotOrigin, std::vector<cnoid::Position>& o_refPose, std::vector<cnoid::Vector6>& o_refWrench, double& o_dz) const; // output
 protected:
   // refFootOriginWeightとdefaultTranslatePosとcopOffset に基づいて両足中間座標を求める
   cnoid::Position calcRefFootMidCoords(const cnoid::BodyPtr& robot, const EndEffectorParam& endEffectorParams, const GaitParam& gaitParam) const;
