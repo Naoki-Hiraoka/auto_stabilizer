@@ -37,8 +37,23 @@ bool RefToGenFrameConverter::convertFrame(const cnoid::BodyPtr& refRobot, const 
     refRobotOrigin->joint(i)->u() = refRobot->joint(i)->u();
   }
   refRobotOrigin->calcForwardKinematics();
+  refRobotOrigin->calcCenterOfMass();
+  /*
+    次の2つの座標系が一致するようにreference frameとgenerate frameを対応付ける
+    - refRobotの、refFootOriginWeightとdefaultTranslatePosとcopOffsetに基づいて求めた足裏中間座標 (イメージとしては静止状態の目標ZMP位置にdefaultTranslatePosを作用させたもの)
+    - 位置XYはgenRobotの重心位置. 位置ZはgenRobotの重心位置 - dz. 姿勢はfootMidCoords. (ただしHandFixModeなら、位置のfootMidCoords座標系Y成分はfootMidCoordsの位置.)
+      - handControlWeight = 0なら、位置も姿勢もfootMidCoords
+  */
   cnoid::Position refFootMidCoords = this->calcRefFootMidCoords(refRobotOrigin, endEffectorParams, gaitParam);
-  cnoidbodyutil::moveCoords(refRobotOrigin, gaitParam.footMidCoords.value(), refFootMidCoords); // 1周期前のfootMidCoordsを使っているが、footMidCoordsは不連続に変化するものではないのでよい
+  double dz = (refFootMidCoords.inverse() * refRobotOrigin->centerOfMass())[2]; // ref重心高さ
+  cnoid::Vector3 genCog_genFootMidCoordsLocal = gaitParam.footMidCoords.value().linear().transpose() * (gaitParam.genCog - gaitParam.footMidCoords.value().translation());
+  genCog_genFootMidCoordsLocal[1] *= (1.0 - handFixMode.value());
+  genCog_genFootMidCoordsLocal[2] -= dz;
+  cnoid::Position genFootMidCoords;
+  genFootMidCoords.linear() = gaitParam.footMidCoords.value().linear();
+  genFootMidCoords.translation() = gaitParam.footMidCoords.value().translation() + gaitParam.footMidCoords.value().linear() * genCog_genFootMidCoordsLocal;
+  genFootMidCoords = mathutil::calcMidCoords({gaitParam.footMidCoords.value(), genFootMidCoords}, {1.0-handControlRatio.value(), handControlRatio.value()});
+  cnoidbodyutil::moveCoords(refRobotOrigin, genFootMidCoords, refFootMidCoords); // 1周期前のfootMidCoordsを使っているが、footMidCoordsは不連続に変化するものではないのでよい
   refRobotOrigin->calcForwardKinematics();
   refRobotOrigin->calcCenterOfMass();
 
@@ -54,9 +69,6 @@ bool RefToGenFrameConverter::convertFrame(const cnoid::BodyPtr& refRobot, const 
     refWrench[i].head<3>() = gaitParam.footMidCoords.value().linear() * endEffectorParams.refWrenchOrigin[i].head<3>();
     refWrench[i].tail<3>() = gaitParam.footMidCoords.value().linear() * endEffectorParams.refWrenchOrigin[i].tail<3>();
   }
-
-  // ref重心高さ
-  double dz = refRobotOrigin->centerOfMass()[2] - gaitParam.footMidCoords.value().translation()[2];
 
   o_refPose = refPose;
   o_refWrench = refWrench;

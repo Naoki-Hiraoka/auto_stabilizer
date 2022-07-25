@@ -8,15 +8,33 @@
 class RefToGenFrameConverter {
 public:
   // RefToGenFrameConverterだけでつかうパラメータ
-
-  bool isHandFixMode = false; // falseならHandは重心の動きに合わせて左右に揺れる. trueなら揺れない
+  cpp_filters::TwoPointInterpolator<double> handFixMode = cpp_filters::TwoPointInterpolator<double>(0.0,0.0,0.0,cpp_filters::HOFFARBIB); // 0~1. 0ならHandは重心の動きに合わせて左右に揺れる. 1なら揺れない
   std::vector<cpp_filters::TwoPointInterpolator<double> > refFootOriginWeight = std::vector<cpp_filters::TwoPointInterpolator<double> >(NUM_LEGS,cpp_filters::TwoPointInterpolator<double>(1.0,0.0,0.0,cpp_filters::HOFFARBIB)); // 要素数2. 0: rleg. 1: lleg. Reference座標系のfootOriginを計算するときに用いるweight. このfootOriginからの相対位置で、GaitGeneratorに管理されていないEndEffectorのReference位置が解釈される. interpolatorによって連続的に変化する. 全てのLegのrefFootOriginWeightが同時に0になることはない
 
+protected:
+  cpp_filters::TwoPointInterpolator<double> handControlRatio = cpp_filters::TwoPointInterpolator<double>(0.0,0.0,0.0,cpp_filters::HOFFARBIB); // 0~1. startAutoBalancer直後の不連続性を減らすためのもの. 0 -> 1へ遷移
+  double handControlRatioTransitionTime = 1.0;
+
+public:
+  // startAutoBalancer時に呼ばれる
+  void reset() {
+    handControlRatio.reset(0.0);
+    handControlRatio.setGoal(1.0, handControlRatioTransitionTime);
+    handFixMode.reset(handFixMode.getGoal());
+    for(int i=0;i<refFootOriginWeight.size();i++) refFootOriginWeight[i].reset(refFootOriginWeight[i].getGoal());
+  }
+  // 内部の補間器をdtだけ進める
+  void update(double dt){
+    handControlRatio.interpolate(dt);
+    handFixMode.interpolate(dt);
+    for(int i=0;i<refFootOriginWeight.size();i++) refFootOriginWeight[i].interpolate(dt);
+  }
 public:
   /*
     次の2つの座標系が一致するようにreference frameとgenerate frameを対応付ける
     - refRobotの、refFootOriginWeightとdefaultTranslatePosとcopOffsetに基づいて求めた足裏中間座標 (イメージとしては静止状態の目標ZMP位置にdefaultTranslatePosを作用させたもの)
-    - 位置はgenRobotの重心位置. 姿勢はfootMidCoords. (ただしHandFixModeなら、位置のfootMidCoords座標系Y座標成分はfootMidCoordsの位置.)
+    - 位置XYはgenRobotの重心位置. 位置ZはgenRobotの重心位置 - dz. 姿勢はfootMidCoords. (ただしHandFixModeなら、位置のfootMidCoords座標系Y成分はfootMidCoordsの位置.)
+      - handControlWeight = 0なら、位置も姿勢もfootMidCoords
    */
 
   // startAutoBalancer直後の初回に呼ぶ必要がある.

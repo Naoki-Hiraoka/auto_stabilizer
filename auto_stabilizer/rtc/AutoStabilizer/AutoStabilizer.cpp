@@ -733,6 +733,7 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
   if(!AutoStabilizer::readInPortData(this->ports_, this->refRobot_, this->actRobot_, this->endEffectorParams_)) return RTC::RTC_OK;  // qRef が届かなければ何もしない
 
   this->mode_.update(this->dt_);
+  this->refToGenFrameConverter_.update(this->dt_);
 
   if(!this->mode_.isABCRunning()) {
     AutoStabilizer::copyRobotState(this->refRobot_, this->genRobot_);
@@ -752,6 +753,7 @@ RTC::ReturnCode_t AutoStabilizer::onActivated(RTC::UniqueId ec_id){
   std::cerr << "[" << m_profile.instance_name << "] "<< "onActivated(" << ec_id << ")" << std::endl;
   // 各種処理を初期化する TODO
   this->mode_.reset();
+  this->refToGenFrameConverter_.reset();
   this->footStepGenerator_.reset();
   return RTC::RTC_OK;
 }
@@ -855,23 +857,19 @@ bool AutoStabilizer::getGaitGeneratorParam(OpenHRP::AutoStabilizerService::GaitG
 }
 bool AutoStabilizer::setAutoBalancerParam(const OpenHRP::AutoStabilizerService::AutoBalancerParam& i_param){
   std::lock_guard<std::mutex> guard(this->mutex_);
-  this->mode_.abc_transition_time = i_param.transition_time;
   return true;
 }
 bool AutoStabilizer::getAutoBalancerParam(OpenHRP::AutoStabilizerService::AutoBalancerParam& i_param){
   std::lock_guard<std::mutex> guard(this->mutex_);
-  i_param.transition_time = this->mode_.abc_transition_time;
   // i_param.leg_names // refFootOriginWeightとautoControlRatioが必要
   return true;
 }
 void AutoStabilizer::setStabilizerParam(const OpenHRP::AutoStabilizerService::StabilizerParam& i_param){
   std::lock_guard<std::mutex> guard(this->mutex_);
-  this->mode_.st_transition_time = i_param.transition_time;
   return;
 }
 void AutoStabilizer::getStabilizerParam(OpenHRP::AutoStabilizerService::StabilizerParam& i_param){
   std::lock_guard<std::mutex> guard(this->mutex_);
-  i_param.transition_time = this->mode_.st_transition_time;
   return;
 }
 
