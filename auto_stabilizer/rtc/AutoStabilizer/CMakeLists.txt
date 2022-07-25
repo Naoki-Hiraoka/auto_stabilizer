@@ -30,6 +30,7 @@ add_library(AutoStabilizer SHARED
   LegCoordsGenerator.cpp
   FootStepGenerator.cpp
   GaitParam.cpp
+  RefToGenFrameConverter.cpp
   )
 target_link_libraries(AutoStabilizer
   ${catkin_LIBRARIES}

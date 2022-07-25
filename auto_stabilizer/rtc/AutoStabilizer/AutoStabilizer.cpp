@@ -5,7 +5,7 @@
 #include <cnoid/ValueTree>
 #include <cnoid/EigenUtil>
 #include "MathUtil.h"
-#include "FootGuidedController.h"
+#include "CnoidBodyUtil.h"
 #include <limits>
 
 #define DEBUG false
@@ -110,6 +110,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
 
   {
     // load end_effector
+    cnoid::DeviceList<cnoid::ForceSensor> forceSensors(this->refRobot_->devices());
     std::string endEffectors; this->getProperty("end_effectors", endEffectors);
     std::stringstream ss_endEffectors(endEffectors);
     std::string buf;
@@ -142,52 +143,46 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
       cnoid::Matrix3 localR;
       if(localaxis.norm() == 0) localR = cnoid::Matrix3::Identity();
       else localR = Eigen::AngleAxisd(localangle, localaxis.normalized()).toRotationMatrix();
+      cnoid::Position localT;
+      localT.translation() = localp;
+      localT.linear() = localR;
 
-      EndEffectorParam ikp;
-      ikp.name = name;
-      ikp.parentLink = parentLink;
-      ikp.localT.translation() = localp;
-      ikp.localT.linear() = localR;
-      this->endEffectorParams_.push_back(ikp);
-    }
-  }
-
-  {
-    //add more information to EndEffectors
-
-    // 0番目が右脚. 1番目が左脚. という仮定がある.
-    if(this->endEffectorParams_.size() < NUM_LEGS || this->endEffectorParams_[RLEG].name != "rleg" || this->endEffectorParams_[LLEG].name != "lleg"){
-      std::cerr << "\x1b[31m[" << this->m_profile.instance_name << "] " << " this->endEffectorParams_.size() < 2 || this->endEffectorParams_[0].name != \"rleg\" || this->endEffectorParams_[1].name != \"lleg\" not holds" << "\x1b[39m" << std::endl;
-      return RTC::RTC_ERROR;
-    }
-
-    // 各EndEffectorsから親リンク側に遡っていき、最初に見つかったForceSensorをEndEffectorに対応付ける. 以後、ForceSensorの値を座標変換したものがEndEffectorが受けている力とみなされる. 見つからなければ受けている力は常に0とみなされる
-    cnoid::DeviceList<cnoid::ForceSensor> forceSensors(this->actRobot_->devices());
-    for (int i=0;i<this->endEffectorParams_.size();i++){
-      cnoid::LinkPtr link = this->actRobot_->link(this->endEffectorParams_[i].parentLink);
-      bool found = false;
-      while (link != nullptr && found == false) {
-        for (size_t j = 0; j < forceSensors.size(); j++) {
-          if(forceSensors[j]->link() == link) {
-            this->endEffectorParams_[i].forceSensor = forceSensors[j]->name();
-            found = true;
-            break;
+      // 各EndEffectorsから親リンク側に遡っていき、最初に見つかったForceSensorをEndEffectorに対応付ける. 以後、ForceSensorの値を座標変換したものがEndEffectorが受けている力とみなされる. 見つからなければ受けている力は常に0とみなされる
+      std::string forceSensor = "";
+      {
+        cnoid::LinkPtr link = this->refRobot_->link(parentLink);
+        bool found = false;
+        while (link != nullptr && found == false) {
+          for (size_t j = 0; j < forceSensors.size(); j++) {
+            if(forceSensors[j]->link() == link) {
+              forceSensor = forceSensors[j]->name();
+              found = true;
+              break;
+            }
           }
         }
       }
+
+      this->endEffectorParams_.push_back(name, parentLink, localT, forceSensor);
     }
+  }
+
+  // 0番目が右脚. 1番目が左脚. という仮定がある.
+  if(this->endEffectorParams_.name.size() < NUM_LEGS || this->endEffectorParams_.name[RLEG] != "rleg" || this->endEffectorParams_.name[LLEG] != "lleg"){
+    std::cerr << "\x1b[31m[" << this->m_profile.instance_name << "] " << " this->endEffectorParams_.name.size() < 2 || this->endEffectorParams_.name[0] != \"rleg\" || this->endEffectorParams_.name[1] != \"lleg\" not holds" << "\x1b[39m" << std::endl;
+    return RTC::RTC_ERROR;
   }
 
   {
     // generate LegParams
-    cnoid::Position defautFootMidCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{cnoid::Position(this->refRobotOrigin_->link(this->endEffectorParams_[RLEG].parentLink)->T()*this->endEffectorParams_[RLEG].localT),cnoid::Position(this->refRobotOrigin_->link(this->endEffectorParams_[LLEG].parentLink)->T()*this->endEffectorParams_[LLEG].localT)},
+    cnoid::Position defautFootMidCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{cnoid::Position(this->refRobotOrigin_->link(this->endEffectorParams_.parentLink[RLEG])->T()*this->endEffectorParams_.localT[RLEG]),cnoid::Position(this->refRobotOrigin_->link(this->endEffectorParams_.parentLink[LLEG])->T()*this->endEffectorParams_.localT[LLEG])},
                                                             std::vector<double>{1,1});
     for(int i=0; i<NUM_LEGS; i++){
       LegParam param;
-      param.name = this->endEffectorParams_[i].name;
+      param.name = this->endEffectorParams_.name[i];
       this->legParams_.push_back(param);
 
-      cnoid::Position defaultPose = this->refRobotOrigin_->link(this->endEffectorParams_[i].parentLink)->T()*this->endEffectorParams_[i].localT;
+      cnoid::Position defaultPose = this->refRobotOrigin_->link(this->endEffectorParams_.parentLink[i])->T()*this->endEffectorParams_.localT[i];
       this->gaitParam_.defaultTranslatePos[i] = defautFootMidCoords.inverse() * defaultPose.translation();
     }
   }
@@ -222,10 +217,10 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
     // add more ports (ロボットモデルやEndEffectorの情報を使って)
 
     // 各EndEffectorにつき、ref<name>WrenchInというInPortをつくる
-    this->ports_.m_refWrenchIn_.resize(this->endEffectorParams_.size());
-    this->ports_.m_refWrench_.resize(this->endEffectorParams_.size());
-    for(int i=0;i<this->endEffectorParams_.size();i++){
-      std::string name = "ref"+this->endEffectorParams_[i].name+"WrenchIn";
+    this->ports_.m_refWrenchIn_.resize(this->endEffectorParams_.name.size());
+    this->ports_.m_refWrench_.resize(this->endEffectorParams_.name.size());
+    for(int i=0;i<this->endEffectorParams_.name.size();i++){
+      std::string name = "ref"+this->endEffectorParams_.name[i]+"WrenchIn";
       this->ports_.m_refWrenchIn_[i] = std::make_unique<RTC::InPort<RTC::TimedDoubleSeq> >(name.c_str(), this->ports_.m_refWrench_[i]);
       this->addInPort(name.c_str(), *(this->ports_.m_refWrenchIn_[i]));
     }
@@ -267,7 +262,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
 }
 
 // static function
-bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobot, cnoid::BodyPtr actRobot, std::vector<AutoStabilizer::EndEffectorParam>& endEffectors){
+bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobot, cnoid::BodyPtr actRobot, EndEffectorParam& endEffectors){
   bool refRobot_changed = false;
   bool qRef_updated = false;
   if(ports.m_qRefIn_.isNew()){
@@ -314,7 +309,7 @@ bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr
       ports.m_refWrenchIn_[i]->read();
       if(ports.m_refWrench_[i].data.length() == 6){
         for(int j=0;j<6;j++){
-          if(std::isfinite(ports.m_refWrench_[i].data[j])) endEffectors[i].refWrenchOrigin[j] = ports.m_refWrench_[i].data[j];
+          if(std::isfinite(ports.m_refWrench_[i].data[j])) endEffectors.refWrenchOrigin[i][j] = ports.m_refWrench_[i].data[j];
         }
       }
     }
@@ -390,72 +385,22 @@ bool AutoStabilizer::copyRobotState(cnoid::BodyPtr inRobot, cnoid::BodyPtr outRo
 }
 
 // static function
-cnoid::Position AutoStabilizer::calcRefFootMidCoords(const cnoid::BodyPtr robot, const std::vector<AutoStabilizer::LegParam>& legParams, const std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, const GaitParam& gaitParam){
-  cnoid::Position rleg = robot->link(endEffectorParams[RLEG].parentLink)->T()*endEffectorParams[RLEG].localT;
-  cnoid::Position lleg = robot->link(endEffectorParams[LLEG].parentLink)->T()*endEffectorParams[LLEG].localT;
-
-  cnoid::Position bothmidcoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{rleg, lleg},
-                                                          std::vector<double>{1.0, 1.0});
-  cnoid::Position rlegmidcoords = rleg; rlegmidcoords.translation() -= rlegmidcoords.linear() * gaitParam.defaultTranslatePos[RLEG];
-  cnoid::Position llegmidcoords = lleg; llegmidcoords.translation() -= llegmidcoords.linear() * gaitParam.defaultTranslatePos[LLEG];
-
-  double bothweight = std::min(legParams[RLEG].refFootOriginWeight, legParams[LLEG].refFootOriginWeight);
-  double rlegweight = legParams[RLEG].refFootOriginWeight - bothweight;
-  double llegweight = legParams[LLEG].refFootOriginWeight - bothweight;
-  return mathutil::calcMidCoords(std::vector<cnoid::Position>{bothmidcoords, rlegmidcoords, llegmidcoords},
-                                 std::vector<double>{bothweight, rlegweight, llegweight});
-}
-
-// static function
-void AutoStabilizer::moveCoords(cnoid::BodyPtr robot, const cnoid::Position& target, const cnoid::Position& at){
-  // fix ’at’ coords on ’robot’ to ’target’
-  cnoid::Position transform = target * at.inverse();
-  robot->rootLink()->T() = transform * robot->rootLink()->T();
-}
-
-// static function
-bool AutoStabilizer::calcReferenceParameters(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, cnoid::BodyPtr& genRobot, std::vector<AutoStabilizer::LegParam>& legParams, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, GaitParam& gaitParam) {
+bool AutoStabilizer::calcReferenceParameters(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, cnoid::BodyPtr& genRobot, const RefToGenFrameConverter& refToGenFrameConverter, EndEffectorParam& endEffectorParams, GaitParam& gaitParam) {
   // FootOrigin座標系を用いてrefRobotをgenerate frameに投影しrefRobotOriginとする
-  {
-    if(mode.isABCInit()){ // startAutoBalancer直後の初回
-      // generate frame中のfootMidCoordsの位置がreference frame中のrefRobotのfootMidCoordsの位置と同じで、generate frame中のfootMidCoordsの傾きが水平になるように、refRobotOriginの初期位置を決める
-      refRobotOrigin->rootLink()->T() = refRobot->rootLink()->T();
-      for(int i=0;i<refRobotOrigin->numJoints();i++){
-        refRobotOrigin->joint(i)->q() = refRobot->joint(i)->q();
-      }
-      refRobotOrigin->calcForwardKinematics();
-      cnoid::Position refFootMidCoords = AutoStabilizer::calcRefFootMidCoords(refRobotOrigin, legParams, endEffectorParams, gaitParam);
-      gaitParam.footMidCoords.reset(mathutil::orientCoordToAxis(refFootMidCoords, cnoid::Vector3::UnitZ())); // 初期化
-      AutoStabilizer::moveCoords(refRobotOrigin, gaitParam.footMidCoords.value(), refFootMidCoords);
-      for(int i=0;i<refRobotOrigin->numJoints();i++){
-        refRobotOrigin->joint(i)->q() = refRobot->joint(i)->q();
-      }
-      refRobotOrigin->calcForwardKinematics();
-      for(int i=0; i<endEffectorParams.size(); i++){
-        endEffectorParams[i].abcTargetPose = refRobotOrigin->link(endEffectorParams[i].parentLink)->T() * endEffectorParams[i].localT; // 初期化
-      }
-
-    } // if(mode.isABCInit())
+  if(mode.isABCInit()){ // startAutoBalancer直後の初回
+    refToGenFrameConverter.initGenRobot(refRobot, endEffectorParams, gaitParam,
+                                        genRobot, gaitParam.footMidCoords);
   }
 
-  {
-    for(int i=0;i<refRobotOrigin->numJoints();i++){
-      refRobotOrigin->joint(i)->q() = refRobot->joint(i)->q();
-      refRobotOrigin->joint(i)->u() = refRobot->joint(i)->u();
-    }
-    refRobotOrigin->calcForwardKinematics();
-    cnoid::Position refFootMidCoords = AutoStabilizer::calcRefFootMidCoords(refRobotOrigin, legParams, endEffectorParams, gaitParam);
-    AutoStabilizer::moveCoords(refRobotOrigin, gaitParam.footMidCoords.value(), refFootMidCoords); // 1周期前のfootMidCoordsを使っているが、footMidCoordsは不連続に変化するものではないのでよい
-    refRobotOrigin->calcForwardKinematics();
-    refRobotOrigin->calcCenterOfMass();
-  }
+  refToGenFrameConverter.convertFrame(refRobot, endEffectorParams, gaitParam,
+                                      refRobotOrigin);
 
   {
     // 各エンドエフェクタのreferenceの位置・力を計算
-    for(int i=0;i<endEffectorParams.size(); i++){
-      endEffectorParams[i].refPose = refRobotOrigin->link(endEffectorParams[i].parentLink)->T() * endEffectorParams[i].localT;
-      endEffectorParams[i].refWrench.head<3>() = gaitParam.footMidCoords.value().linear() * endEffectorParams[i].refWrenchOrigin.head<3>();
-      endEffectorParams[i].refWrench.tail<3>() = gaitParam.footMidCoords.value().linear() * endEffectorParams[i].refWrenchOrigin.tail<3>();
+    for(int i=0;i<endEffectorParams.name.size(); i++){
+      endEffectorParams.refPose[i] = refRobotOrigin->link(endEffectorParams.parentLink[i])->T() * endEffectorParams.localT[i];
+      endEffectorParams.refWrench[i].head<3>() = gaitParam.footMidCoords.value().linear() * endEffectorParams.refWrenchOrigin[i].head<3>();
+      endEffectorParams.refWrench[i].tail<3>() = gaitParam.footMidCoords.value().linear() * endEffectorParams.refWrenchOrigin[i].tail<3>();
     }
   }
 
@@ -467,8 +412,8 @@ bool AutoStabilizer::calcReferenceParameters(const AutoStabilizer::ControlMode& 
   if(mode.isABCInit()){ // startAutoBalancer直後の初回
     // genRobotの姿勢を初期化する
     AutoStabilizer::copyRobotState(refRobotOrigin, genRobot);
-    for(int i=0;i<endEffectorParams.size();i++){
-      endEffectorParams[i].abcTargetPose = genRobot->link(endEffectorParams[i].parentLink)->T()*endEffectorParams[i].localT;
+    for(int i=0;i<endEffectorParams.name.size();i++){
+      endEffectorParams.abcTargetPose[i] = genRobot->link(endEffectorParams.parentLink[i])->T()*endEffectorParams.localT[i];
     }
     gaitParam.genCog = genRobot->centerOfMass();
     gaitParam.genCogVel = cnoid::Vector3::Zero();
@@ -478,7 +423,7 @@ bool AutoStabilizer::calcReferenceParameters(const AutoStabilizer::ControlMode& 
 }
 
 // static function
-bool AutoStabilizer::calcActualParameters(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, std::vector<AutoStabilizer::LegParam>& legParams, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, GaitParam& gaitParam, double dt) {
+bool AutoStabilizer::calcActualParameters(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, std::vector<AutoStabilizer::LegParam>& legParams, EndEffectorParam& endEffectorParams, GaitParam& gaitParam, double dt) {
 
   {
     // FootOrigin座標系を用いてactRobotをgenerate frameに投影しactRobotOriginとする
@@ -495,33 +440,33 @@ bool AutoStabilizer::calcActualParameters(const AutoStabilizer::ControlMode& mod
     double rlegweight = (legParams[RLEG].genContactState)? 1.0 : 0.0;
     double llegweight = (legParams[LLEG].genContactState)? 1.0 : 0.0;
     if(!legParams[RLEG].genContactState && !legParams[LLEG].genContactState) rlegweight = llegweight = 1.0;
-    cnoid::Position actrleg = actRobotOrigin->link(endEffectorParams[RLEG].parentLink)->T()*endEffectorParams[RLEG].localT;
-    cnoid::Position actlleg = actRobotOrigin->link(endEffectorParams[LLEG].parentLink)->T()*endEffectorParams[LLEG].localT;
+    cnoid::Position actrleg = actRobotOrigin->link(endEffectorParams.parentLink[RLEG])->T()*endEffectorParams.localT[RLEG];
+    cnoid::Position actlleg = actRobotOrigin->link(endEffectorParams.parentLink[LLEG])->T()*endEffectorParams.localT[LLEG];
     cnoid::Position actFootMidCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{actrleg, actlleg},
                                                                std::vector<double>{rlegweight, llegweight});
     cnoid::Position actFootOriginCoords = mathutil::orientCoordToAxis(actFootMidCoords, cnoid::Vector3::UnitZ());
-    cnoid::Position genFootMidCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{endEffectorParams[RLEG].abcTargetPose, endEffectorParams[LLEG].abcTargetPose},
+    cnoid::Position genFootMidCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{endEffectorParams.abcTargetPose[RLEG], endEffectorParams.abcTargetPose[LLEG]},
                                                                std::vector<double>{rlegweight, llegweight});  // 1周期前のabcTargetPoseを使っているが、abcTargetPoseは不連続に変化するものではないのでよい
     cnoid::Position genFootOriginCoords = mathutil::orientCoordToAxis(genFootMidCoords, cnoid::Vector3::UnitZ());
-    AutoStabilizer::moveCoords(actRobotOrigin, genFootOriginCoords, actFootOriginCoords);
+    cnoidbodyutil::moveCoords(actRobotOrigin, genFootOriginCoords, actFootOriginCoords);
     actRobotOrigin->calcForwardKinematics();
     actRobotOrigin->calcCenterOfMass();
   }
 
   {
     // 各エンドエフェクタのactualの位置・力を計算
-    for(int i=0;i<endEffectorParams.size(); i++){
-      endEffectorParams[i].actPose = actRobotOrigin->link(endEffectorParams[i].parentLink)->T() * endEffectorParams[i].localT;
-      if(endEffectorParams[i].forceSensor != ""){
-        cnoid::ForceSensorPtr sensor = actRobotOrigin->findDevice<cnoid::ForceSensor>(endEffectorParams[i].forceSensor);
+    for(int i=0;i<endEffectorParams.name.size(); i++){
+      endEffectorParams.actPose[i] = actRobotOrigin->link(endEffectorParams.parentLink[i])->T() * endEffectorParams.localT[i];
+      if(endEffectorParams.forceSensor[i] != ""){
+        cnoid::ForceSensorPtr sensor = actRobotOrigin->findDevice<cnoid::ForceSensor>(endEffectorParams.forceSensor[i]);
         cnoid::Vector6 senF = sensor->F();
         cnoid::Position senPose = sensor->link()->T() * sensor->T_local();
-        cnoid::Position eefTosenPose = endEffectorParams[i].actPose.inverse() * senPose;
+        cnoid::Position eefTosenPose = endEffectorParams.actPose[i].inverse() * senPose;
         cnoid::Vector6 eefF; // endeffector frame. endeffector origin.
         eefF.head<3>() = eefTosenPose.linear() * senF.head<3>();
         eefF.tail<3>() = eefTosenPose.linear() * senF.tail<3>() + eefTosenPose.translation().cross(eefF.head<3>());
-        endEffectorParams[i].actWrench.head<3>() = endEffectorParams[i].actPose.linear() * eefF.head<3>();
-        endEffectorParams[i].actWrench.tail<3>() = endEffectorParams[i].actPose.linear() * eefF.tail<3>();
+        endEffectorParams.actWrench[i].head<3>() = endEffectorParams.actPose[i].linear() * eefF.head<3>();
+        endEffectorParams.actWrench[i].tail<3>() = endEffectorParams.actPose[i].linear() * eefF.tail<3>();
       }
     }
   }
@@ -551,14 +496,14 @@ bool AutoStabilizer::calcActualParameters(const AutoStabilizer::ControlMode& mod
 }
 
 // static function
-bool AutoStabilizer::execAutoBalancer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, cnoid::BodyPtr& genRobot, std::vector<AutoStabilizer::LegParam>& legParams, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator) {
-  AutoStabilizer::calcReferenceParameters(mode, refRobot, refRobotOrigin, genRobot, legParams, endEffectorParams, gaitParam);
+bool AutoStabilizer::execAutoBalancer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, cnoid::BodyPtr& genRobot, std::vector<AutoStabilizer::LegParam>& legParams, EndEffectorParam& endEffectorParams, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter) {
+  AutoStabilizer::calcReferenceParameters(mode, refRobot, refRobotOrigin, genRobot, refToGenFrameConverter, endEffectorParams, gaitParam);
 
   if(mode.isABCInit()){ // startAutoBalancer直後の初回
     {
       // footStepNodesListを初期化する
-      cnoid::Position rlegCoords = genRobot->link(endEffectorParams[RLEG].parentLink)->T()*endEffectorParams[RLEG].localT;
-      cnoid::Position llegCoords = genRobot->link(endEffectorParams[LLEG].parentLink)->T()*endEffectorParams[LLEG].localT;
+      cnoid::Position rlegCoords = genRobot->link(endEffectorParams.parentLink[RLEG])->T()*endEffectorParams.localT[RLEG];
+      cnoid::Position llegCoords = genRobot->link(endEffectorParams.parentLink[LLEG])->T()*endEffectorParams.localT[LLEG];
       gaitParam.footstepNodesList.resize(1);
       gaitParam.footstepNodesList[0].dstCoords = {rlegCoords, llegCoords};
       gaitParam.footstepNodesList[0].supportTime = {std::numeric_limits<double>::max(), std::numeric_limits<double>::max()};
@@ -591,26 +536,26 @@ bool AutoStabilizer::execAutoBalancer(const AutoStabilizer::ControlMode& mode, c
     legParams[i].genContactState = gaitParam.isSupportPhase(i);
   }
 
-  for(int i=0;i<endEffectorParams.size();i++){
-    if(i<NUM_LEGS) endEffectorParams[i].abcTargetPose = gaitParam.genCoords[i].value();
-    else endEffectorParams[i].abcTargetPose = endEffectorParams[i].refPose;
+  for(int i=0;i<endEffectorParams.name.size();i++){
+    if(i<NUM_LEGS) endEffectorParams.abcTargetPose[i] = gaitParam.genCoords[i].value();
+    else endEffectorParams.abcTargetPose[i] = endEffectorParams.refPose[i];
   }
 
   return true;
 }
 
 // static function
-bool AutoStabilizer::execStabilizer(std::vector<EndEffectorParam>& endEffectorParams) {
+bool AutoStabilizer::execStabilizer(EndEffectorParam& endEffectorParams) {
   // TODO
-  for(int i=0;i<endEffectorParams.size();i++){
-   endEffectorParams[i].stTargetPose = endEffectorParams[i].abcTargetPose;
+  for(int i=0;i<endEffectorParams.name.size();i++){
+   endEffectorParams.stTargetPose[i] = endEffectorParams.abcTargetPose[i];
   }
 
   return true;
 }
 
 // static function
-bool AutoStabilizer::solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::BodyPtr& refRobotOrigin, std::vector<EndEffectorParam>& endEffectorParams, AutoStabilizer::FullbodyIKParam& fullbodyIKParam, double dt, const std::vector<JointParam>& jointParams, const GaitParam& gaitParam) {
+bool AutoStabilizer::solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::BodyPtr& refRobotOrigin, EndEffectorParam& endEffectorParams, AutoStabilizer::FullbodyIKParam& fullbodyIKParam, double dt, const std::vector<JointParam>& jointParams, const GaitParam& gaitParam) {
   if(fullbodyIKParam.jlim_avoid_weight.size() != 6+genRobot->numJoints()) fullbodyIKParam.jlim_avoid_weight = cnoid::VectorX::Zero(6+genRobot->numJoints());
   cnoid::VectorX dq_weight_all = cnoid::VectorX::Zero(6+genRobot->numJoints());
   for(int i=0;i<6;i++) dq_weight_all[i] = 1.0;
@@ -621,18 +566,18 @@ bool AutoStabilizer::solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::Body
   std::vector<std::shared_ptr<IK::IKConstraint> > ikConstraint;
 
   // EEF
-  for(int i=0;i<endEffectorParams.size();i++){
-    endEffectorParams[i].ikPositionConstraint->A_link() = genRobot->link(endEffectorParams[i].parentLink);
-    endEffectorParams[i].ikPositionConstraint->A_localpos() = endEffectorParams[i].localT;
-    endEffectorParams[i].ikPositionConstraint->B_link() = nullptr;
-    endEffectorParams[i].ikPositionConstraint->B_localpos() = endEffectorParams[i].stTargetPose;
-    endEffectorParams[i].ikPositionConstraint->maxError() << 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt;
-    endEffectorParams[i].ikPositionConstraint->precision() << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0; // 強制的にIKをmax loopまで回す
-    if(i<NUM_LEGS) endEffectorParams[i].ikPositionConstraint->weight() << 9.0, 9.0, 9.0, 9.0, 9.0, 9.0;
-    else endEffectorParams[i].ikPositionConstraint->weight() << 1.0, 1.0, 1.0, 1.0, 1.0, 1.0;
-    endEffectorParams[i].ikPositionConstraint->eval_link() = nullptr;
-    endEffectorParams[i].ikPositionConstraint->eval_localR() = endEffectorParams[i].ikPositionConstraint->B_localpos().linear();
-    ikConstraint.push_back(endEffectorParams[i].ikPositionConstraint);
+  for(int i=0;i<endEffectorParams.name.size();i++){
+    endEffectorParams.ikPositionConstraint[i]->A_link() = genRobot->link(endEffectorParams.parentLink[i]);
+    endEffectorParams.ikPositionConstraint[i]->A_localpos() = endEffectorParams.localT[i];
+    endEffectorParams.ikPositionConstraint[i]->B_link() = nullptr;
+    endEffectorParams.ikPositionConstraint[i]->B_localpos() = endEffectorParams.stTargetPose[i];
+    endEffectorParams.ikPositionConstraint[i]->maxError() << 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt;
+    endEffectorParams.ikPositionConstraint[i]->precision() << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0; // 強制的にIKをmax loopまで回す
+    if(i<NUM_LEGS) endEffectorParams.ikPositionConstraint[i]->weight() << 9.0, 9.0, 9.0, 9.0, 9.0, 9.0;
+    else endEffectorParams.ikPositionConstraint[i]->weight() << 1.0, 1.0, 1.0, 1.0, 1.0, 1.0;
+    endEffectorParams.ikPositionConstraint[i]->eval_link() = nullptr;
+    endEffectorParams.ikPositionConstraint[i]->eval_localR() = endEffectorParams.ikPositionConstraint[i]->B_localpos().linear();
+    ikConstraint.push_back(endEffectorParams.ikPositionConstraint[i]);
   }
 
   // COM
@@ -821,7 +766,7 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
   if(!this->mode_.isABCRunning()) {
     AutoStabilizer::copyRobotState(this->refRobot_, this->genRobot_);
   }else{
-    AutoStabilizer::execAutoBalancer(this->mode_, this->refRobot_, this->refRobotOrigin_, this->actRobot_, this->actRobotOrigin_, this->genRobot_, this->legParams_, this->endEffectorParams_, this->gaitParam_, this->dt_, this->jointParams_, this->footStepGenerator_, this->legCoordsGenerator_);
+    AutoStabilizer::execAutoBalancer(this->mode_, this->refRobot_, this->refRobotOrigin_, this->actRobot_, this->actRobotOrigin_, this->genRobot_, this->legParams_, this->endEffectorParams_, this->gaitParam_, this->dt_, this->jointParams_, this->footStepGenerator_, this->legCoordsGenerator_, this->refToGenFrameConverter_);
     AutoStabilizer::execStabilizer(this->endEffectorParams_);
     AutoStabilizer::solveFullbodyIK(this->genRobot_, this->refRobotOrigin_, this->endEffectorParams_, this->fullbodyIKParam_, this->dt_, this->jointParams_, this->gaitParam_);
   }

@@ -30,7 +30,9 @@
 // #include <joint_limit_table/JointLimitTable.h>
 
 #include "AutoStabilizerService_impl.h"
+#include "EndEffectorParam.h"
 #include "GaitParam.h"
+#include "RefToGenFrameConverter.h"
 #include "FootStepGenerator.h"
 #include "LegCoordsGenerator.h"
 
@@ -185,28 +187,6 @@ protected:
   cnoid::BodyPtr actRobotOrigin_; // actual. generate frame
   cnoid::BodyPtr genRobot_; // output
 
-  class EndEffectorParam {
-  public:
-    // constant
-    std::string name = ""; // 右脚はrleg. 左脚はllegという名前である必要がある
-    std::string parentLink = ""; // 必ずrobot->link(parentLink)がnullptrではないことを約束する. そのため、毎回robot->link(parentLink)がnullptrかをチェックしなくても良い
-    cnoid::Position localT = cnoid::Position::Identity(); // Parent Link Frame
-    std::string forceSensor = ""; // actualのForceSensorの値を座標変換したものがEndEffectorが受けている力とみなされる. forceSensorが""ならば受けている力は常に0とみなされる. forceSensorが""で無いならばrobot->findDevice<cnoid::ForceSensor>(endEffectorParams[i].forceSensor)がnullptrでは無いことを約束するので、毎回nullptrかをチェックしなくても良い
-
-    // from reference port
-    cnoid::Vector6 refWrenchOrigin = cnoid::Vector6::Zero(); // FootOrigin frame. EndEffector origin. ロボットが受ける力
-
-    // AutoStabilizerの内部で計算される
-    cnoid::Position refPose = cnoid::Position::Identity(); // generate frame
-    cnoid::Vector6 refWrench = cnoid::Vector6::Zero(); // generate frame. EndEffector origin. ロボットが受ける力
-    cnoid::Position actPose = cnoid::Position::Identity(); // generate frame
-    cnoid::Vector6 actWrench = cnoid::Vector6::Zero(); // generate frame. EndEffector origin. ロボットが受ける力
-    cnoid::Position abcTargetPose = cnoid::Position::Identity(); // generate frame. abcで計算された目標位置姿勢
-    cnoid::Position stTargetPose = cnoid::Position::Identity(); // generate frame. stで計算された目標位置姿勢
-    std::shared_ptr<IK::PositionConstraint> ikPositionConstraint = std::make_shared<IK::PositionConstraint>();
-  };
-  std::vector<EndEffectorParam> endEffectorParams_; // 要素数2以上. 0: rleg. 1: lleg. 要素数や順序は変化しない
-
   class LegParam {
   public:
     // constant
@@ -240,8 +220,10 @@ protected:
   };
   std::vector<JointParam> jointParams_; // 要素数robot->numJoints(). jointIdの順.
 
+  EndEffectorParam endEffectorParams_;
   GaitParam gaitParam_;
 
+  RefToGenFrameConverter refToGenFrameConverter_;
   FootStepGenerator footStepGenerator_;
   LegCoordsGenerator legCoordsGenerator_;
 
@@ -252,12 +234,11 @@ protected:
   static bool copyRobotState(cnoid::BodyPtr inRobot, cnoid::BodyPtr outRobot);
   static void moveCoords(cnoid::BodyPtr robot, const cnoid::Position& target, const cnoid::Position& at);
 
-  static bool readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobot, cnoid::BodyPtr actRobot, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams);
-  static cnoid::Position calcRefFootMidCoords(const cnoid::BodyPtr refRobotOrigin, const std::vector<AutoStabilizer::LegParam>& legParams, const std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, const GaitParam& gaitParam);
-  static bool calcReferenceParameters(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, cnoid::BodyPtr& genRobot, std::vector<AutoStabilizer::LegParam>& legParams, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, GaitParam& gaitParam);
-  static bool calcActualParameters(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, std::vector<AutoStabilizer::LegParam>& legParams, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, GaitParam& gaitParam, double dt);
-  static bool execAutoBalancer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, cnoid::BodyPtr& genRobot, std::vector<AutoStabilizer::LegParam>& legParams, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator);
-  static bool execStabilizer(std::vector<EndEffectorParam>& endEffectorParams);
+  static bool readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobot, cnoid::BodyPtr actRobot, EndEffectorParam& endEffectorParams);
+  static bool calcReferenceParameters(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, cnoid::BodyPtr& genRobot, const RefToGenFrameConverter& refToGenFrameConverter, EndEffectorParam& endEffectorParams, GaitParam& gaitParam);
+  static bool calcActualParameters(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, std::vector<AutoStabilizer::LegParam>& legParams, EndEffectorParam& endEffectorParams, GaitParam& gaitParam, double dt);
+  static bool execAutoBalancer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, cnoid::BodyPtr& genRobot, std::vector<AutoStabilizer::LegParam>& legParams, EndEffectorParam& endEffectorParams, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter);
+  static bool execStabilizer(EndEffectorParam& endEffectorParams);
   class FullbodyIKParam {
   public:
     cnoid::VectorX jlim_avoid_weight;
@@ -267,7 +248,7 @@ protected:
     std::shared_ptr<IK::AngularMomentumConstraint> angularMomentumConstraint = std::make_shared<IK::AngularMomentumConstraint>();
   };
   FullbodyIKParam fullbodyIKParam_;
-  static bool solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::BodyPtr& refRobotOrigin, std::vector<AutoStabilizer::EndEffectorParam>& endEffectorParams, AutoStabilizer::FullbodyIKParam& fullbodyIKParam, double dt, const std::vector<JointParam>& jointParams, const GaitParam& gaitParam);
+  static bool solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::BodyPtr& refRobotOrigin, EndEffectorParam& endEffectorParams, AutoStabilizer::FullbodyIKParam& fullbodyIKParam, double dt, const std::vector<JointParam>& jointParams, const GaitParam& gaitParam);
   class OutputOffsetInterpolators {
   public:
     cpp_filters::TwoPointInterpolatorSE3 genBasePoseInterpolator = cpp_filters::TwoPointInterpolatorSE3(cnoid::Position::Identity(),cnoid::Vector6::Zero(),cnoid::Vector6::Zero(),cpp_filters::HOFFARBIB);
