@@ -175,6 +175,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
 
   {
     // generate LegParams
+    // init-poseのとき両脚が水平かつX軸が前方であるという仮定がある
     cnoid::Position defautFootMidCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{cnoid::Position(this->refRobotOrigin_->link(this->endEffectorParams_.parentLink[RLEG])->T()*this->endEffectorParams_.localT[RLEG]),cnoid::Position(this->refRobotOrigin_->link(this->endEffectorParams_.parentLink[LLEG])->T()*this->endEffectorParams_.localT[LLEG])},
                                                             std::vector<double>{1,1});
     for(int i=0; i<NUM_LEGS; i++){

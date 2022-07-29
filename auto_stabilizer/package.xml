@@ -12,11 +12,12 @@
 
   <buildtool_depend>catkin</buildtool_depend>
 
-  <depend>qpoases_vendor</depend>
+  <!-- <depend>qpoases_vendor</depend> -->
   <depend>rtmbuild2</depend>
   <depend>cpp_filters</depend>
   <depend>choreonoid</depend>
   <depend>hrpsys_ros_bridge</depend>
   <depend>ik_constraint</depend>
+  <depend>prioritized_qp</depend>
   <depend>fullbody_inverse_kinematics_solver</depend>
 </package>

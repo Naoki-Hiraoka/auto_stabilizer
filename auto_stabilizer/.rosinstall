@@ -21,3 +21,9 @@
 - git:
     uri: https://github.com/Naoki-Hiraoka/ik_solvers
     local-name: ik_solvers
+- git:
+    uri: https://github.com/Naoki-Hiraoka/qp_solvers
+    local-name: qp_solvers
+- git:
+    uri: https://github.com/Naoki-Hiraoka/prioritized_qp
+    local-name: prioritized_qp

@@ -8,12 +8,13 @@ add_definitions(-Wno-deprecated)
 find_package(catkin REQUIRED COMPONENTS
   ik_constraint
   fullbody_inverse_kinematics_solver
-  #prioritized_qp
+  prioritized_qp
   #prioritized_inverse_kinematics_solver
   cpp_filters
   #ik_constraint_joint_limit_table
   )
 find_package(choreonoid REQUIRED)
+find_package(OsqpEigen REQUIRED)
 
 find_package(PkgConfig)
 pkg_check_modules(openrtm_aist openrtm-aist REQUIRED)
@@ -31,12 +32,14 @@ add_library(AutoStabilizer SHARED
   FootStepGenerator.cpp
   GaitParam.cpp
   RefToGenFrameConverter.cpp
+  Stabilizer.cpp
   )
 target_link_libraries(AutoStabilizer
   ${catkin_LIBRARIES}
   ${CHOREONOID_BODY_LIBRARIES}
   ${openrtm_aist_LIBRARIES}
   ${${PROJECT_NAME}_IDLLIBRARY_DIRS}
+  OsqpEigen::OsqpEigen
   )
 set_target_properties(AutoStabilizer PROPERTIES PREFIX "")
 add_dependencies(AutoStabilizer RTMBUILD2_${PROJECT_NAME}_genrpc) # wait for rtmbuild2_genidl
