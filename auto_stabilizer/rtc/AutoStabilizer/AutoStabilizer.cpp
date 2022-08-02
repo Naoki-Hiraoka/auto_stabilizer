@@ -106,6 +106,8 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
     this->actRobotOrigin_->calcForwardKinematics(); this->actRobotOrigin_->calcCenterOfMass();
     this->genRobot_ = robot->clone();
     this->genRobot_->calcForwardKinematics(); this->genRobot_->calcCenterOfMass();
+    this->actRobotTqc_ = robot->clone();
+    this->actRobotTqc_->calcForwardKinematics(); this->actRobotTqc_->calcCenterOfMass();
   }
 
   {
@@ -165,6 +167,10 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
 
       this->endEffectorParams_.push_back(name, parentLink, localT, forceSensor);
     }
+  }
+
+  for(int i=0;i<this->endEffectorParams_.name.size();i++){
+    this->impedanceController_.push_back();
   }
 
   // 0番目が右脚. 1番目が左脚. という仮定がある.
@@ -455,9 +461,9 @@ bool AutoStabilizer::calcActualParameters(const AutoStabilizer::ControlMode& mod
 }
 
 // static function
-bool AutoStabilizer::execAutoBalancer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, cnoid::BodyPtr& genRobot, EndEffectorParam& endEffectorParams, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ImpedanceController& impedanceController) {
+bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, cnoid::BodyPtr& genRobot, cnoid::BodyPtr& actRobotTqc, EndEffectorParam& endEffectorParams, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer) {
   if(mode.isABCInit()){ // startAutoBalancer直後の初回
-    // FootOrigin座標系を用いてrefRobotをgenerate frameに投影しgenRoboとする
+    // FootOrigin座標系を用いてrefRobotをgenerate frameに投影しgenRobotとする
     refToGenFrameConverter.initGenRobot(refRobot, endEffectorParams, gaitParam,
                                         genRobot, gaitParam.footMidCoords, gaitParam.genCog, gaitParam.genCogVel);
   }
@@ -491,10 +497,14 @@ bool AutoStabilizer::execAutoBalancer(const AutoStabilizer::ControlMode& mode, c
 
     for(int i=0;i<endEffectorParams.name.size();i++){
       endEffectorParams.icOffset[i].reset(cnoid::Vector6::Zero());
+      endEffectorParams.stOffset[i].reset(cnoid::Vector6::Zero());
     }
+    gaitParam.stOffsetRootRpy.reset(cnoid::Vector3::Zero());
   }
 
   AutoStabilizer::calcActualParameters(mode, actRobot, actRobotOrigin, endEffectorParams, gaitParam, dt);
+
+  // Impedance Controller
   impedanceController.calcImpedanceControl(dt, endEffectorParams,
                                            endEffectorParams.icOffset);
   for(int i=0;i<endEffectorParams.name.size();i++){
@@ -503,24 +513,32 @@ bool AutoStabilizer::execAutoBalancer(const AutoStabilizer::ControlMode& mode, c
     endEffectorParams.icTargetPose[i].translation() = icOffset.head<3>() + endEffectorParams.refPose[i].translation();
     endEffectorParams.icTargetPose[i].linear() = cnoid::AngleAxisd(icOffset.tail<3>().norm(),(icOffset.tail<3>().norm()>0)?icOffset.tail<3>().normalized() : cnoid::Vector3::UnitX()) * endEffectorParams.refPose[i].linear();
   }
+
+  // AutoBalancer
   footStepGenerator.calcFootSteps(gaitParam, dt,
                                   gaitParam.footstepNodesList, gaitParam.srcCoords);
   legCoordsGenerator.calcLegCoords(gaitParam, dt,
                                    gaitParam.refZmpTraj, gaitParam.genCoords, gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.footMidCoords, gaitParam.prevSupportPhase);
   legCoordsGenerator.calcCOMCoords(gaitParam, dt, 9.80665, genRobot->mass(),
                                    gaitParam.genCog, gaitParam.genCogVel);
-
   for(int i=0;i<endEffectorParams.name.size();i++){
     if(i<NUM_LEGS) endEffectorParams.abcTargetPose[i] = gaitParam.genCoords[i].value();
     else endEffectorParams.abcTargetPose[i] = endEffectorParams.icTargetPose[i];
   }
 
-  // stabilizer
-  // reset dRootRpy TODO
+  // Stabilizer
+  if(mode.isSTRunning()){
+    stabilizer.execStabilizer(refRobotOrigin, actRobotOrigin, genRobot, gaitParam, endEffectorParams, dt, 9.80665, genRobot->mass(),
+                              actRobotTqc, gaitParam.stOffsetRootRpy, endEffectorParams.stOffset);
+  }
+  gaitParam.stOffsetRootRpy.interpolate(dt);
   gaitParam.stTargetRootPose.translation() = refRobotOrigin->rootLink()->p();
-  gaitParam.stTargetRootPose.linear() = (gaitParam.footMidCoords.value().linear() * cnoid::rotFromRpy(gaitParam.dRootRpy)) * refRobotOrigin->rootLink()->R();
+  gaitParam.stTargetRootPose.linear() = (gaitParam.footMidCoords.value().linear() * cnoid::rotFromRpy(gaitParam.stOffsetRootRpy.value())) * refRobotOrigin->rootLink()->R();
   for(int i=0;i<endEffectorParams.name.size();i++){
-   endEffectorParams.stTargetPose[i] = endEffectorParams.abcTargetPose[i];
+    endEffectorParams.stOffset[i].interpolate(dt);
+    cnoid::Vector6 stOffset = endEffectorParams.stOffset[i].value();
+    endEffectorParams.stTargetPose[i].translation() = stOffset.head<3>() + endEffectorParams.abcTargetPose[i].translation();
+    endEffectorParams.stTargetPose[i].linear() = cnoid::AngleAxisd(stOffset.tail<3>().norm(),(stOffset.tail<3>().norm()>0)?stOffset.tail<3>().normalized() : cnoid::Vector3::UnitX()) * endEffectorParams.abcTargetPose[i].linear();
   }
 
 
@@ -740,7 +758,7 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
   if(!this->mode_.isABCRunning()) {
     AutoStabilizer::copyRobotState(this->refRobot_, this->genRobot_);
   }else{
-    AutoStabilizer::execAutoBalancer(this->mode_, this->refRobot_, this->refRobotOrigin_, this->actRobot_, this->actRobotOrigin_, this->genRobot_, this->endEffectorParams_, this->gaitParam_, this->dt_, this->jointParams_, this->footStepGenerator_, this->legCoordsGenerator_, this->refToGenFrameConverter_, this->impedanceController_);
+    AutoStabilizer::execAutoStabilizer(this->mode_, this->refRobot_, this->refRobotOrigin_, this->actRobot_, this->actRobotOrigin_, this->genRobot_, this->actRobotTqc_, this->endEffectorParams_, this->gaitParam_, this->dt_, this->jointParams_, this->footStepGenerator_, this->legCoordsGenerator_, this->refToGenFrameConverter_, this->impedanceController_, this->stabilizer_);
     AutoStabilizer::solveFullbodyIK(this->genRobot_, this->refRobotOrigin_, this->endEffectorParams_, this->fullbodyIKParam_, this->dt_, this->jointParams_, this->gaitParam_);
   }
 
@@ -756,6 +774,7 @@ RTC::ReturnCode_t AutoStabilizer::onActivated(RTC::UniqueId ec_id){
   this->mode_.reset();
   this->refToGenFrameConverter_.reset();
   this->footStepGenerator_.reset();
+  this->impedanceController_.reset();
   return RTC::RTC_OK;
 }
 RTC::ReturnCode_t AutoStabilizer::onDeactivated(RTC::UniqueId ec_id){
@@ -779,7 +798,6 @@ bool AutoStabilizer::goVelocity(const double& vx, const double& vy, const double
   }else{
     return false;
   }
-  return true;
 }
 bool AutoStabilizer::goStop(){
   std::lock_guard<std::mutex> guard(this->mutex_);
@@ -843,6 +861,37 @@ bool AutoStabilizer::stopStabilizer(void){
     while (this->mode_.now() != ControlMode::MODE_ABC) usleep(1000);
     usleep(1000);
     return true;
+  }else{
+    return false;
+  }
+}
+
+bool AutoStabilizer::startImpedanceController(const std::string& i_name){
+  std::lock_guard<std::mutex> guard(this->mutex_);
+  if(this->mode_.isABCRunning()){
+    for(int i=0;i<this->endEffectorParams_.name.size();i++){
+      if(this->endEffectorParams_.name[i] != i_name) continue;
+      if(this->impedanceController_.isImpedanceMode[i]) return false;
+      this->impedanceController_.isImpedanceMode[i] = true;
+      return true;
+    }
+    return false;
+  }else{
+    return false;
+  }
+}
+
+bool AutoStabilizer::stopImpedanceController(const std::string& i_name){
+  std::lock_guard<std::mutex> guard(this->mutex_);
+  if(this->mode_.isABCRunning()){
+    for(int i=0;i<this->endEffectorParams_.name.size();i++){
+      if(this->endEffectorParams_.name[i] != i_name) continue;
+      if(!this->impedanceController_.isImpedanceMode[i]) return false;
+      this->impedanceController_.isImpedanceMode[i] = false;
+      this->endEffectorParams_.icOffset[i].setGoal(cnoid::Vector6::Zero(), 2.0);
+      return true;
+    }
+    return false;
   }else{
     return false;
   }

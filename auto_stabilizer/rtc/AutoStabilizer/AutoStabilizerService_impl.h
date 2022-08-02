@@ -31,6 +31,8 @@ public:
   void setStabilizerParam(const OpenHRP::AutoStabilizerService::StabilizerParam& i_param);
   void getStabilizerParam(OpenHRP::AutoStabilizerService::StabilizerParam_out i_param);
   CORBA::Boolean releaseEmergencyStop();
+  CORBA::Boolean startImpedanceController(const char *i_name_);
+  CORBA::Boolean stopImpedanceController(const char *i_name_);
   //
   //
   void setComp(AutoStabilizer *i_comp);

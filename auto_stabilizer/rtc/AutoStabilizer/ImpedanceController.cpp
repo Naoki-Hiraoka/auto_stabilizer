@@ -2,7 +2,7 @@
 #include "MathUtil.h"
 
 bool ImpedanceController::calcImpedanceControl(double dt, const EndEffectorParam& endEffectorParam,
-                                               std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& icOffset /*generate frame, endeffector origin*/) const{
+                                               std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_icOffset /*generate frame, endeffector origin*/) const{
   for(int i=0;i<endEffectorParam.name.size();i++){
     if(!this->isImpedanceMode[i])  continue;
 
@@ -37,8 +37,8 @@ bool ImpedanceController::calcImpedanceControl(double dt, const EndEffectorParam
 
       dOffsetLocal[j] =
         ((actWrenchLocal[j] - refWrenchLocal[j]) * this->wrenchGain[i][j] * dt * dt
-         - this->K[i][j] * offsetPrevLocal[i] * dt * dt
-         + this->M[i][j] * dOffsetPrevLocal[i]*dt)
+         - this->K[i][j] * offsetPrevLocal[j] * dt * dt
+         + this->M[i][j] * dOffsetPrevLocal[j]*dt)
         / (this->M[i][j] + this->D[i][j] * dt + this->K[i][j] * dt * dt);
     }
 
@@ -48,7 +48,7 @@ bool ImpedanceController::calcImpedanceControl(double dt, const EndEffectorParam
 
     cnoid::Vector6 offset = offsetPrev + dOffset;
     offset = mathutil::clampMatrix<cnoid::Vector6>(offset, this->compensationLimit[i]);
-    icOffset[i].reset(offset, dOffset/dt);
+    o_icOffset[i].reset(offset, dOffset/dt);
   }
 
   return true;

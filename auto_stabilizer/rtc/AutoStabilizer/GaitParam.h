@@ -33,8 +33,7 @@ public:
   cnoid::Vector3 genCog; // generate frame.  現在のCOM
   cnoid::Vector3 genCogVel;  // generate frame.  現在のCOM速度
 
-  cnoid::Vector3 dRootRpy = cnoid::Vector3::Zero(); // gaitParam.footMidCoords座標系. stで計算された目標位置姿勢オフセット
-
+  cpp_filters::TwoPointInterpolator<cnoid::Vector3> stOffsetRootRpy = cpp_filters::TwoPointInterpolator<cnoid::Vector3>(cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::HOFFARBIB);; // gaitParam.footMidCoords座標系. stで計算された目標位置姿勢オフセット
   cnoid::Position stTargetRootPose = cnoid::Position::Identity(); // generate frame
 public:
   // param

@@ -36,6 +36,7 @@
 #include "FootStepGenerator.h"
 #include "LegCoordsGenerator.h"
 #include "ImpedanceController.h"
+#include "Stabilizer.h"
 
 class AutoStabilizer : public RTC::DataFlowComponentBase{
 public:
@@ -64,6 +65,8 @@ public:
   void setStabilizerParam(const OpenHRP::AutoStabilizerService::StabilizerParam& i_param);
   bool startStabilizer(void);
   bool stopStabilizer(void);
+  bool startImpedanceController(const std::string& i_name);
+  bool stopImpedanceController(const std::string& i_name);
 
 protected:
   std::mutex mutex_;
@@ -186,7 +189,8 @@ protected:
   cnoid::BodyPtr refRobotOrigin_; // reference. generate frame
   cnoid::BodyPtr actRobot_; // actual. actual imu world frame
   cnoid::BodyPtr actRobotOrigin_; // actual. generate frame
-  cnoid::BodyPtr genRobot_; // output
+  cnoid::BodyPtr genRobot_; // output. 関節位置制御用
+  cnoid::BodyPtr actRobotTqc_; // output. 関節トルク制御用
 
   class JointParam {
   public:
@@ -206,6 +210,7 @@ protected:
   ImpedanceController impedanceController_;
   FootStepGenerator footStepGenerator_;
   LegCoordsGenerator legCoordsGenerator_;
+  Stabilizer stabilizer_;
 
 protected:
   // utility functions
@@ -216,7 +221,7 @@ protected:
 
   static bool readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobot, cnoid::BodyPtr actRobot, EndEffectorParam& endEffectorParams);
   static bool calcActualParameters(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, EndEffectorParam& endEffectorParams, GaitParam& gaitParam, double dt);
-  static bool execAutoBalancer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, cnoid::BodyPtr& genRobot, EndEffectorParam& endEffectorParams, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ImpedanceController& impedanceController);
+  static bool execAutoStabilizer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, cnoid::BodyPtr& genRobot, cnoid::BodyPtr& actRobotTqc, EndEffectorParam& endEffectorParams, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer);
   class FullbodyIKParam {
   public:
     cnoid::VectorX jlim_avoid_weight;

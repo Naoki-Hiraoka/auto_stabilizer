@@ -749,6 +749,21 @@ module OpenHRP
      * @return
      */
     boolean stopStabilizer();
+
+    /**
+     * @brief start impedance controller.
+     * @param name: name of end_effector
+     * @return true if set successfully, false otherwise
+     */
+    boolean startImpedanceController(in string name);
+
+    /**
+     * @brief stop impedance controller.
+     * @param name: name of end_effector
+     * @return true if set successfully, false otherwise
+     */
+    boolean stopImpedanceController(in string name);
+
   };
 };
 

@@ -105,6 +105,16 @@ CORBA::Boolean AutoStabilizerService_impl::releaseEmergencyStop()
     return this->comp_->releaseEmergencyStop();
 };
 
+CORBA::Boolean AutoStabilizerService_impl::startImpedanceController(const char *i_name_)
+{
+  return this->comp_->startImpedanceController(i_name_);
+};
+
+CORBA::Boolean AutoStabilizerService_impl::stopImpedanceController(const char *i_name_)
+{
+  return this->comp_->stopImpedanceController(i_name_);
+};
+
 void AutoStabilizerService_impl::setComp(AutoStabilizer *i_comp)
 {
   this->comp_ = i_comp;

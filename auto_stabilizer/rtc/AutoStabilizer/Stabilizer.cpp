@@ -4,16 +4,16 @@
 #include <cnoid/Jacobian>
 
 bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobotOrigin, const cnoid::BodyPtr actRobotOrigin, const cnoid::BodyPtr genRobot, const GaitParam& gaitParam, const EndEffectorParam& endEffectorParam, double dt, double g, double mass,
-                                cnoid::BodyPtr& genRobotTqc, cnoid::Vector3& o_dRootRpy) const{
+                                cnoid::BodyPtr& actRobotTqc, cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stOffset /*generate frame, endeffector origin*/) const{
   // - root attitude control
   // - 現在のactual重心位置から、目標ZMPを計算
   // - 目標ZMPを満たすように目標足裏反力を計算
-  // - 目標足裏反力を満たすようにDamping Control. 目標手先反力を満たすようにImpedance Control. 目標反力を満たすように重力補償+仮想仕事の原理
+  // - 目標反力を満たすように重力補償+仮想仕事の原理
+  // - 目標足裏反力を満たすようにDamping Control.
 
   // root attitude control
-  cnoid::Vector3 dRootRpy; // gaitParam.footMidCoords座標系.
   this->moveBasePosRotForBodyRPYControl(refRobotOrigin, actRobotOrigin, dt, gaitParam, // input
-                                        dRootRpy); // output
+                                        o_stOffsetRootRpy); // output
 
   // 現在のactual重心位置から、目標ZMPを計算
   cnoid::Vector3 tgtZmp; // generate frame
@@ -26,27 +26,31 @@ bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobotOrigin, const cnoid
   this->calcWrench(gaitParam, endEffectorParam, tgtZmp, tgtForce, // input
                    tgtWrench); // output
 
+  // 目標反力を満たすように重力補償+仮想仕事の原理
   this->calcTorque(actRobotOrigin, dt, endEffectorParam, tgtWrench, // input
-                   genRobotTqc); // output
+                   actRobotTqc); // output
 
-  o_dRootRpy = dRootRpy;
+  // 目標足裏反力を満たすようにDamping Control
+  this->calcDampingControl(dt, gaitParam, endEffectorParam, tgtWrench, // input
+                           o_stOffset); // output
+
   return true;
 }
 
 bool Stabilizer::moveBasePosRotForBodyRPYControl(const cnoid::BodyPtr refRobotOrigin, const cnoid::BodyPtr actRobotOrigin, double dt, const GaitParam& gaitParam,
-                                                 cnoid::Vector3& o_dRootRpy) const{
-  cnoid::Vector3 dRootRpy = gaitParam.dRootRpy; // gaitParam.footMidCoords座標系
+                                                 cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy) const{
+  cnoid::Vector3 stOffsetRootRpy = gaitParam.stOffsetRootRpy.value(); // gaitParam.footMidCoords座標系
 
   cnoid::Matrix3 rootRError = gaitParam.footMidCoords.value().linear().transpose() * (refRobotOrigin->rootLink()->R() * actRobotOrigin->rootLink()->R().transpose()); // gaitParam.footMidCoords座標系
   cnoid::Vector3 rootRpyError = cnoid::rpyFromRot(rootRError); // gaitParam.footMidCoords座標系
 
   for (size_t i = 0; i < 2; i++) {
-    dRootRpy[i] += (this->bodyAttitudeControlGain[i] * rootRpyError[i] - 1.0/this->bodyAttitudeControlTimeConst[i] * dRootRpy[i]) * dt;
-    dRootRpy[i] = mathutil::clamp(dRootRpy[i], this->rootRotCompensationLimit[i]);
+    stOffsetRootRpy[i] += (this->bodyAttitudeControlGain[i] * rootRpyError[i] - 1.0/this->bodyAttitudeControlTimeConst[i] * stOffsetRootRpy[i]) * dt;
+    stOffsetRootRpy[i] = mathutil::clamp(stOffsetRootRpy[i], this->rootRotCompensationLimit[i]);
   }
-  dRootRpy[2] = 0.0;
+  stOffsetRootRpy[2] = 0.0;
 
-  o_dRootRpy = dRootRpy;
+  o_stOffsetRootRpy.reset(stOffsetRootRpy);
   return true;
 }
 
@@ -99,25 +103,25 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const EndEffectorParam& 
 }
 
 bool Stabilizer::calcTorque(const cnoid::BodyPtr actRobotOrigin, double dt, const EndEffectorParam& endEffectorParam, const std::vector<cnoid::Vector6>& tgtWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/,
-                            cnoid::BodyPtr& genRobotTqc) const{
+                            cnoid::BodyPtr& actRobotTqc) const{
   // 速度・加速度を考慮しない重力補償
-  genRobotTqc->rootLink()->T() = actRobotOrigin->rootLink()->T();
-  genRobotTqc->rootLink()->v() = cnoid::Vector3::Zero();
-  genRobotTqc->rootLink()->w() = cnoid::Vector3::Zero();
-  genRobotTqc->rootLink()->dv() = cnoid::Vector3::Zero();
-  genRobotTqc->rootLink()->dw() = cnoid::Vector3::Zero();
-  for(int i=0;i<genRobotTqc->numJoints();i++){
-    genRobotTqc->joint(i)->q() = actRobotOrigin->joint(i)->q();
-    genRobotTqc->joint(i)->dq() = 0.0;
-    genRobotTqc->joint(i)->ddq() = 0.0;
+  actRobotTqc->rootLink()->T() = actRobotOrigin->rootLink()->T();
+  actRobotTqc->rootLink()->v() = cnoid::Vector3::Zero();
+  actRobotTqc->rootLink()->w() = cnoid::Vector3::Zero();
+  actRobotTqc->rootLink()->dv() = cnoid::Vector3::Zero();
+  actRobotTqc->rootLink()->dw() = cnoid::Vector3::Zero();
+  for(int i=0;i<actRobotTqc->numJoints();i++){
+    actRobotTqc->joint(i)->q() = actRobotOrigin->joint(i)->q();
+    actRobotTqc->joint(i)->dq() = 0.0;
+    actRobotTqc->joint(i)->ddq() = 0.0;
   }
-  genRobotTqc->calcForwardKinematics(true, true); // genRobotTqc->joint()->u()に書き込まれる
+  actRobotTqc->calcForwardKinematics(true, true); // actRobotTqc->joint()->u()に書き込まれる
 
   // tgtWrench
   for(int i=0;i<endEffectorParam.name.size();i++){
-    cnoid::JointPath jointPath(genRobotTqc->rootLink(), genRobotTqc->link(endEffectorParam.parentLink[i]));
+    cnoid::JointPath jointPath(actRobotTqc->rootLink(), actRobotTqc->link(endEffectorParam.parentLink[i]));
     cnoid::MatrixXd J = cnoid::MatrixXd::Zero(6,jointPath.numJoints()); // generate frame. endeffector origin
-    cnoid::setJacobian<0x3f,0,0,true>(jointPath,genRobotTqc->link(endEffectorParam.parentLink[i]),endEffectorParam.localT[i].translation(), // input
+    cnoid::setJacobian<0x3f,0,0,true>(jointPath,actRobotTqc->link(endEffectorParam.parentLink[i]),endEffectorParam.localT[i].translation(), // input
                                       J); // output
     cnoid::VectorX tau = - J.transpose() * tgtWrench[i];
     for(int j=0;j<jointPath.numJoints();j++){
@@ -128,11 +132,62 @@ bool Stabilizer::calcTorque(const cnoid::BodyPtr actRobotOrigin, double dt, cons
   return true;
 }
 
-bool Stabilizer::calcDampingControl(double dt, const EndEffectorParam& endEffectorParam, const std::vector<cnoid::Vector6>& tgtWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/,
-                                    std::vector<cnoid::Position>& o_tgtPose /*generate frame*/) const{
-  std::vector<cnoid::Position> tgtPose = endEffectorParam.abcTargetPose; /*generate frame*/
+bool Stabilizer::calcDampingControl(double dt, const GaitParam& gaitParam, const EndEffectorParam& endEffectorParam, const std::vector<cnoid::Vector6>& tgtWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/,
+                                    std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stOffset /*generate frame, endeffector origin*/) const{
 
-  
+  std::vector<cnoid::Vector6> wrenchError(NUM_LEGS); // generate frame. endEffector origin.
+  for(int i=0;i<NUM_LEGS;i++){
+    wrenchError[i] = endEffectorParam.actWrench[i] - tgtWrench[i];
+  }
+  // force difference control
+  if(gaitParam.isSupportPhase(RLEG) && !gaitParam.isSupportPhase(LLEG)) wrenchError[RLEG][2] = 0.0;
+  else if(!gaitParam.isSupportPhase(RLEG) && gaitParam.isSupportPhase(LLEG)) wrenchError[LLEG][2] = 0.0;
+  else if(gaitParam.isSupportPhase(RLEG) && gaitParam.isSupportPhase(LLEG)) {
+    double averageFzError = (wrenchError[RLEG][2] + wrenchError[LLEG][2]) / 2.0;
+    wrenchError[RLEG][2] -= averageFzError;
+    wrenchError[LLEG][2] -= averageFzError;
+  }
+
+  for(int i=0;i<NUM_LEGS;i++){
+
+    cnoid::Vector6 offsetPrev; // generate frame. endEffector origin
+    cnoid::Vector6 dOffsetPrev; // generate frame. endEffector origin
+    endEffectorParam.stOffset[i].value(offsetPrev, dOffsetPrev);
+
+    cnoid::Matrix3 eeR = cnoid::AngleAxisd(offsetPrev.tail<3>().norm(),(offsetPrev.tail<3>().norm()>0)?offsetPrev.tail<3>().normalized() : cnoid::Vector3::UnitX()) * endEffectorParam.abcTargetPose[i].linear();
+
+    cnoid::Vector6 wrenchErrorLocal; //endEffector frame. endeffector origin
+    wrenchErrorLocal.head<3>() = eeR.transpose() * wrenchError[i].head<3>();
+    wrenchErrorLocal.tail<3>() = eeR.transpose() * wrenchError[i].tail<3>();
+    wrenchErrorLocal = mathutil::clampMatrix<cnoid::Vector6>(wrenchErrorLocal, this->dampingWrenchErrorLimit[i]);
+
+    cnoid::Vector6 offsetPrevLocal; //endEffector frame. endeffector origin
+    offsetPrevLocal.head<3>() = eeR.transpose() * offsetPrev.head<3>();
+    offsetPrevLocal.tail<3>() = eeR.transpose() * offsetPrev.tail<3>();
+
+    cnoid::Vector6 dOffsetPrevLocal; //endEffector frame. endeffector origin
+    dOffsetPrevLocal.head<3>() = eeR.transpose() * dOffsetPrev.head<3>();
+    dOffsetPrevLocal.tail<3>() = eeR.transpose() * dOffsetPrev.tail<3>();
+
+    cnoid::Vector6 dOffsetLocal; //endEffector frame. endeffector origin
+    for(size_t j=0;j<6;j++){
+      if(this->dampingGain[i][j] == 0.0 || this->dampingTimeConst[i][j] == 0.0){
+        dOffsetLocal[j] = 0.0;
+        continue;
+      }
+
+      dOffsetLocal[j] = (wrenchErrorLocal[j] / this->dampingGain[i][j] - offsetPrevLocal[j] / this->dampingTimeConst[i][j]) * dt;
+    }
+
+    cnoid::Vector6 dOffset; //generate frame. endeffector origin
+    dOffset.head<3>() = eeR * dOffsetLocal.head<3>();
+    dOffset.tail<3>() = eeR * dOffsetLocal.tail<3>();
+
+    cnoid::Vector6 offset = offsetPrev + dOffset;
+    offset = mathutil::clampMatrix<cnoid::Vector6>(offset, this->dampingCompensationLimit[i]);
+    o_stOffset[i].reset(offset, dOffset/dt);
+  }
+
 
   return true;
 }
