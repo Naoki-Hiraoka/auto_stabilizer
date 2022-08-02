@@ -11,6 +11,7 @@ enum leg_enum{RLEG=0, LLEG=1, NUM_LEGS=2};
 
 class GaitParam {
 public:
+  // AutoStabilizerの中で計算更新される.
   class FootStepNodes {
   public:
     std::vector<cnoid::Position> dstCoords = std::vector<cnoid::Position>(NUM_LEGS,cnoid::Position::Identity()); // 要素数2. rleg: 0. lleg: 1. generate frame. 終了時の位置
@@ -27,6 +28,15 @@ public:
   cpp_filters::TwoPointInterpolatorSE3 footMidCoords = cpp_filters::TwoPointInterpolatorSE3(cnoid::Position::Identity(),cnoid::Vector6::Zero(),cnoid::Vector6::Zero(),cpp_filters::HOFFARBIB); // generate frame. Z軸は鉛直. footstepNodesListの各要素終了時の支持脚の位置姿勢(Z軸は鉛直)にdefaultTranslatePosを適用したものの間をつなぐ. interpolatorによって連続的に変化する. reference frameとgenerate frameの対応付けに用いられる
   std::vector<bool> prevSupportPhase = std::vector<bool>{true, true}; // 要素数2. rleg: 0. lleg: 1. 一つ前の周期でSupportPhaseだったかどうか
 
+  cnoid::Vector3 actCog; // generate frame.  現在のCOM
+  cpp_filters::FirstOrderLowPassFilter<cnoid::Vector3> actCogVel = cpp_filters::FirstOrderLowPassFilter<cnoid::Vector3>(4.0, cnoid::Vector3::Zero());  // generate frame.  現在のCOM速度
+  cnoid::Vector3 genCog; // generate frame.  現在のCOM
+  cnoid::Vector3 genCogVel;  // generate frame.  現在のCOM速度
+
+  cnoid::Vector3 dRootRpy = cnoid::Vector3::Zero(); // gaitParam.footMidCoords座標系. stで計算された目標位置姿勢オフセット
+
+  cnoid::Position stTargetRootPose = cnoid::Position::Identity(); // generate frame
+public:
   // param
   std::vector<cnoid::Vector3> copOffset = std::vector<cnoid::Vector3>{cnoid::Vector3::Zero(),cnoid::Vector3::Zero()}; // 要素数2. rleg: 0. lleg: 1. leg frame. 足裏COPの目標位置. 幾何的な位置はcopOffset無しで考えるが、目標COPを考えるときはcopOffsetを考慮する
   std::vector<std::vector<cnoid::Vector2> > legPolygon = std::vector<std::vector<cnoid::Vector2> >(2, std::vector<cnoid::Vector2>{cnoid::Vector2(0.1,0.1),cnoid::Vector2(-0.1,0.1),cnoid::Vector2(-0.1,-0.1),cnoid::Vector2(0.1,-0.1)}); // 要素数2. rleg: 0. lleg: 1. leg frame. 上から見て半時計回り TODO
@@ -34,11 +44,6 @@ public:
   double dz = 1.0; // generate frame. 支持脚からのCogの目標高さ. 0より大きい
 
   std::vector<bool> isLegAutoControlMode = std::vector<bool>{true,true}; // 要素数2. rleg: 0. lleg: 1. 脚軌道生成器が自動で位置姿勢を生成するか(true)、reference軌道を使うか(false) TODO
-
-  cnoid::Vector3 actCog; // generate frame.  現在のCOM
-  cpp_filters::FirstOrderLowPassFilter<cnoid::Vector3> actCogVel = cpp_filters::FirstOrderLowPassFilter<cnoid::Vector3>(4.0, cnoid::Vector3::Zero());  // generate frame.  現在のCOM速度
-  cnoid::Vector3 genCog; // generate frame.  現在のCOM
-  cnoid::Vector3 genCogVel;  // generate frame.  現在のCOM速度
 
 public:
   bool isSupportPhase(int leg) const{ // 今がSupportPhaseかどうか

@@ -503,15 +503,14 @@ bool AutoStabilizer::execAutoBalancer(const AutoStabilizer::ControlMode& mode, c
     else endEffectorParams.abcTargetPose[i] = endEffectorParams.refPose[i];
   }
 
-  return true;
-}
-
-// static function
-bool AutoStabilizer::execStabilizer(EndEffectorParam& endEffectorParams) {
-  // TODO
+  // stabilizer
+  // reset dRootRpy TODO
+  gaitParam.stTargetRootPose.translation() = refRobotOrigin->rootLink()->p();
+  gaitParam.stTargetRootPose.linear() = (gaitParam.footMidCoords.value().linear() * cnoid::rotFromRpy(gaitParam.dRootRpy)) * refRobotOrigin->rootLink()->R();
   for(int i=0;i<endEffectorParams.name.size();i++){
    endEffectorParams.stTargetPose[i] = endEffectorParams.abcTargetPose[i];
   }
+
 
   return true;
 }
@@ -572,7 +571,7 @@ bool AutoStabilizer::solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::Body
     fullbodyIKParam.rootPositionConstraint->A_link() = genRobot->rootLink();
     fullbodyIKParam.rootPositionConstraint->A_localpos() = cnoid::Position::Identity();
     fullbodyIKParam.rootPositionConstraint->B_link() = nullptr;
-    fullbodyIKParam.rootPositionConstraint->B_localpos() = refRobotOrigin->rootLink()->T();
+    fullbodyIKParam.rootPositionConstraint->B_localpos() = gaitParam.stTargetRootPose;
     fullbodyIKParam.rootPositionConstraint->maxError() << 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt;
     fullbodyIKParam.rootPositionConstraint->precision() << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0; // 強制的にIKをmax loopまで回す
     fullbodyIKParam.rootPositionConstraint->weight() << 0.0, 0.0, 0.0, 3e-1, 3e-1, 3e-1;
@@ -730,7 +729,6 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
     AutoStabilizer::copyRobotState(this->refRobot_, this->genRobot_);
   }else{
     AutoStabilizer::execAutoBalancer(this->mode_, this->refRobot_, this->refRobotOrigin_, this->actRobot_, this->actRobotOrigin_, this->genRobot_, this->endEffectorParams_, this->gaitParam_, this->dt_, this->jointParams_, this->footStepGenerator_, this->legCoordsGenerator_, this->refToGenFrameConverter_);
-    AutoStabilizer::execStabilizer(this->endEffectorParams_);
     AutoStabilizer::solveFullbodyIK(this->genRobot_, this->refRobotOrigin_, this->endEffectorParams_, this->fullbodyIKParam_, this->dt_, this->jointParams_, this->gaitParam_);
   }
 

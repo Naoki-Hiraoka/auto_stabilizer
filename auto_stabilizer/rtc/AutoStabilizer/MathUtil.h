@@ -70,6 +70,16 @@ namespace mathutil {
     }
     return midCoords;
   }
+
+  template<typename T>
+  inline T clamp(const T& value, const T& limit_value) {
+    return std::max(-limit_value, std::min(limit_value, value));
+  }
+  template<typename T>
+  inline T clamp(const T& value, const T& llimit_value, const T& ulimit_value) {
+    return std::max(llimit_value, std::min(ulimit_value, value));
+  }
+
 };
 
 
