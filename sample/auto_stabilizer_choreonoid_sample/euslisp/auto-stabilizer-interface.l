@@ -241,6 +241,24 @@
    "Stop Stabilizer Mode."
    (send self :autostabilizerservice_stopstabilizer)
    )
+  (:start-impedance
+   (limb)
+   "Start impedance controller mode.
+    limb should be limb symbol name such as :rarm, :larm, :rleg, :lleg, :arms, or :legs."
+   (send self :force-sensor-method
+         limb
+         #'(lambda (name &rest _args)
+             (send self :autostabilizerservice_startimpedancecontroller :name (string-downcase name)))
+         :start-impedance))
+  (:stop-impedance
+   (limb)
+   "Stop impedance controller mode.
+    limb should be limb symbol name such as :rarm, :larm, :rleg, :lleg, :arms, or :legs."
+   (send self :force-sensor-method
+         limb
+         #'(lambda (name &rest _args)
+             (send self :autostabilizerservice_stopimpedancecontroller :name (string-downcase name)))
+         :stop-impedance))
   )
 
 

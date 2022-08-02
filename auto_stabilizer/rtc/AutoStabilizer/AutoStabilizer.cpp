@@ -795,12 +795,19 @@ bool AutoStabilizer::goVelocity(const double& vx, const double& vy, const double
     this->footStepGenerator_.cmdVel[0] = vx;
     this->footStepGenerator_.cmdVel[1] = vy;
     this->footStepGenerator_.cmdVel[2] = vth / 180.0 * M_PI;
+    return true;
   }else{
     return false;
   }
 }
 bool AutoStabilizer::goStop(){
   std::lock_guard<std::mutex> guard(this->mutex_);
+  if(this->mode_.isABCRunning()){
+    this->footStepGenerator_.isGoVelocityMode = false;
+    this->footStepGenerator_.cmdVel.setZero();
+  }else{
+    return false;
+  }
   return true;
 }
 bool AutoStabilizer::jumpTo(const double& x, const double& y, const double& z, const double& ts, const double& tf){
@@ -832,6 +839,7 @@ bool AutoStabilizer::startAutoBalancer(){
     usleep(1000);
     return true;
   }else{
+    std::cerr << "[" << this->m_profile.instance_name << "] auto balancer is already started" << std::endl;
     return false;
   }
 }
@@ -842,6 +850,7 @@ bool AutoStabilizer::stopAutoBalancer(){
     usleep(1000);
     return true;
   }else{
+    std::cerr << "[" << this->m_profile.instance_name << "] auto balancer is already stopped" << std::endl;
     return false;
   }
 }
@@ -852,6 +861,7 @@ bool AutoStabilizer::startStabilizer(void){
     usleep(1000);
     return true;
   }else{
+    std::cerr << "[" << this->m_profile.instance_name << "] Please start AutoBalancer" << std::endl;
     return false;
   }
 }
@@ -862,6 +872,7 @@ bool AutoStabilizer::stopStabilizer(void){
     usleep(1000);
     return true;
   }else{
+    std::cerr << "[" << this->m_profile.instance_name << "] Please start AutoBalancer" << std::endl;
     return false;
   }
 }
@@ -871,12 +882,18 @@ bool AutoStabilizer::startImpedanceController(const std::string& i_name){
   if(this->mode_.isABCRunning()){
     for(int i=0;i<this->endEffectorParams_.name.size();i++){
       if(this->endEffectorParams_.name[i] != i_name) continue;
-      if(this->impedanceController_.isImpedanceMode[i]) return false;
+      if(this->impedanceController_.isImpedanceMode[i]) {
+        std::cerr << "[" << this->m_profile.instance_name << "] Impedance control [" << i_name << "] is already started" << std::endl;
+        return false;
+      }
+      std::cerr << "[" << this->m_profile.instance_name << "] Start impedance control [" << i_name << "]" << std::endl;
       this->impedanceController_.isImpedanceMode[i] = true;
       return true;
     }
+    std::cerr << "[" << this->m_profile.instance_name << "] Could not found impedance controller param [" << i_name << "]" << std::endl;
     return false;
   }else{
+    std::cerr << "[" << this->m_profile.instance_name << "] Please start AutoBalancer" << std::endl;
     return false;
   }
 }
@@ -886,13 +903,19 @@ bool AutoStabilizer::stopImpedanceController(const std::string& i_name){
   if(this->mode_.isABCRunning()){
     for(int i=0;i<this->endEffectorParams_.name.size();i++){
       if(this->endEffectorParams_.name[i] != i_name) continue;
-      if(!this->impedanceController_.isImpedanceMode[i]) return false;
+      if(!this->impedanceController_.isImpedanceMode[i]) {
+        std::cerr << "[" << this->m_profile.instance_name << "] Impedance control [" << i_name << "] is already stopped" << std::endl;
+        return false;
+      }
+      std::cerr << "[" << this->m_profile.instance_name << "] Stop impedance control [" << i_name << "]" << std::endl;
       this->impedanceController_.isImpedanceMode[i] = false;
       this->endEffectorParams_.icOffset[i].setGoal(cnoid::Vector6::Zero(), 2.0);
       return true;
     }
+    std::cerr << "[" << this->m_profile.instance_name << "] Could not found impedance controller param [" << i_name << "]" << std::endl;
     return false;
   }else{
+    std::cerr << "[" << this->m_profile.instance_name << "] Please start AutoBalancer" << std::endl;
     return false;
   }
 }
