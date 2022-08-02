@@ -3,6 +3,7 @@
 
 #include <cnoid/EigenTypes>
 #include <ik_constraint/PositionConstraint.h>
+#include <cpp_filters/TwoPointInterpolator.h>
 
 class EndEffectorParam {
 public:
@@ -22,6 +23,8 @@ public:
   std::vector<cnoid::Vector6> refWrench; // generate frame. EndEffector origin. ロボットが受ける力
   std::vector<cnoid::Position> actPose; // generate frame
   std::vector<cnoid::Vector6> actWrench; // generate frame. EndEffector origin. ロボットが受ける力
+  std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> > icOffset; // generate frame. endEffector origin. icで計算されるオフセット
+  std::vector<cnoid::Position> icTargetPose; // generate frame. icで計算された目標位置姿勢
   std::vector<cnoid::Position> abcTargetPose; // generate frame. abcで計算された目標位置姿勢
   std::vector<cnoid::Position> stTargetPose; // generate frame. stで計算された目標位置姿勢
   std::vector<std::shared_ptr<IK::PositionConstraint> > ikPositionConstraint;
@@ -37,6 +40,8 @@ public:
     refWrench.push_back(cnoid::Vector6::Zero());
     actPose.push_back(cnoid::Position::Identity());
     actWrench.push_back(cnoid::Vector6::Zero());
+    icOffset.push_back(cpp_filters::TwoPointInterpolator<cnoid::Vector6>(cnoid::Vector6::Zero(),cnoid::Vector6::Zero(),cnoid::Vector6::Zero(), cpp_filters::HOFFARBIB));
+    icTargetPose.push_back(cnoid::Position::Identity());
     abcTargetPose.push_back(cnoid::Position::Identity());
     stTargetPose.push_back(cnoid::Position::Identity());
     ikPositionConstraint.push_back(std::make_shared<IK::PositionConstraint>());

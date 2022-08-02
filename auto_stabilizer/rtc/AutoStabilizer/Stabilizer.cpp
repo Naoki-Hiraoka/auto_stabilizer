@@ -127,3 +127,14 @@ bool Stabilizer::calcTorque(const cnoid::BodyPtr actRobotOrigin, double dt, cons
 
   return true;
 }
+
+bool Stabilizer::calcImpedanceControl(double dt, const EndEffectorParam& endEffectorParam, const std::vector<cnoid::Vector6>& tgtWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/,
+                                      std::vector<cnoid::Position>& o_tgtPose /*generate frame*/) const{
+  std::vector<cnoid::Position> tgtPose = endEffectorParam.abcTargetPose; /*generate frame*/
+
+  // legはDamping Control
+
+  // leg以外はImpedance Control
+
+  return true;
+}

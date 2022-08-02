@@ -33,6 +33,7 @@ add_library(AutoStabilizer SHARED
   GaitParam.cpp
   RefToGenFrameConverter.cpp
   Stabilizer.cpp
+  ImpedanceController.cpp
   )
 target_link_libraries(AutoStabilizer
   ${catkin_LIBRARIES}

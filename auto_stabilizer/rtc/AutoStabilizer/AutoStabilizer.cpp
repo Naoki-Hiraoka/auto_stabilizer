@@ -455,7 +455,7 @@ bool AutoStabilizer::calcActualParameters(const AutoStabilizer::ControlMode& mod
 }
 
 // static function
-bool AutoStabilizer::execAutoBalancer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, cnoid::BodyPtr& genRobot, EndEffectorParam& endEffectorParams, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter) {
+bool AutoStabilizer::execAutoBalancer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, cnoid::BodyPtr& genRobot, EndEffectorParam& endEffectorParams, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ImpedanceController& impedanceController) {
   if(mode.isABCInit()){ // startAutoBalancer直後の初回
     // FootOrigin座標系を用いてrefRobotをgenerate frameに投影しgenRoboとする
     refToGenFrameConverter.initGenRobot(refRobot, endEffectorParams, gaitParam,
@@ -488,9 +488,21 @@ bool AutoStabilizer::execAutoBalancer(const AutoStabilizer::ControlMode& mode, c
     for(int i=0;i<NUM_LEGS;i++){
       gaitParam.prevSupportPhase[i] = gaitParam.isSupportPhase(i);
     }
+
+    for(int i=0;i<endEffectorParams.name.size();i++){
+      endEffectorParams.icOffset[i].reset(cnoid::Vector6::Zero());
+    }
   }
 
   AutoStabilizer::calcActualParameters(mode, actRobot, actRobotOrigin, endEffectorParams, gaitParam, dt);
+  impedanceController.calcImpedanceControl(dt, endEffectorParams,
+                                           endEffectorParams.icOffset);
+  for(int i=0;i<endEffectorParams.name.size();i++){
+    endEffectorParams.icOffset[i].interpolate(dt);
+    cnoid::Vector6 icOffset = endEffectorParams.icOffset[i].value();
+    endEffectorParams.icTargetPose[i].translation() = icOffset.head<3>() + endEffectorParams.refPose[i].translation();
+    endEffectorParams.icTargetPose[i].linear() = cnoid::AngleAxisd(icOffset.tail<3>().norm(),(icOffset.tail<3>().norm()>0)?icOffset.tail<3>().normalized() : cnoid::Vector3::UnitX()) * endEffectorParams.refPose[i].linear();
+  }
   footStepGenerator.calcFootSteps(gaitParam, dt,
                                   gaitParam.footstepNodesList, gaitParam.srcCoords);
   legCoordsGenerator.calcLegCoords(gaitParam, dt,
@@ -500,7 +512,7 @@ bool AutoStabilizer::execAutoBalancer(const AutoStabilizer::ControlMode& mode, c
 
   for(int i=0;i<endEffectorParams.name.size();i++){
     if(i<NUM_LEGS) endEffectorParams.abcTargetPose[i] = gaitParam.genCoords[i].value();
-    else endEffectorParams.abcTargetPose[i] = endEffectorParams.refPose[i];
+    else endEffectorParams.abcTargetPose[i] = endEffectorParams.icTargetPose[i];
   }
 
   // stabilizer
@@ -728,7 +740,7 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
   if(!this->mode_.isABCRunning()) {
     AutoStabilizer::copyRobotState(this->refRobot_, this->genRobot_);
   }else{
-    AutoStabilizer::execAutoBalancer(this->mode_, this->refRobot_, this->refRobotOrigin_, this->actRobot_, this->actRobotOrigin_, this->genRobot_, this->endEffectorParams_, this->gaitParam_, this->dt_, this->jointParams_, this->footStepGenerator_, this->legCoordsGenerator_, this->refToGenFrameConverter_);
+    AutoStabilizer::execAutoBalancer(this->mode_, this->refRobot_, this->refRobotOrigin_, this->actRobot_, this->actRobotOrigin_, this->genRobot_, this->endEffectorParams_, this->gaitParam_, this->dt_, this->jointParams_, this->footStepGenerator_, this->legCoordsGenerator_, this->refToGenFrameConverter_, this->impedanceController_);
     AutoStabilizer::solveFullbodyIK(this->genRobot_, this->refRobotOrigin_, this->endEffectorParams_, this->fullbodyIKParam_, this->dt_, this->jointParams_, this->gaitParam_);
   }
 

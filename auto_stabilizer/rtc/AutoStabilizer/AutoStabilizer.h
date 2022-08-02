@@ -35,6 +35,7 @@
 #include "RefToGenFrameConverter.h"
 #include "FootStepGenerator.h"
 #include "LegCoordsGenerator.h"
+#include "ImpedanceController.h"
 
 class AutoStabilizer : public RTC::DataFlowComponentBase{
 public:
@@ -202,6 +203,7 @@ protected:
   GaitParam gaitParam_;
 
   RefToGenFrameConverter refToGenFrameConverter_;
+  ImpedanceController impedanceController_;
   FootStepGenerator footStepGenerator_;
   LegCoordsGenerator legCoordsGenerator_;
 
@@ -214,7 +216,7 @@ protected:
 
   static bool readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobot, cnoid::BodyPtr actRobot, EndEffectorParam& endEffectorParams);
   static bool calcActualParameters(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, EndEffectorParam& endEffectorParams, GaitParam& gaitParam, double dt);
-  static bool execAutoBalancer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, cnoid::BodyPtr& genRobot, EndEffectorParam& endEffectorParams, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter);
+  static bool execAutoBalancer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, cnoid::BodyPtr& genRobot, EndEffectorParam& endEffectorParams, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ImpedanceController& impedanceController);
   class FullbodyIKParam {
   public:
     cnoid::VectorX jlim_avoid_weight;
