@@ -3,6 +3,7 @@
 
 #include "GaitParam.h"
 #include "EndEffectorParam.h"
+#include <prioritized_qp/PrioritizedQPSolver.h>
 
 class Stabilizer{
 public:
@@ -24,6 +25,12 @@ public:
       dampingWrenchErrorLimit[i] << 200, 200, 200, 15, 15, 15;
     }
   }
+protected:
+  // 計算高速化のためのキャッシュ. クリアしなくても別に副作用はない.
+  std::shared_ptr<prioritized_qp::Task> constraintTask_;
+  std::shared_ptr<prioritized_qp::Task> tgtZmpTask_;
+  std::shared_ptr<prioritized_qp::Task> copTask_;
+  std::shared_ptr<prioritized_qp::Task> squaredNormTask_;
 public:
 
   bool execStabilizer(const cnoid::BodyPtr refRobotOrigin, const cnoid::BodyPtr actRobotOrigin, const cnoid::BodyPtr genRobot, const GaitParam& gaitParam, const EndEffectorParam& endEffectorParam, double dt, double g, double mass,

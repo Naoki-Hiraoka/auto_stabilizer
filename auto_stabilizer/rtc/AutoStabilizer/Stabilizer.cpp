@@ -90,9 +90,10 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const EndEffectorParam& 
     最後に、FACE表現に変換する.
 
     階層QPのタスクは次の通り
-    1. ノルム>0
-    2. 合力がtgtForce, ZMPがtgtZmp
-    3. 各Legについて、各頂点のノルムの重心がCOPOffsetと一致
+    変数: SPAN表現のノルム. 各脚のCOP(XY)
+    1. ノルム>0. 合力がtgtForce. 各脚のCOPが各頂点のノルムの重心と一致
+    2. ZMPがtgtZmp
+    3. 各脚のCOPがCOPOffsetと一致
     4. ノルムの2乗和の最小化
   */
 
