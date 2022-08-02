@@ -1,4 +1,5 @@
 #include "ImpedanceController.h"
+#include "MathUtil.h"
 
 bool ImpedanceController::calcImpedanceControl(double dt, const EndEffectorParam& endEffectorParam,
                                                std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& icOffset /*generate frame, endeffector origin*/) const{
@@ -46,6 +47,7 @@ bool ImpedanceController::calcImpedanceControl(double dt, const EndEffectorParam
     dOffset.tail<3>() = eeR * dOffsetLocal.tail<3>();
 
     cnoid::Vector6 offset = offsetPrev + dOffset;
+    offset = mathutil::clampMatrix<cnoid::Vector6>(offset, this->compensationLimit[i]);
     icOffset[i].reset(offset, dOffset/dt);
   }
 

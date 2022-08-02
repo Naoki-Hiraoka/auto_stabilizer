@@ -79,6 +79,14 @@ namespace mathutil {
   inline T clamp(const T& value, const T& llimit_value, const T& ulimit_value) {
     return std::max(llimit_value, std::min(ulimit_value, value));
   }
+  template<typename Derived>
+  inline typename Derived::PlainObject clampMatrix(const Eigen::MatrixBase<Derived>& value, const Eigen::MatrixBase<Derived>& limit_value) {
+    return value.array().max(-limit_value.array()).min(limit_value.array());
+  }
+  template<typename Derived>
+  inline typename Derived::PlainObject clampMatrix(const Eigen::MatrixBase<Derived>& value, const Eigen::MatrixBase<Derived>& llimit_value, const Eigen::MatrixBase<Derived>& ulimit_value) {
+    return value.array().max(llimit_value.array()).min(ulimit_value.array());
+  }
 
 };
 

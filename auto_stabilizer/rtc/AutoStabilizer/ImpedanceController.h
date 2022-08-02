@@ -6,7 +6,7 @@
 class ImpedanceController {
 public:
   // Impedance Controllerでしか使わないパラメータ
-  std::vector<cnoid::Vector6> CompensationLimit; // 要素数EndEffectors. generate frame. endEffector origin
+  std::vector<cnoid::Vector6> compensationLimit; // 要素数EndEffectors. generate frame. endEffector origin. この値はisImpedanceModeがtrueのときに不連続に変えてはならない
   std::vector<cnoid::Vector6> M; // 要素数EndEffectors. EndEffector frame(icTargetPose). endEffector origin
   std::vector<cnoid::Vector6> D; // 要素数EndEffectors. EndEffector frame(icTargetPose). endEffector origin
   std::vector<cnoid::Vector6> K; // 要素数EndEffectors. EndEffector frame(icTargetPose). endEffector origin
@@ -16,8 +16,8 @@ public:
   std::vector<bool> isImpedanceMode; // 要素数EndEffectors. Impedance Controlをするかどうか
 public:
   void push_back(){
-    cnoid::Vector6 defaultCompensationLimit; defaultCompensationLimit << 0.08, 0.08, 0.08, 0.05, 0.05, 0.05;
-    this->CompensationLimit.push_back(defaultCompensationLimit);
+    cnoid::Vector6 defaultCompensationLimit; defaultCompensationLimit << 0.2, 0.2, 0.2, 1.0, 1.0, 1.0;
+    this->compensationLimit.push_back(defaultCompensationLimit);
     cnoid::Vector6 defaultM; defaultM << 10, 10, 10, 5, 5, 5;
     this->M.push_back(defaultM);
     cnoid::Vector6 defaultD; defaultD << 600, 600, 600, 200, 200, 200;

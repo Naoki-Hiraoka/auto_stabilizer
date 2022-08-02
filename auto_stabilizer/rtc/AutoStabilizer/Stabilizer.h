@@ -59,8 +59,8 @@ protected:
                   std::vector<cnoid::Vector6>& o_tgtWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/) const;
   bool calcTorque(const cnoid::BodyPtr actRobotOrigin, double dt, const EndEffectorParam& endEffectorParam, const std::vector<cnoid::Vector6>& tgtWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/,
                   cnoid::BodyPtr& genRobotTqc) const;
-  bool calcImpedanceControl(double dt, const EndEffectorParam& endEffectorParam, const std::vector<cnoid::Vector6>& tgtWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/,
-                            std::vector<cnoid::Position>& o_tgtPose /*generate frame*/) const;
+  bool calcDampingControl(double dt, const EndEffectorParam& endEffectorParam, const std::vector<cnoid::Vector6>& tgtWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/,
+                          std::vector<cnoid::Position>& o_tgtPose /*generate frame*/) const;
 };
 
 #endif
