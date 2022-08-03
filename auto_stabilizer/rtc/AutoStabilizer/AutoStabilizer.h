@@ -125,7 +125,7 @@ protected:
       MODE_IDLE -> startAutoBalancer() -> MODE_SYNC_TO_ABC -> MODE_ABC -> startStabilizer() -> MODE_SYNC_TO_ST -> MODE_ST -> stopStabilizer() -> MODE_SYNC_TO_STOPST -> MODE_ABC -> stopAutoBalancer() -> MODE_SYNC_TO_IDLE -> MODE_IDLE
       MODE_SYNC_TO*の時間はstartの方はすぐに遷移し、stopの方はtransition_timeの時間をかけて遷移するが、少なくとも1周期はMODE_SYNC_TO*を経由する.
       MODE_SYNC_TO*では、基本的に次のMODEと同じ処理が行われるが、出力時に前回のMODEの出力から補間するような軌道に加工されることで出力の連続性を確保する
-      補間している途中で別のmodeに切り替わることは無いので、そこは安心してプログラムを書いてよい(例外はonActivated)
+      補間している途中で別のmodeに切り替わることは無いので、そこは安心してプログラムを書いてよい(例外はonActivated). 同様に、remainTimeが突然減ったり増えたりすることもない
      */
     enum Mode_enum{ MODE_IDLE, MODE_SYNC_TO_ABC, MODE_ABC, MODE_SYNC_TO_ST, MODE_ST, MODE_SYNC_TO_STOPST, MODE_SYNC_TO_IDLE};
     enum Transition_enum{ START_ABC, STOP_ABC, START_ST, STOP_ST};
@@ -139,13 +139,13 @@ protected:
     bool setNextTransition(const Transition_enum request){
       switch(request){
       case START_ABC:
-        if(current == MODE_IDLE){ next = MODE_SYNC_TO_ABC; remain_time = abc_start_transition_time; return true; }else{ return false; }
+        if(current == MODE_IDLE){ next = MODE_SYNC_TO_ABC; return true; }else{ return false; }
       case STOP_ABC:
-        if(current == MODE_ABC){ next = MODE_SYNC_TO_IDLE; remain_time = abc_stop_transition_time; return true; }else{ return false; }
+        if(current == MODE_ABC){ next = MODE_SYNC_TO_IDLE; return true; }else{ return false; }
       case START_ST:
-        if(current == MODE_ABC){ next = MODE_SYNC_TO_ST; remain_time = st_start_transition_time; return true; }else{ return false; }
+        if(current == MODE_ABC){ next = MODE_SYNC_TO_ST; return true; }else{ return false; }
       case STOP_ST:
-        if(current == MODE_ST){ next = MODE_SYNC_TO_STOPST; remain_time = st_stop_transition_time; return true; }else{ return false; }
+        if(current == MODE_ST){ next = MODE_SYNC_TO_STOPST; return true; }else{ return false; }
       default:
         return false;
       }
@@ -153,6 +153,18 @@ protected:
     void update(double dt){
       if(current != next) {
         previous = current; current = next;
+        switch(current){
+        case MODE_SYNC_TO_ABC:
+          remain_time = abc_start_transition_time; break;
+        case MODE_SYNC_TO_IDLE:
+          remain_time = abc_stop_transition_time; break;
+        case MODE_SYNC_TO_ST:
+          remain_time = st_start_transition_time; break;
+        case MODE_SYNC_TO_STOPST:
+          remain_time = st_stop_transition_time; break;
+        default:
+          break;
+        }
       }else{
         previous = current;
         remain_time -= dt;
@@ -176,12 +188,14 @@ protected:
     double remainTime() const{ return remain_time;}
     Mode_enum now() const{ return current; }
     Mode_enum pre() const{ return previous; }
-    bool isABCInit() const{ return (current == MODE_SYNC_TO_ABC) && (previous == MODE_IDLE);}
     bool isABCRunning() const{ return (current==MODE_SYNC_TO_ABC) || (current==MODE_ABC) || (current==MODE_SYNC_TO_ST) || (current==MODE_ST) || (current==MODE_SYNC_TO_STOPST) ;}
-    bool isSTInit() const{ return (current == MODE_SYNC_TO_ST) && (previous == MODE_ABC);}
+    bool isSyncToABC() const{ return current==MODE_SYNC_TO_ABC;}
+    bool isSyncToABCInit() const{ return (current != previous) && isSyncToABC();}
+    bool isSyncToIdle() const{ return current==MODE_SYNC_TO_IDLE;}
+    bool isSyncToIdleInit() const{ return (current != previous) && isSyncToIdle();}
+    bool isSyncToStopST() const{ return current == MODE_SYNC_TO_STOPST;}
+    bool isSyncToStopSTInit() const{ return (current != previous) && isSyncToStopST();}
     bool isSTRunning() const{ return (current==MODE_SYNC_TO_ST) || (current==MODE_ST) ;}
-    bool isSyncInit() const{ return (current != previous) && isSync();}
-    bool isSync() const{ return ((current==MODE_SYNC_TO_ABC) || (current==MODE_SYNC_TO_ST) || (current==MODE_SYNC_TO_STOPST) || (current==MODE_SYNC_TO_IDLE));}
   };
   ControlMode mode_;
 
@@ -216,7 +230,6 @@ protected:
   // utility functions
   bool getProperty(const std::string& key, std::string& ret);
 
-  static bool copyRobotState(cnoid::BodyPtr inRobot, cnoid::BodyPtr outRobot);
   static void moveCoords(cnoid::BodyPtr robot, const cnoid::Position& target, const cnoid::Position& at);
 
   static bool readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobot, cnoid::BodyPtr actRobot, EndEffectorParam& endEffectorParams);
