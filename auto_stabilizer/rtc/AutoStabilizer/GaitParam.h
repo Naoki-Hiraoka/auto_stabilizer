@@ -38,7 +38,7 @@ public:
 public:
   // param
   std::vector<cnoid::Vector3> copOffset = std::vector<cnoid::Vector3>{cnoid::Vector3::Zero(),cnoid::Vector3::Zero()}; // 要素数2. rleg: 0. lleg: 1. leg frame. 足裏COPの目標位置. 幾何的な位置はcopOffset無しで考えるが、目標COPを考えるときはcopOffsetを考慮する
-  std::vector<std::vector<cnoid::Vector2> > legPolygon = std::vector<std::vector<cnoid::Vector2> >(2, std::vector<cnoid::Vector2>{cnoid::Vector2(0.1,0.1),cnoid::Vector2(-0.1,0.1),cnoid::Vector2(-0.1,-0.1),cnoid::Vector2(0.1,-0.1)}); // 要素数2. rleg: 0. lleg: 1. leg frame. 上から見て半時計回り TODO
+  std::vector<std::vector<cnoid::Vector3> > legPolygon = std::vector<std::vector<cnoid::Vector3> >(2, std::vector<cnoid::Vector3>{cnoid::Vector3(0.1,0.1,0.0),cnoid::Vector3(-0.1,0.1,0.0),cnoid::Vector3(-0.1,-0.1,0.0),cnoid::Vector3(0.1,-0.1,0.0)}); // 要素数2. rleg: 0. lleg: 1. leg frame. 上から見て半時計回り. Z成分はあったほうが計算上扱いやすいからありにしているが、0でなければならない
   std::vector<cnoid::Vector3> defaultTranslatePos = std::vector<cnoid::Vector3>(2,cnoid::Vector3::Zero()); // goPos, goVelocity, その場足踏みをするときの右脚と左脚の中心からの相対位置. あるいは、reference frameとgenerate frameの対応付けに用いられる. (Z軸は鉛直).
   double dz = 1.0; // generate frame. 支持脚からのCogの目標高さ. 0より大きい
 

@@ -61,7 +61,7 @@ bool Stabilizer::calcZMP(const GaitParam& gaitParam, double dt, double g, double
   l[2] = gaitParam.dz;
   cnoid::Vector3 actDCM = gaitParam.actCog + gaitParam.actCogVel.value() / w;
   cnoid::Vector3 tgtZmp = footguidedcontroller::calcFootGuidedControl(w,l,actDCM,gaitParam.refZmpTraj);
-  // check zmp in polygon TODO. COMより低く. 角運動量オフセット
+  // check zmp in polygon TODO. COMより低く. 角運動量オフセット. actual robotの関節角度を用いて計算する
   cnoid::Vector3 tgtCog,tgtCogVel,tgtForce;
   footguidedcontroller::updateState(w,l,gaitParam.actCog,gaitParam.actCogVel.value(),tgtZmp,mass,dt,
                                     tgtCog, tgtCogVel, tgtForce);
@@ -71,7 +71,7 @@ bool Stabilizer::calcZMP(const GaitParam& gaitParam, double dt, double g, double
   return true;
 }
 
-bool Stabilizer::calcWrench(const GaitParam& gaitParam, const EndEffectorParam& endEffectorParam, const cnoid::Vector3& tgtZmp, const cnoid::Vector3& tgtForce,
+bool Stabilizer::calcWrench(const GaitParam& gaitParam, const EndEffectorParam& endEffectorParam, const cnoid::Vector3& tgtZmp/*generate座標系*/, const cnoid::Vector3& tgtForce/*generate座標系 ロボットが受ける力*/,
                             std::vector<cnoid::Vector6>& o_tgtWrench) const{
   std::vector<cnoid::Vector6> tgtWrench(endEffectorParam.name.size(), cnoid::Vector6::Zero()); /* 要素数EndEffector数. generate frame. EndEffector origin*/
 
@@ -83,6 +83,7 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const EndEffectorParam& 
   /*
     legは、legから受けるwrenchの和がtgtZmp, tgtForceを満たすように.
     非Support期のlegには分配せずゼロを入れる. 全てのlegが非Support期なら分配計算すら行わない
+    actual robotの関節角度を用いて計算する
     各EEFのwrenchを、polygonの各頂点からのSPAN表現で考える.
     各頂点のfx, fy, fzの向きは、合力の向きと同じで、ノルムだけを変数とする. 合力がtgtForce, ZMPがtgtZmpになるように、ノルムの値を求める.
       - nzが反映できない、力の向きの冗長性を利用できない、摩擦係数を考慮できない、といった欠点がある. 二次元動歩行なので、まずは物理的・数学的厳密性や冗長性の利用よりもシンプルさ、ロバストさを優先する. そのあたりをこだわりたいなら三次元多点接触でやる.
@@ -90,14 +91,137 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const EndEffectorParam& 
     最後に、FACE表現に変換する.
 
     階層QPのタスクは次の通り
-    変数: SPAN表現のノルム. 各脚のCOP(XY)
-    1. ノルム>0. 合力がtgtForce. 各脚のCOPが各頂点のノルムの重心と一致
+    変数: SPAN表現のノルム. 0~1
+    1. ノルム>0. 合力がtgtForce.
     2. ZMPがtgtZmp
-    3. 各脚のCOPがCOPOffsetと一致
-    4. ノルムの2乗和の最小化
+    3. 各脚の各頂点のノルムの重心がCOPOffsetと一致 (fzの値でスケールされてしまうので、alphaを用いて左右をそろえる)
+    4. ノルムの2乗和の最小化 (3の中で微小な重みで一緒にやる)
   */
 
-  // TODO
+  if(gaitParam.isSupportPhase(RLEG) && !gaitParam.isSupportPhase(LLEG)){
+    tgtWrench[LLEG].setZero();
+    tgtWrench[RLEG].head<3>() = tgtForce;
+    tgtWrench[RLEG].tail<3>() = (tgtZmp - endEffectorParam.actPose[RLEG].translation()).cross(tgtForce);
+  }else if(!gaitParam.isSupportPhase(RLEG) && gaitParam.isSupportPhase(LLEG)){
+    tgtWrench[RLEG].setZero();
+    tgtWrench[LLEG].head<3>() = tgtForce;
+    tgtWrench[LLEG].tail<3>() = (tgtZmp - endEffectorParam.actPose[LLEG].translation()).cross(tgtForce);
+  }else if(!gaitParam.isSupportPhase(RLEG) && !gaitParam.isSupportPhase(LLEG)){
+    tgtWrench[RLEG].setZero();
+    tgtWrench[LLEG].setZero();
+  }else if(tgtForce.norm() == 0){// たぶん無いが念の為
+    tgtWrench[RLEG].setZero();
+    tgtWrench[LLEG].setZero();
+  }else{
+    int dim = gaitParam.legPolygon[RLEG].size() + gaitParam.legPolygon[LLEG].size();
+    {
+      // 1. ノルム>0. 合力がtgtForce.
+
+      // 合力がtgtForce. (合計が1)
+      this->constraintTask_->A() = Eigen::SparseMatrix<double,Eigen::RowMajor>(1,dim);
+      for(int i=0;i<dim;i++) this->constraintTask_->A().insert(0,i) = 1.0;
+      this->constraintTask_->b() = Eigen::VectorXd::Ones(1);
+      this->constraintTask_->wa() = cnoid::VectorX::Ones(1);
+
+      // 各値が0~1
+      this->constraintTask_->C() = Eigen::SparseMatrix<double,Eigen::RowMajor>(dim,dim);
+      for(int i=0;i<dim;i++) this->constraintTask_->C().insert(i,i) = 1.0;
+      this->constraintTask_->dl() = Eigen::VectorXd::Zero(dim);
+      this->constraintTask_->du() = Eigen::VectorXd::Ones(dim);
+      this->constraintTask_->wc() = cnoid::VectorX::Ones(dim);
+
+      this->constraintTask_->w() = cnoid::VectorX::Ones(dim) * 1e-6;
+      this->constraintTask_->toSolve() = false;
+      //this->constraintTask_->solver().settings()->setVerbosity(debugLevel);
+    }
+    {
+      // 2. ZMPがtgtZmp
+      // tgtZmpまわりのトルクの和を求めて、tgtForceの向きの単位ベクトルとの外積が0なら良い
+      this->tgtZmpTask_->A() = Eigen::SparseMatrix<double,Eigen::RowMajor>(3,dim);
+      cnoid::Vector3 tgtForceDir = tgtForce.normalized();
+      int idx = 0;
+      for(int i=0;i<NUM_LEGS;i++){
+        for(int j=0;j<gaitParam.legPolygon[i].size();j++){
+          cnoid::Vector3 pos = endEffectorParam.actPose[i].translation() + endEffectorParam.actPose[i].linear() * gaitParam.legPolygon[i][j];
+          cnoid::Vector3 a = tgtForceDir.cross( (pos - tgtZmp).cross(tgtForce));
+          for(int k=0;k<3;k++) this->tgtZmpTask_->A().insert(k,idx) = a[k];
+          idx ++;
+        }
+      }
+      this->tgtZmpTask_->b() = Eigen::VectorXd::Zero(3);
+      this->tgtZmpTask_->wa() = cnoid::VectorX::Ones(3);
+
+      this->tgtZmpTask_->C() = Eigen::SparseMatrix<double,Eigen::RowMajor>(0,dim);
+      this->tgtZmpTask_->dl() = Eigen::VectorXd::Zero(0);
+      this->tgtZmpTask_->du() = Eigen::VectorXd::Ones(0);
+      this->tgtZmpTask_->wc() = cnoid::VectorX::Ones(0);
+
+      this->tgtZmpTask_->w() = cnoid::VectorX::Ones(dim) * 1e-6;
+      this->tgtZmpTask_->toSolve() = true;
+      //this->tgtZmpTask_->solver().settings()->setVerbosity(debugLevel);
+    }
+    {
+      // 3. 各脚の各頂点のノルムの重心がCOPOffsetと一致 (fzの値でスケールされてしまうので、alphaを用いて左右をそろえる)
+
+      // 各EndEffectorとtgtZmpの距離を用いてalphaを求める
+      std::vector<double> alpha(2);
+      {
+        cnoid::Vector3 rleg2leg = endEffectorParam.actPose[LLEG].translation() - endEffectorParam.actPose[RLEG].translation();
+        rleg2leg[2] = 0.0;
+        if(rleg2leg.norm() == 0.0){
+          alpha[RLEG] = alpha[LLEG] = 0.5;
+        }else{
+          cnoid::Vector3 rleg2legDir = rleg2leg.normalized();
+          double rleg2llegDistance = rleg2leg.norm();
+          double rleg2tgtZmpRatio = rleg2legDir.dot(tgtZmp - endEffectorParam.actPose[RLEG].translation()) / rleg2llegDistance;
+          alpha[RLEG] = mathutil::clamp(1.0 - rleg2tgtZmpRatio, 0.05, 1.0-0.05);
+          alpha[LLEG] = mathutil::clamp(rleg2tgtZmpRatio, 0.05, 1.0-0.05);
+        }
+      }
+
+      this->copTask_->A() = Eigen::SparseMatrix<double,Eigen::RowMajor>(3*NUM_LEGS,dim);
+      int idx = 0;
+      for(int i=0;i<NUM_LEGS;i++) {
+        cnoid::Vector3 cop = endEffectorParam.actPose[i].translation() + endEffectorParam.actPose[i].linear() * gaitParam.copOffset[i];
+        for(int j=0;j<gaitParam.legPolygon[i].size();j++){
+          cnoid::Vector3 pos = endEffectorParam.actPose[i].translation() + endEffectorParam.actPose[i].linear() * gaitParam.legPolygon[i][j];
+          cnoid::Vector3 a = (pos - cop) / alpha[i];
+          for(int k=0;k<3;k++) this->copTask_->A().insert(i*3+k,idx) = a[k];
+          idx ++;
+        }
+      }
+      this->copTask_->b() = Eigen::VectorXd::Zero(3*NUM_LEGS);
+      this->copTask_->wa() = cnoid::VectorX::Ones(3*NUM_LEGS);
+
+      this->copTask_->C() = Eigen::SparseMatrix<double,Eigen::RowMajor>(0,dim);
+      this->copTask_->dl() = Eigen::VectorXd::Zero(0);
+      this->copTask_->du() = Eigen::VectorXd::Ones(0);
+      this->copTask_->wc() = cnoid::VectorX::Ones(0);
+
+      this->copTask_->w() = cnoid::VectorX::Ones(dim) * 1e-6;
+      this->copTask_->toSolve() = true;
+      //this->copTask_->solver().settings()->setVerbosity(debugLevel);
+    }
+
+    std::vector<std::shared_ptr<prioritized_qp_base::Task> > tasks{this->constraintTask_,this->tgtZmpTask_,this->copTask_};
+    cnoid::VectorX result;
+    if(!prioritized_qp_base::solve(tasks,
+                                   result,
+                                   0 // debuglevel
+                                   )){
+      tgtWrench[RLEG].head<3>() = tgtForce / 2;
+      tgtWrench[LLEG].head<3>() = tgtForce / 2;
+    }else{
+      int idx = 0;
+      for(int i=0;i<NUM_LEGS;i++){
+        for(int j=0;j<gaitParam.legPolygon[i].size();j++){
+          tgtWrench[i].head<3>() += tgtForce * result[idx];
+          tgtWrench[i].tail<3>() += (endEffectorParam.actPose[i].linear() * gaitParam.legPolygon[i][j]).cross(tgtForce * result[idx]);
+          idx ++;
+        }
+      }
+    }
+  }
 
   o_tgtWrench = tgtWrench;
   return true;

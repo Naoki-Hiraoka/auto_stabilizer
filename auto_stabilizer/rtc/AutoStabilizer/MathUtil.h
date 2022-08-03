@@ -88,6 +88,14 @@ namespace mathutil {
     return value.array().max(llimit_value.array()).min(ulimit_value.array());
   }
 
+  inline Eigen::Matrix3d cross(const Eigen::Vector3d& m){
+    Eigen::Matrix3d ret;
+    ret <<
+        0.0, -m[2],  m[1],
+       m[2],   0.0, -m[0],
+      -m[1],  m[0],   0.0;
+    return ret;
+  }
 };
 
 
