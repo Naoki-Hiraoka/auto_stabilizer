@@ -201,8 +201,8 @@ protected:
 
   cnoid::BodyPtr refRobot_; // reference. reference world frame
   cnoid::BodyPtr refRobotOrigin_; // reference. generate frame
-  cnoid::BodyPtr actRobot_; // actual. actual imu world frame
-  cnoid::BodyPtr actRobotOrigin_; // actual. generate frame
+  cnoid::BodyPtr actRobotRaw_; // actual. actual imu world frame
+  cnoid::BodyPtr actRobot_; // actual. generate frame
   cnoid::BodyPtr genRobot_; // output. 関節位置制御用
   cnoid::BodyPtr actRobotTqc_; // output. 関節トルク制御用
 
@@ -232,9 +232,9 @@ protected:
 
   static void moveCoords(cnoid::BodyPtr robot, const cnoid::Position& target, const cnoid::Position& at);
 
-  static bool readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobot, cnoid::BodyPtr actRobot, EndEffectorParam& endEffectorParams);
-  static bool calcActualParameters(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, EndEffectorParam& endEffectorParams, GaitParam& gaitParam, double dt);
-  static bool execAutoStabilizer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, const cnoid::BodyPtr& actRobot, cnoid::BodyPtr& actRobotOrigin, cnoid::BodyPtr& genRobot, cnoid::BodyPtr& actRobotTqc, EndEffectorParam& endEffectorParams, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer);
+  static bool readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobot, cnoid::BodyPtr actRobotRaw, EndEffectorParam& endEffectorParams);
+  static bool calcActualParameters(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& actRobotRaw, cnoid::BodyPtr& actRobot, EndEffectorParam& endEffectorParams, GaitParam& gaitParam, double dt);
+  static bool execAutoStabilizer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, const cnoid::BodyPtr& actRobotRaw, cnoid::BodyPtr& actRobot, cnoid::BodyPtr& genRobot, cnoid::BodyPtr& actRobotTqc, EndEffectorParam& endEffectorParams, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer);
   class FullbodyIKParam {
   public:
     cnoid::VectorX jlim_avoid_weight;

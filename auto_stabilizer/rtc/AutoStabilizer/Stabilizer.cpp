@@ -3,7 +3,7 @@
 #include <cnoid/JointPath>
 #include <cnoid/Jacobian>
 
-bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobotOrigin, const cnoid::BodyPtr actRobotOrigin, const cnoid::BodyPtr genRobot, const GaitParam& gaitParam, const EndEffectorParam& endEffectorParam, double dt, double g, double mass,
+bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobotOrigin, const cnoid::BodyPtr actRobot, const cnoid::BodyPtr genRobot, const GaitParam& gaitParam, const EndEffectorParam& endEffectorParam, double dt, double g, double mass,
                                 cnoid::BodyPtr& actRobotTqc, cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stOffset /*generate frame, endeffector origin*/) const{
   // - root attitude control
   // - 現在のactual重心位置から、目標ZMPを計算
@@ -12,7 +12,7 @@ bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobotOrigin, const cnoid
   // - 目標足裏反力を満たすようにDamping Control.
 
   // root attitude control
-  this->moveBasePosRotForBodyRPYControl(refRobotOrigin, actRobotOrigin, dt, gaitParam, // input
+  this->moveBasePosRotForBodyRPYControl(refRobotOrigin, actRobot, dt, gaitParam, // input
                                         o_stOffsetRootRpy); // output
 
   // 現在のactual重心位置から、目標ZMPを計算
@@ -27,7 +27,7 @@ bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobotOrigin, const cnoid
                    tgtWrench); // output
 
   // 目標反力を満たすように重力補償+仮想仕事の原理
-  this->calcTorque(actRobotOrigin, dt, endEffectorParam, tgtWrench, // input
+  this->calcTorque(actRobot, dt, endEffectorParam, tgtWrench, // input
                    actRobotTqc); // output
 
   // 目標足裏反力を満たすようにDamping Control
@@ -37,11 +37,11 @@ bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobotOrigin, const cnoid
   return true;
 }
 
-bool Stabilizer::moveBasePosRotForBodyRPYControl(const cnoid::BodyPtr refRobotOrigin, const cnoid::BodyPtr actRobotOrigin, double dt, const GaitParam& gaitParam,
+bool Stabilizer::moveBasePosRotForBodyRPYControl(const cnoid::BodyPtr refRobotOrigin, const cnoid::BodyPtr actRobot, double dt, const GaitParam& gaitParam,
                                                  cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy) const{
   cnoid::Vector3 stOffsetRootRpy = gaitParam.stOffsetRootRpy.value(); // gaitParam.footMidCoords frame
 
-  cnoid::Matrix3 rootRErrorGenerateFrame = refRobotOrigin->rootLink()->R() * actRobotOrigin->rootLink()->R().transpose(); // generate frame
+  cnoid::Matrix3 rootRErrorGenerateFrame = refRobotOrigin->rootLink()->R() * actRobot->rootLink()->R().transpose(); // generate frame
   cnoid::Matrix3 rootRError = gaitParam.footMidCoords.value().linear().transpose() * rootRErrorGenerateFrame/*generate frame*/ * gaitParam.footMidCoords.value().linear(); // gaitParam.footMidCoords frame
   cnoid::Vector3 rootRpyError = cnoid::rpyFromRot(rootRError); // gaitParam.footMidCoords frame
 
@@ -229,16 +229,16 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const EndEffectorParam& 
   return true;
 }
 
-bool Stabilizer::calcTorque(const cnoid::BodyPtr actRobotOrigin, double dt, const EndEffectorParam& endEffectorParam, const std::vector<cnoid::Vector6>& tgtWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/,
+bool Stabilizer::calcTorque(const cnoid::BodyPtr actRobot, double dt, const EndEffectorParam& endEffectorParam, const std::vector<cnoid::Vector6>& tgtWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/,
                             cnoid::BodyPtr& actRobotTqc) const{
   // 速度・加速度を考慮しない重力補償
-  actRobotTqc->rootLink()->T() = actRobotOrigin->rootLink()->T();
+  actRobotTqc->rootLink()->T() = actRobot->rootLink()->T();
   actRobotTqc->rootLink()->v() = cnoid::Vector3::Zero();
   actRobotTqc->rootLink()->w() = cnoid::Vector3::Zero();
   actRobotTqc->rootLink()->dv() = cnoid::Vector3::Zero();
   actRobotTqc->rootLink()->dw() = cnoid::Vector3::Zero();
   for(int i=0;i<actRobotTqc->numJoints();i++){
-    actRobotTqc->joint(i)->q() = actRobotOrigin->joint(i)->q();
+    actRobotTqc->joint(i)->q() = actRobot->joint(i)->q();
     actRobotTqc->joint(i)->dq() = 0.0;
     actRobotTqc->joint(i)->ddq() = 0.0;
   }
