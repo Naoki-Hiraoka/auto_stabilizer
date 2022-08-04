@@ -266,7 +266,6 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
 
 // static function
 bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobotRaw, cnoid::BodyPtr actRobotRaw, EndEffectorParam& endEffectors){
-  bool refRobotRaw_changed = false;
   bool qRef_updated = false;
   if(ports.m_qRefIn_.isNew()){
     ports.m_qRefIn_.read();
@@ -274,7 +273,6 @@ bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr
       for(int i=0;i<ports.m_qRef_.data.length();i++){
         if(std::isfinite(ports.m_qRef_.data[i])) refRobotRaw->joint(i)->q() = ports.m_qRef_.data[i];
       }
-      refRobotRaw_changed = true;
       qRef_updated = true;
     }
   }
@@ -293,19 +291,15 @@ bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr
       refRobotRaw->rootLink()->p()[1] = ports.m_refBasePos_.data.y;
       refRobotRaw->rootLink()->p()[2] = ports.m_refBasePos_.data.z;
     }
-    refRobotRaw_changed = true;
   }
   if(ports.m_refBaseRpyIn_.isNew()){
     ports.m_refBaseRpyIn_.read();
     if(std::isfinite(ports.m_refBaseRpy_.data.r) && std::isfinite(ports.m_refBaseRpy_.data.p) && std::isfinite(ports.m_refBaseRpy_.data.y)){
       refRobotRaw->rootLink()->R() = cnoid::rotFromRpy(ports.m_refBaseRpy_.data.r, ports.m_refBaseRpy_.data.p, ports.m_refBaseRpy_.data.y);
     }
-    refRobotRaw_changed = true;
   }
-  if(refRobotRaw_changed){
-    refRobotRaw->calcForwardKinematics();
-    refRobotRaw->calcCenterOfMass();
-  }
+  refRobotRaw->calcForwardKinematics();
+  refRobotRaw->calcCenterOfMass();
 
   for(int i=0;i<ports.m_refWrenchIn_.size();i++){
     if(ports.m_refWrenchIn_[i]->isNew()){
@@ -318,14 +312,12 @@ bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr
     }
   }
 
-  bool actRobotRaw_changed = false;
   if(ports.m_qActIn_.isNew()){
     ports.m_qActIn_.read();
     if(ports.m_qAct_.data.length() == actRobotRaw->numJoints()){
       for(int i=0;i<ports.m_qAct_.data.length();i++){
         if(std::isfinite(ports.m_qAct_.data[i])) actRobotRaw->joint(i)->q() = ports.m_qAct_.data[i];
       }
-      actRobotRaw_changed = true;
     }
   }
   if(ports.m_dqActIn_.isNew()){
@@ -334,7 +326,6 @@ bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr
       for(int i=0;i<ports.m_dqAct_.data.length();i++){
         if(std::isfinite(ports.m_dqAct_.data[i])) actRobotRaw->joint(i)->dq() = ports.m_dqAct_.data[i];
       }
-      actRobotRaw_changed = true;
     }
   }
   if(ports.m_actImuIn_.isNew()){
@@ -346,12 +337,9 @@ bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr
       cnoid::Matrix3 actR = cnoid::rotFromRpy(ports.m_actImu_.data.r, ports.m_actImu_.data.p, ports.m_actImu_.data.y);
       actRobotRaw->rootLink()->R() = Eigen::Matrix3d(Eigen::AngleAxisd(actR) * Eigen::AngleAxisd(imuR.transpose() * actRobotRaw->rootLink()->R())); // 単純に3x3行列の空間でRを積算していると、だんだん数値誤差によって回転行列でなくなってしまう恐れがあるので念の為
     }
-    actRobotRaw_changed = true;
   }
-  if(actRobotRaw_changed){
-    actRobotRaw->calcForwardKinematics();
-    actRobotRaw->calcCenterOfMass();
-  }
+  actRobotRaw->calcForwardKinematics();
+  actRobotRaw->calcCenterOfMass();
 
   cnoid::DeviceList<cnoid::ForceSensor> forceSensors(actRobotRaw->devices());
   for(int i=0;i<ports.m_actWrenchIn_.size();i++){
