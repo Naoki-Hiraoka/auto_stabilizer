@@ -30,14 +30,8 @@ bool RefToGenFrameConverter::initGenRobot(const cnoid::BodyPtr& refRobotRaw, con
 
 bool RefToGenFrameConverter::convertFrame(const cnoid::BodyPtr& refRobotRaw, const EndEffectorParam& endEffectorParams, const GaitParam& gaitParam, // input
                                          cnoid::BodyPtr& refRobot, std::vector<cnoid::Position>& o_refPose, std::vector<cnoid::Vector6>& o_refWrench, double& o_dz) const{ // output
-  // refRobotを計算
-  for(int i=0;i<refRobot->numJoints();i++){
-    refRobot->joint(i)->q() = refRobotRaw->joint(i)->q();
-    refRobot->joint(i)->dq() = refRobotRaw->joint(i)->dq();
-    refRobot->joint(i)->u() = refRobotRaw->joint(i)->u();
-  }
-  refRobot->calcForwardKinematics();
-  refRobot->calcCenterOfMass();
+  cnoidbodyutil::copyRobotState(refRobotRaw, refRobot);
+
   /*
     次の2つの座標系が一致するようにreference frameとgenerate frameを対応付ける
     - refRobotRawの、refFootOriginWeightとdefaultTranslatePosとcopOffsetに基づいて求めた足裏中間座標 (イメージとしては静止状態の目標ZMP位置にdefaultTranslatePosを作用させたもの)

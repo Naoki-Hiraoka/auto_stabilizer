@@ -358,76 +358,7 @@ bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr
 }
 
 // static function
-bool AutoStabilizer::calcActualParameters(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& actRobotRaw, cnoid::BodyPtr& actRobot, EndEffectorParam& endEffectorParams, GaitParam& gaitParam, double dt) {
-
-  {
-    // FootOrigin座標系を用いてactRobotRawをgenerate frameに投影しactRobotとする
-    cnoidbodyutil::copyRobotState(actRobotRaw, actRobot);
-    cnoid::DeviceList<cnoid::ForceSensor> actForceSensors(actRobotRaw->devices());
-    cnoid::DeviceList<cnoid::ForceSensor> actOriginForceSensors(actRobot->devices());
-    for(int i=0;i<actForceSensors.size();i++){
-      actOriginForceSensors[i]->F() = actForceSensors[i]->F();
-    }
-    double rlegweight = gaitParam.isSupportPhase(RLEG)? 1.0 : 0.0;
-    double llegweight = gaitParam.isSupportPhase(LLEG)? 1.0 : 0.0;
-    if(!gaitParam.isSupportPhase(RLEG) && !gaitParam.isSupportPhase(LLEG)) rlegweight = llegweight = 1.0;
-    cnoid::Position actrleg = actRobot->link(endEffectorParams.parentLink[RLEG])->T()*endEffectorParams.localT[RLEG];
-    cnoid::Position actlleg = actRobot->link(endEffectorParams.parentLink[LLEG])->T()*endEffectorParams.localT[LLEG];
-    cnoid::Position actFootMidCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{actrleg, actlleg},
-                                                               std::vector<double>{rlegweight, llegweight});
-    cnoid::Position actFootOriginCoords = mathutil::orientCoordToAxis(actFootMidCoords, cnoid::Vector3::UnitZ());
-    cnoid::Position genFootMidCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{endEffectorParams.abcTargetPose[RLEG], endEffectorParams.abcTargetPose[LLEG]},
-                                                               std::vector<double>{rlegweight, llegweight});  // 1周期前のabcTargetPoseを使っているが、abcTargetPoseは不連続に変化するものではないのでよい
-    cnoid::Position genFootOriginCoords = mathutil::orientCoordToAxis(genFootMidCoords, cnoid::Vector3::UnitZ());
-    cnoidbodyutil::moveCoords(actRobot, genFootOriginCoords, actFootOriginCoords);
-    actRobot->calcForwardKinematics();
-    actRobot->calcCenterOfMass();
-  }
-
-  {
-    // 各エンドエフェクタのactualの位置・力を計算
-    for(int i=0;i<endEffectorParams.name.size(); i++){
-      endEffectorParams.actPose[i] = actRobot->link(endEffectorParams.parentLink[i])->T() * endEffectorParams.localT[i];
-      if(endEffectorParams.forceSensor[i] != ""){
-        cnoid::ForceSensorPtr sensor = actRobot->findDevice<cnoid::ForceSensor>(endEffectorParams.forceSensor[i]);
-        cnoid::Vector6 senF = sensor->F();
-        cnoid::Position senPose = sensor->link()->T() * sensor->T_local();
-        cnoid::Position eefTosenPose = endEffectorParams.actPose[i].inverse() * senPose;
-        cnoid::Vector6 eefF; // endeffector frame. endeffector origin.
-        eefF.head<3>() = eefTosenPose.linear() * senF.head<3>();
-        eefF.tail<3>() = eefTosenPose.linear() * senF.tail<3>() + eefTosenPose.translation().cross(eefF.head<3>());
-        endEffectorParams.actWrench[i].head<3>() = endEffectorParams.actPose[i].linear() * eefF.head<3>();
-        endEffectorParams.actWrench[i].tail<3>() = endEffectorParams.actPose[i].linear() * eefF.tail<3>();
-      }
-    }
-  }
-
-  if(mode.isSyncToABCInit()){ // startAutoBalancer直後の初回
-    // actCogを初期化
-    gaitParam.actCog = actRobot->centerOfMass();
-    gaitParam.actCogVel.reset(cnoid::Vector3::Zero());
-  }
-
-  {
-    // actCogを計算
-    bool genContactState_changed = false;
-    for(int i=0;i<NUM_LEGS;i++){
-      if(gaitParam.isSupportPhase(i) != gaitParam.prevSupportPhase[i]) genContactState_changed = true;
-    }
-    if(genContactState_changed){
-      //座標系が飛んでいるので、gaitParam.actCogVel は前回の周期の値をそのままつかう
-    }else{
-      cnoid::Vector3 cogVel = (actRobot->centerOfMass() - gaitParam.actCog) / dt;
-      gaitParam.actCogVel.passFilter(cogVel, dt);
-    }
-    gaitParam.actCog = actRobot->centerOfMass();
-  }
-
-  return true;
-}
-
-// static function
-bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobotRaw, cnoid::BodyPtr& refRobot, const cnoid::BodyPtr& actRobotRaw, cnoid::BodyPtr& actRobot, cnoid::BodyPtr& genRobot, cnoid::BodyPtr& actRobotTqc, EndEffectorParam& endEffectorParams, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer) {
+bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobotRaw, cnoid::BodyPtr& refRobot, const cnoid::BodyPtr& actRobotRaw, cnoid::BodyPtr& actRobot, cnoid::BodyPtr& genRobot, cnoid::BodyPtr& actRobotTqc, EndEffectorParam& endEffectorParams, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ActToGenFrameConverter& actToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer) {
   if(mode.isSyncToABCInit()){ // startAutoBalancer直後の初回
 
     // FootOrigin座標系を用いてrefRobotRawをgenerate frameに投影しgenRobotとする
@@ -469,7 +400,8 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
     gaitParam.stOffsetRootRpy.reset(cnoid::Vector3::Zero());
   }
 
-  AutoStabilizer::calcActualParameters(mode, actRobotRaw, actRobot, endEffectorParams, gaitParam, dt);
+  actToGenFrameConverter.convertFrame(actRobotRaw, endEffectorParams, gaitParam, dt,
+                                      actRobot, endEffectorParams.actPose, endEffectorParams.actWrench, gaitParam.actCog,gaitParam.actCogVel);
 
   // Impedance Controller
   impedanceController.calcImpedanceControl(dt, endEffectorParams,
@@ -733,10 +665,11 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
   }else{
     if(this->mode_.isSyncToABCInit()){ // startAutoBalancer直後の初回
       this->refToGenFrameConverter_.reset();
+      this->actToGenFrameConverter_.reset();
       this->footStepGenerator_.reset();
       this->impedanceController_.reset();
     }
-    AutoStabilizer::execAutoStabilizer(this->mode_, this->refRobotRaw_, this->refRobot_, this->actRobotRaw_, this->actRobot_, this->genRobot_, this->actRobotTqc_, this->endEffectorParams_, this->gaitParam_, this->dt_, this->jointParams_, this->footStepGenerator_, this->legCoordsGenerator_, this->refToGenFrameConverter_, this->impedanceController_, this->stabilizer_);
+    AutoStabilizer::execAutoStabilizer(this->mode_, this->refRobotRaw_, this->refRobot_, this->actRobotRaw_, this->actRobot_, this->genRobot_, this->actRobotTqc_, this->endEffectorParams_, this->gaitParam_, this->dt_, this->jointParams_, this->footStepGenerator_, this->legCoordsGenerator_, this->refToGenFrameConverter_, this->actToGenFrameConverter_, this->impedanceController_, this->stabilizer_);
     AutoStabilizer::solveFullbodyIK(this->genRobot_, this->refRobot_, this->endEffectorParams_, this->fullbodyIKParam_, this->dt_, this->jointParams_, this->gaitParam_);
   }
 

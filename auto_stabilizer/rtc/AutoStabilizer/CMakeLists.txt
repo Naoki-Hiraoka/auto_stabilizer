@@ -30,8 +30,8 @@ add_library(AutoStabilizer SHARED
   AutoStabilizerService_impl.cpp
   LegCoordsGenerator.cpp
   FootStepGenerator.cpp
-  GaitParam.cpp
   RefToGenFrameConverter.cpp
+  ActToGenFrameConverter.cpp
   Stabilizer.cpp
   ImpedanceController.cpp
   )
