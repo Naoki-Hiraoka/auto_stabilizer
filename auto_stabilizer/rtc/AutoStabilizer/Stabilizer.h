@@ -32,11 +32,11 @@ protected:
   mutable std::shared_ptr<prioritized_qp::Task> copTask_ = std::make_shared<prioritized_qp::Task>();;
 public:
 
-  bool execStabilizer(const cnoid::BodyPtr refRobotOrigin, const cnoid::BodyPtr actRobot, const cnoid::BodyPtr genRobot, const GaitParam& gaitParam, const EndEffectorParam& endEffectorParam, double dt, double g, double mass,
+  bool execStabilizer(const cnoid::BodyPtr refRobot, const cnoid::BodyPtr actRobot, const cnoid::BodyPtr genRobot, const GaitParam& gaitParam, const EndEffectorParam& endEffectorParam, double dt, double g, double mass,
                       cnoid::BodyPtr& actRobotTqc, cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stOffset /*generate frame, endeffector origin*/) const;
 
 protected:
-  bool moveBasePosRotForBodyRPYControl(const cnoid::BodyPtr refRobotOrigin, const cnoid::BodyPtr actRobot, double dt, const GaitParam& gaitParam,
+  bool moveBasePosRotForBodyRPYControl(const cnoid::BodyPtr refRobot, const cnoid::BodyPtr actRobot, double dt, const GaitParam& gaitParam,
                                        cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy) const;
   bool calcZMP(const GaitParam& gaitParam, double dt, double g, double mass,
                cnoid::Vector3& o_tgtZmp/*generate座標系*/, cnoid::Vector3& o_tgtForce/*generate座標系*/) const;

@@ -2,15 +2,15 @@
 #include "CnoidBodyUtil.h"
 #include "MathUtil.h"
 
-bool RefToGenFrameConverter::initGenRobot(const cnoid::BodyPtr& refRobot, const EndEffectorParam& endEffectorParams, const GaitParam& gaitParam, // input
+bool RefToGenFrameConverter::initGenRobot(const cnoid::BodyPtr& refRobotRaw, const EndEffectorParam& endEffectorParams, const GaitParam& gaitParam, // input
                                          cnoid::BodyPtr& genRobot, cpp_filters::TwoPointInterpolatorSE3& o_footMidCoords, cnoid::Vector3& o_genCog, cnoid::Vector3& o_genCogVel) const{ // output
-  genRobot->rootLink()->T() = refRobot->rootLink()->T();
-  genRobot->rootLink()->v() = refRobot->rootLink()->v();
-  genRobot->rootLink()->w() = refRobot->rootLink()->w();
+  genRobot->rootLink()->T() = refRobotRaw->rootLink()->T();
+  genRobot->rootLink()->v() = refRobotRaw->rootLink()->v();
+  genRobot->rootLink()->w() = refRobotRaw->rootLink()->w();
   for(int i=0;i<genRobot->numJoints();i++){
-    genRobot->joint(i)->q() = refRobot->joint(i)->q();
-    genRobot->joint(i)->dq() = refRobot->joint(i)->dq();
-    genRobot->joint(i)->u() = refRobot->joint(i)->u();
+    genRobot->joint(i)->q() = refRobotRaw->joint(i)->q();
+    genRobot->joint(i)->dq() = refRobotRaw->joint(i)->dq();
+    genRobot->joint(i)->u() = refRobotRaw->joint(i)->u();
   }
   genRobot->calcForwardKinematics();
   cnoid::Position refFootMidCoords = this->calcRefFootMidCoords(genRobot, endEffectorParams, gaitParam);
@@ -28,24 +28,24 @@ bool RefToGenFrameConverter::initGenRobot(const cnoid::BodyPtr& refRobot, const 
   return true;
 }
 
-bool RefToGenFrameConverter::convertFrame(const cnoid::BodyPtr& refRobot, const EndEffectorParam& endEffectorParams, const GaitParam& gaitParam, // input
-                                         cnoid::BodyPtr& refRobotOrigin, std::vector<cnoid::Position>& o_refPose, std::vector<cnoid::Vector6>& o_refWrench, double& o_dz) const{ // output
-  // refRobotOriginを計算
-  for(int i=0;i<refRobotOrigin->numJoints();i++){
-    refRobotOrigin->joint(i)->q() = refRobot->joint(i)->q();
-    refRobotOrigin->joint(i)->dq() = refRobot->joint(i)->dq();
-    refRobotOrigin->joint(i)->u() = refRobot->joint(i)->u();
+bool RefToGenFrameConverter::convertFrame(const cnoid::BodyPtr& refRobotRaw, const EndEffectorParam& endEffectorParams, const GaitParam& gaitParam, // input
+                                         cnoid::BodyPtr& refRobot, std::vector<cnoid::Position>& o_refPose, std::vector<cnoid::Vector6>& o_refWrench, double& o_dz) const{ // output
+  // refRobotを計算
+  for(int i=0;i<refRobot->numJoints();i++){
+    refRobot->joint(i)->q() = refRobotRaw->joint(i)->q();
+    refRobot->joint(i)->dq() = refRobotRaw->joint(i)->dq();
+    refRobot->joint(i)->u() = refRobotRaw->joint(i)->u();
   }
-  refRobotOrigin->calcForwardKinematics();
-  refRobotOrigin->calcCenterOfMass();
+  refRobot->calcForwardKinematics();
+  refRobot->calcCenterOfMass();
   /*
     次の2つの座標系が一致するようにreference frameとgenerate frameを対応付ける
-    - refRobotの、refFootOriginWeightとdefaultTranslatePosとcopOffsetに基づいて求めた足裏中間座標 (イメージとしては静止状態の目標ZMP位置にdefaultTranslatePosを作用させたもの)
+    - refRobotRawの、refFootOriginWeightとdefaultTranslatePosとcopOffsetに基づいて求めた足裏中間座標 (イメージとしては静止状態の目標ZMP位置にdefaultTranslatePosを作用させたもの)
     - 位置XYはgenRobotの重心位置. 位置ZはgenRobotの重心位置 - dz. 姿勢はfootMidCoords. (ただしHandFixModeなら、位置のfootMidCoords座標系Y成分はfootMidCoordsの位置.)
       - handControlWeight = 0なら、位置も姿勢もfootMidCoords
   */
-  cnoid::Position refFootMidCoords = this->calcRefFootMidCoords(refRobotOrigin, endEffectorParams, gaitParam);
-  double dz = (refFootMidCoords.inverse() * refRobotOrigin->centerOfMass())[2]; // ref重心高さ
+  cnoid::Position refFootMidCoords = this->calcRefFootMidCoords(refRobot, endEffectorParams, gaitParam);
+  double dz = (refFootMidCoords.inverse() * refRobot->centerOfMass())[2]; // ref重心高さ
   cnoid::Vector3 genCog_genFootMidCoordsLocal = gaitParam.footMidCoords.value().linear().transpose() * (gaitParam.genCog - gaitParam.footMidCoords.value().translation());
   genCog_genFootMidCoordsLocal[1] *= (1.0 - handFixMode.value());
   genCog_genFootMidCoordsLocal[2] -= dz;
@@ -53,14 +53,14 @@ bool RefToGenFrameConverter::convertFrame(const cnoid::BodyPtr& refRobot, const 
   genFootMidCoords.linear() = gaitParam.footMidCoords.value().linear();
   genFootMidCoords.translation() = gaitParam.footMidCoords.value().translation() + gaitParam.footMidCoords.value().linear() * genCog_genFootMidCoordsLocal;
   genFootMidCoords = mathutil::calcMidCoords({gaitParam.footMidCoords.value(), genFootMidCoords}, {1.0-handControlRatio.value(), handControlRatio.value()});
-  cnoidbodyutil::moveCoords(refRobotOrigin, genFootMidCoords, refFootMidCoords); // 1周期前のfootMidCoordsを使っているが、footMidCoordsは不連続に変化するものではないのでよい
-  refRobotOrigin->calcForwardKinematics();
-  refRobotOrigin->calcCenterOfMass();
+  cnoidbodyutil::moveCoords(refRobot, genFootMidCoords, refFootMidCoords); // 1周期前のfootMidCoordsを使っているが、footMidCoordsは不連続に変化するものではないのでよい
+  refRobot->calcForwardKinematics();
+  refRobot->calcCenterOfMass();
 
   // refPoseを計算
   std::vector<cnoid::Position> refPose(endEffectorParams.name.size());
   for(int i=0;i<endEffectorParams.name.size();i++){
-    refPose[i] = refRobotOrigin->link(endEffectorParams.parentLink[i])->T() * endEffectorParams.localT[i];
+    refPose[i] = refRobot->link(endEffectorParams.parentLink[i])->T() * endEffectorParams.localT[i];
   }
 
   // refWrenchを計算

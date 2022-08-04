@@ -96,10 +96,10 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
       std::cerr << "\x1b[31m[" << this->m_profile.instance_name << "] " << "failed to load model[" << fileName << "]" << "\x1b[39m" << std::endl;
       return RTC::RTC_ERROR;
     }
+    this->refRobotRaw_ = robot;
+    this->refRobotRaw_->calcForwardKinematics(); this->refRobotRaw_->calcCenterOfMass();
     this->refRobot_ = robot;
     this->refRobot_->calcForwardKinematics(); this->refRobot_->calcCenterOfMass();
-    this->refRobotOrigin_ = robot;
-    this->refRobotOrigin_->calcForwardKinematics(); this->refRobotOrigin_->calcCenterOfMass();
     this->actRobotRaw_ = robot->clone();
     this->actRobotRaw_->calcForwardKinematics(); this->actRobotRaw_->calcCenterOfMass();
     this->actRobot_ = robot->clone();
@@ -112,7 +112,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
 
   {
     // load end_effector
-    cnoid::DeviceList<cnoid::ForceSensor> forceSensors(this->refRobot_->devices());
+    cnoid::DeviceList<cnoid::ForceSensor> forceSensors(this->refRobotRaw_->devices());
     std::string endEffectors; this->getProperty("end_effectors", endEffectors);
     std::stringstream ss_endEffectors(endEffectors);
     std::string buf;
@@ -138,7 +138,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
       // check validity
       name.erase(std::remove(name.begin(), name.end(), ' '), name.end()); // remove whitespace
       parentLink.erase(std::remove(name.begin(), name.end(), ' '), name.end()); // remove whitespace
-      if(!this->refRobot_->link(parentLink)){
+      if(!this->refRobotRaw_->link(parentLink)){
         std::cerr << "\x1b[31m[" << this->m_profile.instance_name << "] " << " link [" << parentLink << "]" << " is not found for " << name << "\x1b[39m" << std::endl;
         return RTC::RTC_ERROR;
       }
@@ -152,7 +152,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
       // 各EndEffectorsから親リンク側に遡っていき、最初に見つかったForceSensorをEndEffectorに対応付ける. 以後、ForceSensorの値を座標変換したものがEndEffectorが受けている力とみなされる. 見つからなければ受けている力は常に0とみなされる
       std::string forceSensor = "";
       {
-        cnoid::LinkPtr link = this->refRobot_->link(parentLink);
+        cnoid::LinkPtr link = this->refRobotRaw_->link(parentLink);
         bool found = false;
         while (link != nullptr && found == false) {
           for (size_t j = 0; j < forceSensors.size(); j++) {
@@ -182,10 +182,10 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
   {
     // generate LegParams
     // init-poseのとき両脚が水平かつX軸が前方であるという仮定がある
-    cnoid::Position defautFootMidCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{cnoid::Position(this->refRobotOrigin_->link(this->endEffectorParams_.parentLink[RLEG])->T()*this->endEffectorParams_.localT[RLEG]),cnoid::Position(this->refRobotOrigin_->link(this->endEffectorParams_.parentLink[LLEG])->T()*this->endEffectorParams_.localT[LLEG])},
+    cnoid::Position defautFootMidCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{cnoid::Position(this->refRobot_->link(this->endEffectorParams_.parentLink[RLEG])->T()*this->endEffectorParams_.localT[RLEG]),cnoid::Position(this->refRobot_->link(this->endEffectorParams_.parentLink[LLEG])->T()*this->endEffectorParams_.localT[LLEG])},
                                                             std::vector<double>{1,1});
     for(int i=0; i<NUM_LEGS; i++){
-      cnoid::Position defaultPose = this->refRobotOrigin_->link(this->endEffectorParams_.parentLink[i])->T()*this->endEffectorParams_.localT[i];
+      cnoid::Position defaultPose = this->refRobot_->link(this->endEffectorParams_.parentLink[i])->T()*this->endEffectorParams_.localT[i];
       this->gaitParam_.defaultTranslatePos[i] = defautFootMidCoords.inverse() * defaultPose.translation();
     }
   }
@@ -265,46 +265,46 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
 }
 
 // static function
-bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobot, cnoid::BodyPtr actRobotRaw, EndEffectorParam& endEffectors){
-  bool refRobot_changed = false;
+bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobotRaw, cnoid::BodyPtr actRobotRaw, EndEffectorParam& endEffectors){
+  bool refRobotRaw_changed = false;
   bool qRef_updated = false;
   if(ports.m_qRefIn_.isNew()){
     ports.m_qRefIn_.read();
-    if(ports.m_qRef_.data.length() == refRobot->numJoints()){
+    if(ports.m_qRef_.data.length() == refRobotRaw->numJoints()){
       for(int i=0;i<ports.m_qRef_.data.length();i++){
-        if(std::isfinite(ports.m_qRef_.data[i])) refRobot->joint(i)->q() = ports.m_qRef_.data[i];
+        if(std::isfinite(ports.m_qRef_.data[i])) refRobotRaw->joint(i)->q() = ports.m_qRef_.data[i];
       }
-      refRobot_changed = true;
+      refRobotRaw_changed = true;
       qRef_updated = true;
     }
   }
   if(ports.m_refTauIn_.isNew()){
     ports.m_refTauIn_.read();
-    if(ports.m_refTau_.data.length() == refRobot->numJoints()){
+    if(ports.m_refTau_.data.length() == refRobotRaw->numJoints()){
       for(int i=0;i<ports.m_refTau_.data.length();i++){
-        if(std::isfinite(ports.m_refTau_.data[i])) refRobot->joint(i)->u() = ports.m_refTau_.data[i];
+        if(std::isfinite(ports.m_refTau_.data[i])) refRobotRaw->joint(i)->u() = ports.m_refTau_.data[i];
       }
     }
   }
   if(ports.m_refBasePosIn_.isNew()){
     ports.m_refBasePosIn_.read();
     if(std::isfinite(ports.m_refBasePos_.data.x) && std::isfinite(ports.m_refBasePos_.data.y) && std::isfinite(ports.m_refBasePos_.data.z)){
-      refRobot->rootLink()->p()[0] = ports.m_refBasePos_.data.x;
-      refRobot->rootLink()->p()[1] = ports.m_refBasePos_.data.y;
-      refRobot->rootLink()->p()[2] = ports.m_refBasePos_.data.z;
+      refRobotRaw->rootLink()->p()[0] = ports.m_refBasePos_.data.x;
+      refRobotRaw->rootLink()->p()[1] = ports.m_refBasePos_.data.y;
+      refRobotRaw->rootLink()->p()[2] = ports.m_refBasePos_.data.z;
     }
-    refRobot_changed = true;
+    refRobotRaw_changed = true;
   }
   if(ports.m_refBaseRpyIn_.isNew()){
     ports.m_refBaseRpyIn_.read();
     if(std::isfinite(ports.m_refBaseRpy_.data.r) && std::isfinite(ports.m_refBaseRpy_.data.p) && std::isfinite(ports.m_refBaseRpy_.data.y)){
-      refRobot->rootLink()->R() = cnoid::rotFromRpy(ports.m_refBaseRpy_.data.r, ports.m_refBaseRpy_.data.p, ports.m_refBaseRpy_.data.y);
+      refRobotRaw->rootLink()->R() = cnoid::rotFromRpy(ports.m_refBaseRpy_.data.r, ports.m_refBaseRpy_.data.p, ports.m_refBaseRpy_.data.y);
     }
-    refRobot_changed = true;
+    refRobotRaw_changed = true;
   }
-  if(refRobot_changed){
-    refRobot->calcForwardKinematics();
-    refRobot->calcCenterOfMass();
+  if(refRobotRaw_changed){
+    refRobotRaw->calcForwardKinematics();
+    refRobotRaw->calcCenterOfMass();
   }
 
   for(int i=0;i<ports.m_refWrenchIn_.size();i++){
@@ -439,17 +439,17 @@ bool AutoStabilizer::calcActualParameters(const AutoStabilizer::ControlMode& mod
 }
 
 // static function
-bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobot, cnoid::BodyPtr& refRobotOrigin, const cnoid::BodyPtr& actRobotRaw, cnoid::BodyPtr& actRobot, cnoid::BodyPtr& genRobot, cnoid::BodyPtr& actRobotTqc, EndEffectorParam& endEffectorParams, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer) {
+bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobotRaw, cnoid::BodyPtr& refRobot, const cnoid::BodyPtr& actRobotRaw, cnoid::BodyPtr& actRobot, cnoid::BodyPtr& genRobot, cnoid::BodyPtr& actRobotTqc, EndEffectorParam& endEffectorParams, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer) {
   if(mode.isSyncToABCInit()){ // startAutoBalancer直後の初回
 
-    // FootOrigin座標系を用いてrefRobotをgenerate frameに投影しgenRobotとする
-    refToGenFrameConverter.initGenRobot(refRobot, endEffectorParams, gaitParam,
+    // FootOrigin座標系を用いてrefRobotRawをgenerate frameに投影しgenRobotとする
+    refToGenFrameConverter.initGenRobot(refRobotRaw, endEffectorParams, gaitParam,
                                         genRobot, gaitParam.footMidCoords, gaitParam.genCog, gaitParam.genCogVel);
   }
 
-  // FootOrigin座標系を用いてrefRobotをgenerate frameに投影しrefRobotOriginとする
-  refToGenFrameConverter.convertFrame(refRobot, endEffectorParams, gaitParam,
-                                      refRobotOrigin, endEffectorParams.refPose, endEffectorParams.refWrench, gaitParam.dz);
+  // FootOrigin座標系を用いてrefRobotRawをgenerate frameに投影しrefRobotとする
+  refToGenFrameConverter.convertFrame(refRobotRaw, endEffectorParams, gaitParam,
+                                      refRobot, endEffectorParams.refPose, endEffectorParams.refWrench, gaitParam.dz);
 
 
   if(mode.isSyncToABCInit()){ // startAutoBalancer直後の初回
@@ -507,7 +507,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
 
   // Stabilizer
   if(mode.isSTRunning()){
-    stabilizer.execStabilizer(refRobotOrigin, actRobot, genRobot, gaitParam, endEffectorParams, dt, 9.80665, genRobot->mass(),
+    stabilizer.execStabilizer(refRobot, actRobot, genRobot, gaitParam, endEffectorParams, dt, 9.80665, genRobot->mass(),
                               actRobotTqc, gaitParam.stOffsetRootRpy, endEffectorParams.stOffset);
   }else if(mode.isSyncToStopST()){ // stopST直後の初回
     gaitParam.stOffsetRootRpy.setGoal(cnoid::Vector3::Zero(),mode.remainTime());
@@ -516,8 +516,8 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
     }
   }
   gaitParam.stOffsetRootRpy.interpolate(dt);
-  gaitParam.stTargetRootPose.translation() = refRobotOrigin->rootLink()->p();
-  gaitParam.stTargetRootPose.linear() /*generate frame*/= gaitParam.footMidCoords.value().linear() * cnoid::rotFromRpy(gaitParam.stOffsetRootRpy.value()/*gaitParam.footMidCoords frame*/) * gaitParam.footMidCoords.value().linear().transpose() * refRobotOrigin->rootLink()->R()/*generate frame*/;
+  gaitParam.stTargetRootPose.translation() = refRobot->rootLink()->p();
+  gaitParam.stTargetRootPose.linear() /*generate frame*/= gaitParam.footMidCoords.value().linear() * cnoid::rotFromRpy(gaitParam.stOffsetRootRpy.value()/*gaitParam.footMidCoords frame*/) * gaitParam.footMidCoords.value().linear().transpose() * refRobot->rootLink()->R()/*generate frame*/;
   for(int i=0;i<endEffectorParams.name.size();i++){
     endEffectorParams.stOffset[i].interpolate(dt);
     cnoid::Vector6 stOffset = endEffectorParams.stOffset[i].value();
@@ -530,7 +530,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
 }
 
 // static function
-bool AutoStabilizer::solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::BodyPtr& refRobotOrigin, EndEffectorParam& endEffectorParams, AutoStabilizer::FullbodyIKParam& fullbodyIKParam, double dt, const std::vector<JointParam>& jointParams, const GaitParam& gaitParam) {
+bool AutoStabilizer::solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::BodyPtr& refRobot, EndEffectorParam& endEffectorParams, AutoStabilizer::FullbodyIKParam& fullbodyIKParam, double dt, const std::vector<JointParam>& jointParams, const GaitParam& gaitParam) {
   if(fullbodyIKParam.jlim_avoid_weight.size() != 6+genRobot->numJoints()) fullbodyIKParam.jlim_avoid_weight = cnoid::VectorX::Zero(6+genRobot->numJoints());
   cnoid::VectorX dq_weight_all = cnoid::VectorX::Zero(6+genRobot->numJoints());
   for(int i=0;i<6;i++) dq_weight_all[i] = 1.0;
@@ -606,7 +606,7 @@ bool AutoStabilizer::solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::Body
       fullbodyIKParam.refJointAngleConstraint[i]->joint() = genRobot->joint(i);
       fullbodyIKParam.refJointAngleConstraint[i]->maxError() = 10.0 * dt; // 高優先度のmaxError以下にしないと優先度逆転するおそれ
       fullbodyIKParam.refJointAngleConstraint[i]->weight() = 1e-1; // 小さい値すぎると、qp終了判定のtoleranceによって無視されてしまう
-      fullbodyIKParam.refJointAngleConstraint[i]->targetq() = refRobotOrigin->joint(i)->q();
+      fullbodyIKParam.refJointAngleConstraint[i]->targetq() = refRobot->joint(i)->q();
       fullbodyIKParam.refJointAngleConstraint[i]->precision() = 0.0; // 強制的にIKをmax loopまで回す
       ikConstraint.push_back(fullbodyIKParam.refJointAngleConstraint[i]);
     }
@@ -735,21 +735,21 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
   std::string instance_name = std::string(this->m_profile.instance_name);
   this->loop_++;
 
-  if(!AutoStabilizer::readInPortData(this->ports_, this->refRobot_, this->actRobotRaw_, this->endEffectorParams_)) return RTC::RTC_OK;  // qRef が届かなければ何もしない
+  if(!AutoStabilizer::readInPortData(this->ports_, this->refRobotRaw_, this->actRobotRaw_, this->endEffectorParams_)) return RTC::RTC_OK;  // qRef が届かなければ何もしない
 
   this->mode_.update(this->dt_);
   this->refToGenFrameConverter_.update(this->dt_);
 
   if(!this->mode_.isABCRunning()) {
-    cnoidbodyutil::copyRobotState(this->refRobot_, this->genRobot_);
+    cnoidbodyutil::copyRobotState(this->refRobotRaw_, this->genRobot_);
   }else{
     if(this->mode_.isSyncToABCInit()){ // startAutoBalancer直後の初回
       this->refToGenFrameConverter_.reset();
       this->footStepGenerator_.reset();
       this->impedanceController_.reset();
     }
-    AutoStabilizer::execAutoStabilizer(this->mode_, this->refRobot_, this->refRobotOrigin_, this->actRobotRaw_, this->actRobot_, this->genRobot_, this->actRobotTqc_, this->endEffectorParams_, this->gaitParam_, this->dt_, this->jointParams_, this->footStepGenerator_, this->legCoordsGenerator_, this->refToGenFrameConverter_, this->impedanceController_, this->stabilizer_);
-    AutoStabilizer::solveFullbodyIK(this->genRobot_, this->refRobotOrigin_, this->endEffectorParams_, this->fullbodyIKParam_, this->dt_, this->jointParams_, this->gaitParam_);
+    AutoStabilizer::execAutoStabilizer(this->mode_, this->refRobotRaw_, this->refRobot_, this->actRobotRaw_, this->actRobot_, this->genRobot_, this->actRobotTqc_, this->endEffectorParams_, this->gaitParam_, this->dt_, this->jointParams_, this->footStepGenerator_, this->legCoordsGenerator_, this->refToGenFrameConverter_, this->impedanceController_, this->stabilizer_);
+    AutoStabilizer::solveFullbodyIK(this->genRobot_, this->refRobot_, this->endEffectorParams_, this->fullbodyIKParam_, this->dt_, this->jointParams_, this->gaitParam_);
   }
 
   AutoStabilizer::writeOutPortData(this->ports_, this->genRobot_, this->mode_, this->outputOffsetInterpolators_, this->dt_);

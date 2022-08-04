@@ -3,7 +3,7 @@
 #include <cnoid/JointPath>
 #include <cnoid/Jacobian>
 
-bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobotOrigin, const cnoid::BodyPtr actRobot, const cnoid::BodyPtr genRobot, const GaitParam& gaitParam, const EndEffectorParam& endEffectorParam, double dt, double g, double mass,
+bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobot, const cnoid::BodyPtr actRobot, const cnoid::BodyPtr genRobot, const GaitParam& gaitParam, const EndEffectorParam& endEffectorParam, double dt, double g, double mass,
                                 cnoid::BodyPtr& actRobotTqc, cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stOffset /*generate frame, endeffector origin*/) const{
   // - root attitude control
   // - 現在のactual重心位置から、目標ZMPを計算
@@ -12,7 +12,7 @@ bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobotOrigin, const cnoid
   // - 目標足裏反力を満たすようにDamping Control.
 
   // root attitude control
-  this->moveBasePosRotForBodyRPYControl(refRobotOrigin, actRobot, dt, gaitParam, // input
+  this->moveBasePosRotForBodyRPYControl(refRobot, actRobot, dt, gaitParam, // input
                                         o_stOffsetRootRpy); // output
 
   // 現在のactual重心位置から、目標ZMPを計算
@@ -37,11 +37,11 @@ bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobotOrigin, const cnoid
   return true;
 }
 
-bool Stabilizer::moveBasePosRotForBodyRPYControl(const cnoid::BodyPtr refRobotOrigin, const cnoid::BodyPtr actRobot, double dt, const GaitParam& gaitParam,
+bool Stabilizer::moveBasePosRotForBodyRPYControl(const cnoid::BodyPtr refRobot, const cnoid::BodyPtr actRobot, double dt, const GaitParam& gaitParam,
                                                  cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy) const{
   cnoid::Vector3 stOffsetRootRpy = gaitParam.stOffsetRootRpy.value(); // gaitParam.footMidCoords frame
 
-  cnoid::Matrix3 rootRErrorGenerateFrame = refRobotOrigin->rootLink()->R() * actRobot->rootLink()->R().transpose(); // generate frame
+  cnoid::Matrix3 rootRErrorGenerateFrame = refRobot->rootLink()->R() * actRobot->rootLink()->R().transpose(); // generate frame
   cnoid::Matrix3 rootRError = gaitParam.footMidCoords.value().linear().transpose() * rootRErrorGenerateFrame/*generate frame*/ * gaitParam.footMidCoords.value().linear(); // gaitParam.footMidCoords frame
   cnoid::Vector3 rootRpyError = cnoid::rpyFromRot(rootRError); // gaitParam.footMidCoords frame
 
