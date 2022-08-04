@@ -2,6 +2,7 @@
 #define AutoStabilizer_MathUtil_H
 
 #include <Eigen/Eigen>
+#include <limits>
 
 namespace mathutil {
   inline Eigen::Matrix3d orientCoordToAxis(const Eigen::Matrix3d& m, const Eigen::Vector3d& axis, const Eigen::Vector3d& localaxis = Eigen::Vector3d::UnitZ()){
@@ -95,6 +96,60 @@ namespace mathutil {
        m[2],   0.0, -m[0],
       -m[1],  m[0],   0.0;
     return ret;
+  }
+
+  inline bool isInsideHull(const Eigen::Vector3d& p, const std::vector<Eigen::Vector3d>& hull){
+    // Z成分は無視する. hullは半時計回りの凸包
+    if(hull.size() == 0) return false;
+    else if(hull.size() == 1) return hull[0].head<2>() == p.head<2>();
+    else if(hull.size() == 2) {
+      Eigen::Vector3d a = hull[0] - p, b = hull[1] - p;
+      return (a.cross(b)[2] == 0) && (a.head<2>().dot(b.head<2>()) <= 0);
+    }else {
+      for (int i = 0; i < hull.size(); i++) {
+        Eigen::Vector3d a = hull[i] - p, b = hull[(i+1)%hull.size()] - p;
+        if(a.cross(b)[2] < 0) return false;
+      }
+      return true;
+    }
+  }
+
+  inline Eigen::Vector3d calcNearestPointOfHull(const Eigen::Vector3d& p_, const std::vector<Eigen::Vector3d>& hull){
+    // Z成分は無視する. hullは半時計回りの凸包
+    if(isInsideHull(p_,hull)) return Eigen::Vector3d(p_[0],p_[1],0.0);
+    else if(hull.size() == 0) return Eigen::Vector3d(p_[0],p_[1],0.0);
+    else if(hull.size() == 1) return Eigen::Vector3d(hull[0][0],hull[0][1],0.0);
+    else{
+      Eigen::Vector2d p = p_.head<2>();
+      double minDistance = std::numeric_limits<double>::max();
+      Eigen::Vector2d nearestPoint;
+      for (int i = 0; i < hull.size(); i++) {
+        Eigen::Vector2d p1 = hull[i].head<2>(), p2 = hull[(i+1)%hull.size()].head<2>();
+        double dot = (p2 - p1).dot(p - p1);
+        if(dot <= 0) { // p1が近い
+          double distance = (p - p1).norm();
+          if(distance < minDistance){
+            minDistance = distance;
+            nearestPoint = p1;
+          }
+        }else if(dot >= (p2 - p1).squaredNorm()) { // p2が近い
+          double distance = (p - p2).norm();
+          if(distance < minDistance){
+            minDistance = distance;
+            nearestPoint = p2;
+          }
+        }else { // 直線p1 p2におろした垂線の足が近い
+          Eigen::Vector2d p1Top2 = (p2 - p1).normalized();
+          Eigen::Vector2d p3 = p1 + (p - p1).dot(p1Top2) * p1Top2;
+          double distance = (p - p3).norm();
+          if(distance < minDistance){
+            minDistance = distance;
+            nearestPoint = p3;
+          }
+        }
+      }
+      return Eigen::Vector3d(nearestPoint[0],nearestPoint[1],0.0);
+    }
   }
 };
 

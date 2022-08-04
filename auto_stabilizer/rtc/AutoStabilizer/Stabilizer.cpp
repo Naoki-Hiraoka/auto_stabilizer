@@ -115,7 +115,7 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const EndEffectorParam& 
     tgtWrench[RLEG].setZero();
     tgtWrench[LLEG].setZero();
   }else{
-    int dim = gaitParam.legPolygon[RLEG].size() + gaitParam.legPolygon[LLEG].size();
+    int dim = gaitParam.legHull[RLEG].size() + gaitParam.legHull[LLEG].size();
     {
       // 1. ノルム>0. 合力がtgtForce.
 
@@ -143,8 +143,8 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const EndEffectorParam& 
       cnoid::Vector3 tgtForceDir = tgtForce.normalized();
       int idx = 0;
       for(int i=0;i<NUM_LEGS;i++){
-        for(int j=0;j<gaitParam.legPolygon[i].size();j++){
-          cnoid::Vector3 pos = endEffectorParam.actPose[i].translation() + endEffectorParam.actPose[i].linear() * gaitParam.legPolygon[i][j];
+        for(int j=0;j<gaitParam.legHull[i].size();j++){
+          cnoid::Vector3 pos = endEffectorParam.actPose[i].translation() + endEffectorParam.actPose[i].linear() * gaitParam.legHull[i][j];
           cnoid::Vector3 a = tgtForceDir.cross( (pos - tgtZmp).cross(tgtForce));
           for(int k=0;k<3;k++) this->tgtZmpTask_->A().insert(k,idx) = a[k];
           idx ++;
@@ -185,8 +185,8 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const EndEffectorParam& 
       int idx = 0;
       for(int i=0;i<NUM_LEGS;i++) {
         cnoid::Vector3 cop = endEffectorParam.actPose[i].translation() + endEffectorParam.actPose[i].linear() * gaitParam.copOffset[i];
-        for(int j=0;j<gaitParam.legPolygon[i].size();j++){
-          cnoid::Vector3 pos = endEffectorParam.actPose[i].translation() + endEffectorParam.actPose[i].linear() * gaitParam.legPolygon[i][j];
+        for(int j=0;j<gaitParam.legHull[i].size();j++){
+          cnoid::Vector3 pos = endEffectorParam.actPose[i].translation() + endEffectorParam.actPose[i].linear() * gaitParam.legHull[i][j];
           cnoid::Vector3 a = (pos - cop) / alpha[i];
           for(int k=0;k<3;k++) this->copTask_->A().insert(i*3+k,idx) = a[k];
           idx ++;
@@ -216,9 +216,9 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const EndEffectorParam& 
     }else{
       int idx = 0;
       for(int i=0;i<NUM_LEGS;i++){
-        for(int j=0;j<gaitParam.legPolygon[i].size();j++){
+        for(int j=0;j<gaitParam.legHull[i].size();j++){
           tgtWrench[i].head<3>() += tgtForce * result[idx];
-          tgtWrench[i].tail<3>() += (endEffectorParam.actPose[i].linear() * gaitParam.legPolygon[i][j]).cross(tgtForce * result[idx]);
+          tgtWrench[i].tail<3>() += (endEffectorParam.actPose[i].linear() * gaitParam.legHull[i][j]).cross(tgtForce * result[idx]);
           idx ++;
         }
       }

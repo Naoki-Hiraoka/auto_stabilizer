@@ -100,12 +100,8 @@ bool FootStepGenerator::calcFootSteps(const GaitParam& gaitParam, const double& 
       }
     }
 
-    cnoid::Position offset = cnoid::Position::Identity();
-    offset.translation()[0] = this->cmdVel[0] * this->defaultStepTime;
-    offset.translation()[1] = this->cmdVel[1] * this->defaultStepTime;
-    offset.linear() = cnoid::Matrix3(Eigen::AngleAxisd(this->cmdVel[2] * this->defaultStepTime, cnoid::Vector3::UnitZ()));
     for(int i=footstepNodesList.size();i<=this->goVelocityStepNum; i++){
-      footstepNodesList.push_back(this->calcDefaultNextStep(footstepNodesList.back(), gaitParam.defaultTranslatePos, offset));
+      footstepNodesList.push_back(this->calcDefaultNextStep(footstepNodesList.back(), gaitParam.defaultTranslatePos, this->cmdVel * this->defaultStepTime));
     }
   }
 
@@ -130,7 +126,7 @@ bool FootStepGenerator::calcFootSteps(const GaitParam& gaitParam, const double& 
 }
 
 
-GaitParam::FootStepNodes FootStepGenerator::calcDefaultNextStep(const GaitParam::FootStepNodes& footstepNodes, const std::vector<cnoid::Vector3>& defaultTranslatePos, const cnoid::Position& offset) const{
+GaitParam::FootStepNodes FootStepGenerator::calcDefaultNextStep(const GaitParam::FootStepNodes& footstepNodes, const std::vector<cnoid::Vector3>& defaultTranslatePos, const cnoid::Vector3& offset) const{
   GaitParam::FootStepNodes fs;
   if(!GaitParam::isSupportPhaseEnd(footstepNodes, RLEG)){ // ラストのstepで右脚が浮いた状態で終わっている
     fs = calcDefaultNextStep(RLEG, footstepNodes, defaultTranslatePos, offset); // RLEGをswingする
@@ -140,8 +136,8 @@ GaitParam::FootStepNodes FootStepGenerator::calcDefaultNextStep(const GaitParam:
     fs.stepHeight[LLEG] = {0.0,this->defaultStepHeight}; // はじめを上げない
   }else if((footstepNodes.remainTime <= footstepNodes.supportTime[RLEG]) && (footstepNodes.remainTime <= footstepNodes.supportTime[LLEG])){ // ラストのstepで両脚ともswingしていない
     // どっちをswingしてもいいので、進行方向に近いLegをswingする
-    cnoid::Vector3 rlegTolleg = defaultTranslatePos[LLEG] - defaultTranslatePos[RLEG];
-    if(rlegTolleg.dot(offset.translation()) > 0) {
+    cnoid::Vector2 rlegTolleg = (defaultTranslatePos[LLEG] - defaultTranslatePos[RLEG]).head<2>();
+    if(rlegTolleg.dot(offset.head<2>()) > 0) {
       fs = calcDefaultNextStep(LLEG, footstepNodes, defaultTranslatePos, offset); // LLEGをswingする
     }else{
       fs = calcDefaultNextStep(RLEG, footstepNodes, defaultTranslatePos, offset); // RLEGをswingする
@@ -154,16 +150,19 @@ GaitParam::FootStepNodes FootStepGenerator::calcDefaultNextStep(const GaitParam:
   return fs;
 }
 
-GaitParam::FootStepNodes FootStepGenerator::calcDefaultNextStep(const int& swingLeg, const GaitParam::FootStepNodes& footstepNodes, const std::vector<cnoid::Vector3>& defaultTranslatePos, const cnoid::Position& offset) const{
+GaitParam::FootStepNodes FootStepGenerator::calcDefaultNextStep(const int& swingLeg, const GaitParam::FootStepNodes& footstepNodes, const std::vector<cnoid::Vector3>& defaultTranslatePos, const cnoid::Vector3& offset) const{
   GaitParam::FootStepNodes fs;
   int supportLeg = (swingLeg == RLEG) ? LLEG : RLEG;
-  // limit stride. TODO
+
+  cnoid::Position transform = cnoid::Position::Identity(); // supportLeg相対(Z軸は鉛直)での次のswingLegの位置
+  transform.linear() = cnoid::Matrix3(Eigen::AngleAxisd(mathutil::clamp(offset[2],this->defaultStrideLimitationTheta), cnoid::Vector3::UnitZ()));
+  transform.translation() = - defaultTranslatePos[supportLeg] + cnoid::Vector3(offset[0], offset[1], 0.0) + transform.linear() * defaultTranslatePos[swingLeg];
+  transform.translation() = mathutil::calcNearestPointOfHull(transform.translation(), this->defaultStrideLimitationHull[swingLeg]);
+
   fs.remainTime = this->defaultStepTime;
   fs.dstCoords[supportLeg] = footstepNodes.dstCoords[supportLeg];
   cnoid::Position prevOrigin = mathutil::orientCoordToAxis(footstepNodes.dstCoords[supportLeg], cnoid::Vector3::UnitZ());
-  prevOrigin.translation() -= prevOrigin.linear() * defaultTranslatePos[supportLeg];
-  fs.dstCoords[swingLeg] = prevOrigin * offset;
-  fs.dstCoords[swingLeg].translation() += fs.dstCoords[swingLeg].linear() * defaultTranslatePos[swingLeg];
+  fs.dstCoords[swingLeg] = prevOrigin * transform;
   fs.supportTime[supportLeg] = std::numeric_limits<double>::max();
   fs.supportTime[swingLeg] = this->defaultDoubleSupportTime;
   fs.stepHeight[swingLeg] = {this->defaultStepHeight,this->defaultStepHeight};

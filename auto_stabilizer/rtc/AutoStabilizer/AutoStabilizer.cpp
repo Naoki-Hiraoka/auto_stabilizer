@@ -187,6 +187,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
     for(int i=0; i<NUM_LEGS; i++){
       cnoid::Position defaultPose = this->refRobot_->link(this->endEffectorParams_.parentLink[i])->T()*this->endEffectorParams_.localT[i];
       this->gaitParam_.defaultTranslatePos[i] = defautFootMidCoords.inverse() * defaultPose.translation();
+      this->gaitParam_.defaultTranslatePos[i][2] = 0.0;
     }
   }
 
@@ -400,6 +401,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
     gaitParam.stOffsetRootRpy.reset(cnoid::Vector3::Zero());
   }
 
+  // FootOrigin座標系を用いてactRobotRawをgenerate frameに投影しactRobotとする
   actToGenFrameConverter.convertFrame(actRobotRaw, endEffectorParams, gaitParam, dt,
                                       actRobot, endEffectorParams.actPose, endEffectorParams.actWrench, gaitParam.actCog,gaitParam.actCogVel);
 

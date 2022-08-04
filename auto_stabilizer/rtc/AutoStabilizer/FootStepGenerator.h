@@ -7,7 +7,10 @@
 class FootStepGenerator{
 public:
   // FootStepGeneratorでしか使わないパラメータ
-  double defaultStepTime = 0.8; // [s]
+  double defaultStepTime = 0.8; // [s]. goPosやgoVelocityのときに自動生成されるfootstep
+  double defaultStrideLimitationTheta = 0.261799; // [rad]. goPosやgoVelocityのときに自動生成されるfootstepの上下限. 支持脚相対. default 15[rad].
+  std::vector<std::vector<cnoid::Vector3> > defaultStrideLimitationHull = std::vector<std::vector<cnoid::Vector3> >{std::vector<cnoid::Vector3>{cnoid::Vector3(0.15,-0.18,0),cnoid::Vector3(-0.15,-0.18,0),cnoid::Vector3(-0.15,-0.45,0),cnoid::Vector3(0.15,-0.45,0)},std::vector<cnoid::Vector3>{cnoid::Vector3(0.15,0.45,0),cnoid::Vector3(-0.15,0.45,0),cnoid::Vector3(-0.15,0.18,0),cnoid::Vector3(0.15,0.18,0)}}; // 要素数2. 0: rleg用, 1: lleg用. goPosやgoVelocityのときに自動生成されるfootstepの上下限の凸包. 反対の脚のEndEffector frame(Z軸は鉛直)で表現した着地可能領域(自己干渉やIKの考慮が含まれる). あったほうが扱いやすいのでZ成分があるが、Z成分は0でないといけない. 凸形状で,上から見て半時計回り. thetaとは独立に評価されるので、defaultStrideLimitationThetaだけ傾いていても大丈夫なようにせよ
+
   double defaultDoubleSupportTime = 0.12; // [s]. defaultStepTime未満である必要がある.
   double defaultStepHeight = 0.07; // [s].
   unsigned int goVelocityStepNum = 3; // 1以上
@@ -93,9 +96,9 @@ public:
 
 protected:
   // footstepNodesの次の一歩を作る. 両脚が地面についた状態で終わる. RLEGとLLEGどちらをswingすべきかも決める
-  GaitParam::FootStepNodes calcDefaultNextStep(const GaitParam::FootStepNodes& footstepNodes, const std::vector<cnoid::Vector3>& defaultTranslatePos, const cnoid::Position& offset = cnoid::Position::Identity()) const;
+  GaitParam::FootStepNodes calcDefaultNextStep(const GaitParam::FootStepNodes& footstepNodes, const std::vector<cnoid::Vector3>& defaultTranslatePos, const cnoid::Vector3& offset = cnoid::Vector3::Zero()) const;
   // footstepNodesの次の一歩を作る. 両脚が地面についた状態で終わる
-  GaitParam::FootStepNodes calcDefaultNextStep(const int& swingLeg, const GaitParam::FootStepNodes& footstepNodes, const std::vector<cnoid::Vector3>& defaultTranslatePos, const cnoid::Position& offset = cnoid::Position::Identity()) const;
+  GaitParam::FootStepNodes calcDefaultNextStep(const int& swingLeg, const GaitParam::FootStepNodes& footstepNodes, const std::vector<cnoid::Vector3>& defaultTranslatePos, const cnoid::Vector3& offset = cnoid::Vector3::Zero()) const;
 
   // footstepNodesListの終了時の状態が両脚支持でかつその期間の時間がdefaultDoubleSupportTimeよりも短いなら延長する
   void extendDoubleSupportTime(GaitParam::FootStepNodes& footstepNodes) const;
