@@ -374,11 +374,7 @@ bool AutoStabilizer::calcActualParameters(const AutoStabilizer::ControlMode& mod
 
   {
     // FootOrigin座標系を用いてactRobotをgenerate frameに投影しactRobotOriginとする
-    actRobotOrigin->rootLink()->T() = actRobot->rootLink()->T();
-    for(int i=0;i<actRobotOrigin->numJoints();i++){
-      actRobotOrigin->joint(i)->q() = actRobot->joint(i)->q();
-      actRobotOrigin->joint(i)->dq() = actRobot->joint(i)->dq();
-    }
+    cnoidbodyutil::copyRobotState(actRobot, actRobotOrigin);
     cnoid::DeviceList<cnoid::ForceSensor> actForceSensors(actRobot->devices());
     cnoid::DeviceList<cnoid::ForceSensor> actOriginForceSensors(actRobotOrigin->devices());
     for(int i=0;i<actForceSensors.size();i++){
@@ -434,7 +430,7 @@ bool AutoStabilizer::calcActualParameters(const AutoStabilizer::ControlMode& mod
       //座標系が飛んでいるので、gaitParam.actCogVel は前回の周期の値をそのままつかう
     }else{
       cnoid::Vector3 cogVel = (actRobotOrigin->centerOfMass() - gaitParam.actCog) / dt;
-      gaitParam.actCogVel.passFilter(cogVel);
+      gaitParam.actCogVel.passFilter(cogVel, dt);
     }
     gaitParam.actCog = actRobotOrigin->centerOfMass();
   }
@@ -521,7 +517,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
   }
   gaitParam.stOffsetRootRpy.interpolate(dt);
   gaitParam.stTargetRootPose.translation() = refRobotOrigin->rootLink()->p();
-  gaitParam.stTargetRootPose.linear() = (gaitParam.footMidCoords.value().linear() * cnoid::rotFromRpy(gaitParam.stOffsetRootRpy.value())) * refRobotOrigin->rootLink()->R();
+  gaitParam.stTargetRootPose.linear() = cnoid::rotFromRpy(gaitParam.footMidCoords.value().linear() * gaitParam.stOffsetRootRpy.value()/*gaitParam.footMidCoords座標系*/) * refRobotOrigin->rootLink()->R();
   for(int i=0;i<endEffectorParams.name.size();i++){
     endEffectorParams.stOffset[i].interpolate(dt);
     cnoid::Vector6 stOffset = endEffectorParams.stOffset[i].value();
@@ -592,7 +588,8 @@ bool AutoStabilizer::solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::Body
     fullbodyIKParam.rootPositionConstraint->B_localpos() = gaitParam.stTargetRootPose;
     fullbodyIKParam.rootPositionConstraint->maxError() << 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt;
     fullbodyIKParam.rootPositionConstraint->precision() << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0; // 強制的にIKをmax loopまで回す
-    fullbodyIKParam.rootPositionConstraint->weight() << 0.0, 0.0, 0.0, 3e-1, 3e-1, 3e-1;
+    fullbodyIKParam.rootPositionConstraint->weight() << 0.0, 0.0, 0.0, 3, 3, 3; // 角運動量を利用するときは重みを小さく. 通常時、胴の質量・イナーシャやマスパラ誤差の大きさや、胴を大きく動かすための出力不足などによって、二足動歩行では胴の傾きの自由度を使わない方がよい
+    //fullbodyIKParam.rootPositionConstraint->weight() << 0.0, 0.0, 0.0, 3e-1, 3e-1, 3e-1;
     fullbodyIKParam.rootPositionConstraint->eval_link() = nullptr;
     fullbodyIKParam.rootPositionConstraint->eval_localR() = cnoid::Matrix3::Identity();
     ikConstraint.push_back(fullbodyIKParam.rootPositionConstraint);

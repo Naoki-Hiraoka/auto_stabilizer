@@ -12,8 +12,8 @@ bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobotOrigin, const cnoid
   // - 目標足裏反力を満たすようにDamping Control.
 
   // root attitude control
-  this->moveBasePosRotForBodyRPYControl(refRobotOrigin, actRobotOrigin, dt, gaitParam, // input
-                                        o_stOffsetRootRpy); // output
+  // this->moveBasePosRotForBodyRPYControl(refRobotOrigin, actRobotOrigin, dt, gaitParam, // input
+  //                                       o_stOffsetRootRpy); // output
 
   // 現在のactual重心位置から、目標ZMPを計算
   cnoid::Vector3 tgtZmp; // generate frame
@@ -31,8 +31,8 @@ bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobotOrigin, const cnoid
                    actRobotTqc); // output
 
   // 目標足裏反力を満たすようにDamping Control
-  this->calcDampingControl(dt, gaitParam, endEffectorParam, tgtWrench, // input
-                           o_stOffset); // output
+  // this->calcDampingControl(dt, gaitParam, endEffectorParam, tgtWrench, // input
+  //                          o_stOffset); // output
 
   return true;
 }
@@ -97,6 +97,7 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const EndEffectorParam& 
     3. 各脚の各頂点のノルムの重心がCOPOffsetと一致 (fzの値でスケールされてしまうので、alphaを用いて左右をそろえる)
     4. ノルムの2乗和の最小化 (3の中で微小な重みで一緒にやる)
   */
+  // 計算時間は、tgtZmpが支持領域内に無いと遅くなるみたいなので、事前に支持領域内に入るように修正しておくこと
 
   if(gaitParam.isSupportPhase(RLEG) && !gaitParam.isSupportPhase(LLEG)){
     tgtWrench[LLEG].setZero();
@@ -132,7 +133,7 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const EndEffectorParam& 
 
       this->constraintTask_->w() = cnoid::VectorX::Ones(dim) * 1e-6;
       this->constraintTask_->toSolve() = false;
-      //this->constraintTask_->solver().settings()->setVerbosity(debugLevel);
+      this->constraintTask_->solver().settings()->setVerbosity(0);
     }
     {
       // 2. ZMPがtgtZmp
@@ -158,7 +159,7 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const EndEffectorParam& 
 
       this->tgtZmpTask_->w() = cnoid::VectorX::Ones(dim) * 1e-6;
       this->tgtZmpTask_->toSolve() = true;
-      //this->tgtZmpTask_->solver().settings()->setVerbosity(debugLevel);
+      this->tgtZmpTask_->solver().settings()->setVerbosity(0);
     }
     {
       // 3. 各脚の各頂点のノルムの重心がCOPOffsetと一致 (fzの値でスケールされてしまうので、alphaを用いて左右をそろえる)
@@ -200,7 +201,7 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const EndEffectorParam& 
 
       this->copTask_->w() = cnoid::VectorX::Ones(dim) * 1e-6;
       this->copTask_->toSolve() = true;
-      //this->copTask_->solver().settings()->setVerbosity(debugLevel);
+      this->copTask_->solver().settings()->setVerbosity(0);
     }
 
     std::vector<std::shared_ptr<prioritized_qp_base::Task> > tasks{this->constraintTask_,this->tgtZmpTask_,this->copTask_};
