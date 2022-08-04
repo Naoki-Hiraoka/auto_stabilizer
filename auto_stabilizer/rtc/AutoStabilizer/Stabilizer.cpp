@@ -12,8 +12,8 @@ bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobotOrigin, const cnoid
   // - 目標足裏反力を満たすようにDamping Control.
 
   // root attitude control
-  // this->moveBasePosRotForBodyRPYControl(refRobotOrigin, actRobotOrigin, dt, gaitParam, // input
-  //                                       o_stOffsetRootRpy); // output
+  this->moveBasePosRotForBodyRPYControl(refRobotOrigin, actRobotOrigin, dt, gaitParam, // input
+                                        o_stOffsetRootRpy); // output
 
   // 現在のactual重心位置から、目標ZMPを計算
   cnoid::Vector3 tgtZmp; // generate frame
@@ -31,18 +31,19 @@ bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobotOrigin, const cnoid
                    actRobotTqc); // output
 
   // 目標足裏反力を満たすようにDamping Control
-  // this->calcDampingControl(dt, gaitParam, endEffectorParam, tgtWrench, // input
-  //                          o_stOffset); // output
+  this->calcDampingControl(dt, gaitParam, endEffectorParam, tgtWrench, // input
+                           o_stOffset); // output
 
   return true;
 }
 
 bool Stabilizer::moveBasePosRotForBodyRPYControl(const cnoid::BodyPtr refRobotOrigin, const cnoid::BodyPtr actRobotOrigin, double dt, const GaitParam& gaitParam,
                                                  cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy) const{
-  cnoid::Vector3 stOffsetRootRpy = gaitParam.stOffsetRootRpy.value(); // gaitParam.footMidCoords座標系
+  cnoid::Vector3 stOffsetRootRpy = gaitParam.stOffsetRootRpy.value(); // gaitParam.footMidCoords frame
 
-  cnoid::Matrix3 rootRError = gaitParam.footMidCoords.value().linear().transpose() * (refRobotOrigin->rootLink()->R() * actRobotOrigin->rootLink()->R().transpose()); // gaitParam.footMidCoords座標系
-  cnoid::Vector3 rootRpyError = cnoid::rpyFromRot(rootRError); // gaitParam.footMidCoords座標系
+  cnoid::Matrix3 rootRErrorGenerateFrame = refRobotOrigin->rootLink()->R() * actRobotOrigin->rootLink()->R().transpose(); // generate frame
+  cnoid::Matrix3 rootRError = gaitParam.footMidCoords.value().linear().transpose() * rootRErrorGenerateFrame/*generate frame*/ * gaitParam.footMidCoords.value().linear(); // gaitParam.footMidCoords frame
+  cnoid::Vector3 rootRpyError = cnoid::rpyFromRot(rootRError); // gaitParam.footMidCoords frame
 
   for (size_t i = 0; i < 2; i++) {
     stOffsetRootRpy[i] += (this->bodyAttitudeControlGain[i] * rootRpyError[i] - 1.0/this->bodyAttitudeControlTimeConst[i] * stOffsetRootRpy[i]) * dt;

@@ -517,7 +517,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
   }
   gaitParam.stOffsetRootRpy.interpolate(dt);
   gaitParam.stTargetRootPose.translation() = refRobotOrigin->rootLink()->p();
-  gaitParam.stTargetRootPose.linear() = cnoid::rotFromRpy(gaitParam.footMidCoords.value().linear() * gaitParam.stOffsetRootRpy.value()/*gaitParam.footMidCoords座標系*/) * refRobotOrigin->rootLink()->R();
+  gaitParam.stTargetRootPose.linear() /*generate frame*/= gaitParam.footMidCoords.value().linear() * cnoid::rotFromRpy(gaitParam.stOffsetRootRpy.value()/*gaitParam.footMidCoords frame*/) * gaitParam.footMidCoords.value().linear().transpose() * refRobotOrigin->rootLink()->R()/*generate frame*/;
   for(int i=0;i<endEffectorParams.name.size();i++){
     endEffectorParams.stOffset[i].interpolate(dt);
     cnoid::Vector6 stOffset = endEffectorParams.stOffset[i].value();

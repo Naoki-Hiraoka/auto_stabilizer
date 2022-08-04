@@ -92,8 +92,10 @@ public:
 
 
 protected:
-  // footstepNodesの次の一歩を作る. 両脚が地面についた状態で終わる
+  // footstepNodesの次の一歩を作る. 両脚が地面についた状態で終わる. RLEGとLLEGどちらをswingすべきかも決める
   GaitParam::FootStepNodes calcDefaultNextStep(const GaitParam::FootStepNodes& footstepNodes, const std::vector<cnoid::Vector3>& defaultTranslatePos, const cnoid::Position& offset = cnoid::Position::Identity()) const;
+  // footstepNodesの次の一歩を作る. 両脚が地面についた状態で終わる
+  GaitParam::FootStepNodes calcDefaultNextStep(const int& swingLeg, const GaitParam::FootStepNodes& footstepNodes, const std::vector<cnoid::Vector3>& defaultTranslatePos, const cnoid::Position& offset = cnoid::Position::Identity()) const;
 
   // footstepNodesListの終了時の状態が両脚支持でかつその期間の時間がdefaultDoubleSupportTimeよりも短いなら延長する
   void extendDoubleSupportTime(GaitParam::FootStepNodes& footstepNodes) const;
