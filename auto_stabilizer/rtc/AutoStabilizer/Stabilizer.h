@@ -38,7 +38,7 @@ public:
 protected:
   bool moveBasePosRotForBodyRPYControl(const cnoid::BodyPtr refRobot, const cnoid::BodyPtr actRobot, double dt, const GaitParam& gaitParam,
                                        cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy) const;
-  bool calcZMP(const GaitParam& gaitParam, double dt, double g, double mass,
+  bool calcZMP(const GaitParam& gaitParam, const EndEffectorParam& endEffectorParam, double dt, double g, double mass,
                cnoid::Vector3& o_tgtZmp/*generate座標系*/, cnoid::Vector3& o_tgtForce/*generate座標系*/) const;
   bool calcWrench(const GaitParam& gaitParam, const EndEffectorParam& endEffectorParam, const cnoid::Vector3& tgtZmp/*generate座標系*/, const cnoid::Vector3& tgtForce/*generate座標系. ロボットが受ける力*/,
                   std::vector<cnoid::Vector6>& o_tgtWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/) const;

@@ -181,9 +181,14 @@ void LegCoordsGenerator::calcCOMCoords(const GaitParam& gaitParam, double dt, do
   double w = std::sqrt(g/gaitParam.dz); // TODO refforceZ
   cnoid::Vector3 l = cnoid::Vector3::Zero();
   l[2] = gaitParam.dz;
-  cnoid::Vector3 genDCM = gaitParam.genCog + gaitParam.genCogVel / w;
-  cnoid::Vector3 genZmp = footguidedcontroller::calcFootGuidedControl(w,l,genDCM,gaitParam.refZmpTraj);
-  // check zmp in polygon TODO. polygon外に出たとしてもcogを進行方向に少しでもいいから動かすことが重要. そうしないと破綻する恐れあり. COMより低く. 角運動量オフセット
+  cnoid::Vector3 genZmp;
+  if(gaitParam.isSupportPhase(RLEG) || gaitParam.isSupportPhase(LLEG)){
+    cnoid::Vector3 genDCM = gaitParam.genCog + gaitParam.genCogVel / w;
+    genZmp = footguidedcontroller::calcFootGuidedControl(w,l,genDCM,gaitParam.refZmpTraj);
+    // check zmp in polygon TODO. polygon外に出たとしてもcogを進行方向に少しでもいいから動かすことが重要. そうしないと破綻する恐れあり. COMより低く. 角運動量オフセット
+  }else{ // 跳躍期
+    genZmp = gaitParam.genCog;
+  }
   cnoid::Vector3 genNextCog,genNextCogVel,genNextForce;
   footguidedcontroller::updateState(w,l,gaitParam.genCog,gaitParam.genCogVel,genZmp,mass,dt,
                                     genNextCog, genNextCogVel, genNextForce);

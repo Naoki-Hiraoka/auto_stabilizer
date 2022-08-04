@@ -18,7 +18,7 @@ bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobot, const cnoid::Body
   // 現在のactual重心位置から、目標ZMPを計算
   cnoid::Vector3 tgtZmp; // generate frame
   cnoid::Vector3 tgtForce; // generate frame
-  this->calcZMP(gaitParam, dt, g, mass, // input
+  this->calcZMP(gaitParam, endEffectorParam, dt, g, mass, // input
                 tgtZmp, tgtForce); // output
 
   // 目標ZMPを満たすように目標EndEffector反力を計算
@@ -55,14 +55,31 @@ bool Stabilizer::moveBasePosRotForBodyRPYControl(const cnoid::BodyPtr refRobot, 
   return true;
 }
 
-bool Stabilizer::calcZMP(const GaitParam& gaitParam, double dt, double g, double mass,
+bool Stabilizer::calcZMP(const GaitParam& gaitParam, const EndEffectorParam& endEffectorParam, double dt, double g, double mass,
                          cnoid::Vector3& o_tgtZmp, cnoid::Vector3& o_tgtForce) const{
   double w = std::sqrt(g/gaitParam.dz); // TODO refforceZ
   cnoid::Vector3 l = cnoid::Vector3::Zero();
   l[2] = gaitParam.dz;
-  cnoid::Vector3 actDCM = gaitParam.actCog + gaitParam.actCogVel.value() / w;
-  cnoid::Vector3 tgtZmp = footguidedcontroller::calcFootGuidedControl(w,l,actDCM,gaitParam.refZmpTraj);
-  // check zmp in polygon TODO. COMより低く. 角運動量オフセット. actual robotの関節角度を用いて計算する
+  cnoid::Vector3 tgtZmp;
+  if(gaitParam.isSupportPhase(RLEG) || gaitParam.isSupportPhase(LLEG)){
+    cnoid::Vector3 actDCM = gaitParam.actCog + gaitParam.actCogVel.value() / w;
+    tgtZmp = footguidedcontroller::calcFootGuidedControl(w,l,actDCM,gaitParam.refZmpTraj);
+    if(tgtZmp[2] >= gaitParam.actCog[2]) tgtZmp = gaitParam.actCog; // 下向きの力は受けられないので
+    else{
+      // truncate zmp inside polygon. actual robotの関節角度を用いて計算する
+      std::vector<cnoid::Vector3> vertices; // generate frame. 支持点の集合
+      for(int i=0;i<NUM_LEGS;i++){
+        if(!gaitParam.isSupportPhase(i)) continue;
+        for(int j=0;j<gaitParam.legHull[i].size();j++){
+          vertices.push_back(endEffectorParam.actPose[i]*gaitParam.legHull[i][j]);
+        }
+      }
+      tgtZmp = mathutil::calcInsidePointOfPolygon3D(tgtZmp,vertices,gaitParam.actCog);
+      // TODO. 角運動量オフセット.
+    }
+  }else{ // 跳躍期
+    tgtZmp = gaitParam.actCog;
+  }
   cnoid::Vector3 tgtCog,tgtCogVel,tgtForce;
   footguidedcontroller::updateState(w,l,gaitParam.actCog,gaitParam.actCogVel.value(),tgtZmp,mass,dt,
                                     tgtCog, tgtCogVel, tgtForce);
