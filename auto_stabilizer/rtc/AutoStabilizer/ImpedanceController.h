@@ -36,7 +36,7 @@ public:
   }
 
   bool calcImpedanceControl(double dt, const GaitParam& gaitParam,
-                            std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& icOffset /*generate frame, endeffector origin*/) const;
+                            std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& icEEOffset /*generate frame, endeffector origin*/) const;
 };
 
 #endif

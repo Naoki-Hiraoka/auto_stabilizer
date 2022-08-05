@@ -4,7 +4,7 @@
 #include <cnoid/ForceSensor>
 
 bool ActToGenFrameConverter::convertFrame(const cnoid::BodyPtr& actRobotRaw, const GaitParam& gaitParam, double dt,// input
-                                          cnoid::BodyPtr& actRobot, std::vector<cnoid::Position>& o_actPose, std::vector<cnoid::Vector6>& o_actWrench, cnoid::Vector3& o_actCog, cpp_filters::FirstOrderLowPassFilter<cnoid::Vector3>& o_actCogVel) const {
+                                          cnoid::BodyPtr& actRobot, std::vector<cnoid::Position>& o_actEEPose, std::vector<cnoid::Vector6>& o_actEEWrench, cnoid::Vector3& o_actCog, cpp_filters::FirstOrderLowPassFilter<cnoid::Vector3>& o_actCogVel) const {
 
   {
     // FootOrigin座標系を用いてactRobotRawをgenerate frameに投影しactRobotとする
@@ -30,12 +30,12 @@ bool ActToGenFrameConverter::convertFrame(const cnoid::BodyPtr& actRobotRaw, con
     actRobot->calcCenterOfMass();
   }
 
-  std::vector<cnoid::Position> actPose(gaitParam.eeName.size(), cnoid::Position::Identity());
-  std::vector<cnoid::Vector6> actWrench(gaitParam.eeName.size(), cnoid::Vector6::Zero());
+  std::vector<cnoid::Position> actEEPose(gaitParam.eeName.size(), cnoid::Position::Identity());
+  std::vector<cnoid::Vector6> actEEWrench(gaitParam.eeName.size(), cnoid::Vector6::Zero());
   {
     // 各エンドエフェクタのactualの位置・力を計算
     for(int i=0;i<gaitParam.eeName.size(); i++){
-      actPose[i] = actRobot->link(gaitParam.eeParentLink[i])->T() * gaitParam.eeLocalT[i];
+      actEEPose[i] = actRobot->link(gaitParam.eeParentLink[i])->T() * gaitParam.eeLocalT[i];
       if(gaitParam.eeForceSensor[i] != ""){
         cnoid::ForceSensorPtr sensor = actRobot->findDevice<cnoid::ForceSensor>(gaitParam.eeForceSensor[i]);
         cnoid::Vector6 senF = sensor->F();
@@ -44,8 +44,8 @@ bool ActToGenFrameConverter::convertFrame(const cnoid::BodyPtr& actRobotRaw, con
         cnoid::Vector6 eefF; // endeffector frame. endeffector origin.
         eefF.head<3>() = eefTosenPose.linear() * senF.head<3>();
         eefF.tail<3>() = eefTosenPose.linear() * senF.tail<3>() + eefTosenPose.translation().cross(eefF.head<3>());
-        actWrench[i].head<3>() = gaitParam.actEEPose[i].linear() * eefF.head<3>();
-        actWrench[i].tail<3>() = gaitParam.actEEPose[i].linear() * eefF.tail<3>();
+        actEEWrench[i].head<3>() = gaitParam.actEEPose[i].linear() * eefF.head<3>();
+        actEEWrench[i].tail<3>() = gaitParam.actEEPose[i].linear() * eefF.tail<3>();
       }
     }
   }
@@ -66,8 +66,8 @@ bool ActToGenFrameConverter::convertFrame(const cnoid::BodyPtr& actRobotRaw, con
     }
   }
 
-  o_actPose = actPose;
-  o_actWrench = actWrench;
+  o_actEEPose = actEEPose;
+  o_actEEWrench = actEEWrench;
   o_actCog = actCog;
   if(this->isInitial){
     o_actCogVel.reset(cnoid::Vector3::Zero());

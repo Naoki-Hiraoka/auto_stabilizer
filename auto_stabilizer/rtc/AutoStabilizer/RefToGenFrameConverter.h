@@ -43,7 +43,7 @@ public:
 
   // reference frameで表現されたrefRobotRawをgenerate frameに投影しrefRobotとし、各種referencec値をgenerate frameに変換する
   bool convertFrame(const cnoid::BodyPtr& refRobotRaw, const GaitParam& gaitParam, // input
-                    cnoid::BodyPtr& refRobot, std::vector<cnoid::Position>& o_refPose, std::vector<cnoid::Vector6>& o_refWrench, double& o_dz) const; // output
+                    cnoid::BodyPtr& refRobot, std::vector<cnoid::Position>& o_refEEPose, std::vector<cnoid::Vector6>& o_refEEWrench, double& o_dz) const; // output
 protected:
   // refFootOriginWeightとdefaultTranslatePosとcopOffset に基づいて両足中間座標を求める
   cnoid::Position calcRefFootMidCoords(const cnoid::BodyPtr& robot, const GaitParam& gaitParam) const;

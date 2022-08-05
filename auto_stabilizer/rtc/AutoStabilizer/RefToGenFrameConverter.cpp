@@ -29,7 +29,7 @@ bool RefToGenFrameConverter::initGenRobot(const cnoid::BodyPtr& refRobotRaw, con
 }
 
 bool RefToGenFrameConverter::convertFrame(const cnoid::BodyPtr& refRobotRaw, const GaitParam& gaitParam, // input
-                                         cnoid::BodyPtr& refRobot, std::vector<cnoid::Position>& o_refPose, std::vector<cnoid::Vector6>& o_refWrench, double& o_dz) const{ // output
+                                         cnoid::BodyPtr& refRobot, std::vector<cnoid::Position>& o_refEEPose, std::vector<cnoid::Vector6>& o_refEEWrench, double& o_dz) const{ // output
   cnoidbodyutil::copyRobotState(refRobotRaw, refRobot);
 
   /*
@@ -51,21 +51,21 @@ bool RefToGenFrameConverter::convertFrame(const cnoid::BodyPtr& refRobotRaw, con
   refRobot->calcForwardKinematics();
   refRobot->calcCenterOfMass();
 
-  // refPoseを計算
-  std::vector<cnoid::Position> refPose(gaitParam.eeName.size());
+  // refEEPoseを計算
+  std::vector<cnoid::Position> refEEPose(gaitParam.eeName.size());
   for(int i=0;i<gaitParam.eeName.size();i++){
-    refPose[i] = refRobot->link(gaitParam.eeParentLink[i])->T() * gaitParam.eeLocalT[i];
+    refEEPose[i] = refRobot->link(gaitParam.eeParentLink[i])->T() * gaitParam.eeLocalT[i];
   }
 
-  // refWrenchを計算
-  std::vector<cnoid::Vector6> refWrench(gaitParam.eeName.size());
+  // refEEWrenchを計算
+  std::vector<cnoid::Vector6> refEEWrench(gaitParam.eeName.size());
   for(int i=0;i<gaitParam.eeName.size();i++){
-    refWrench[i].head<3>() = gaitParam.footMidCoords.value().linear() * gaitParam.refEEWrenchOrigin[i].head<3>();
-    refWrench[i].tail<3>() = gaitParam.footMidCoords.value().linear() * gaitParam.refEEWrenchOrigin[i].tail<3>();
+    refEEWrench[i].head<3>() = gaitParam.footMidCoords.value().linear() * gaitParam.refEEWrenchOrigin[i].head<3>();
+    refEEWrench[i].tail<3>() = gaitParam.footMidCoords.value().linear() * gaitParam.refEEWrenchOrigin[i].tail<3>();
   }
 
-  o_refPose = refPose;
-  o_refWrench = refWrench;
+  o_refEEPose = refEEPose;
+  o_refEEWrench = refEEWrench;
   o_dz = dz;
 
   return true;

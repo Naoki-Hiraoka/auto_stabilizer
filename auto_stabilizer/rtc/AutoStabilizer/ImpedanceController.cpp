@@ -2,7 +2,7 @@
 #include "MathUtil.h"
 
 bool ImpedanceController::calcImpedanceControl(double dt, const GaitParam& gaitParam,
-                                               std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_icOffset /*generate frame, endeffector origin*/) const{
+                                               std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_icEEOffset /*generate frame, endeffector origin*/) const{
   for(int i=0;i<gaitParam.eeName.size();i++){
     if(!this->isImpedanceMode[i])  continue;
 
@@ -48,7 +48,7 @@ bool ImpedanceController::calcImpedanceControl(double dt, const GaitParam& gaitP
 
     cnoid::Vector6 offset = offsetPrev + dOffset;
     offset = mathutil::clampMatrix<cnoid::Vector6>(offset, this->compensationLimit[i]);
-    o_icOffset[i].reset(offset, dOffset/dt);
+    o_icEEOffset[i].reset(offset, dOffset/dt);
   }
 
   return true;
