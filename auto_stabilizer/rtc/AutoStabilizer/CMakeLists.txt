@@ -34,6 +34,7 @@ add_library(AutoStabilizer SHARED
   ActToGenFrameConverter.cpp
   Stabilizer.cpp
   ImpedanceController.cpp
+  MathUtil.cpp
   )
 target_link_libraries(AutoStabilizer
   ${catkin_LIBRARIES}
