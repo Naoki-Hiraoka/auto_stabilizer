@@ -57,9 +57,9 @@ bool Stabilizer::moveBasePosRotForBodyRPYControl(const cnoid::BodyPtr refRobot, 
 
 bool Stabilizer::calcZMP(const GaitParam& gaitParam, double dt, double g, double mass,
                          cnoid::Vector3& o_tgtZmp, cnoid::Vector3& o_tgtForce) const{
-  double w = std::sqrt(g/gaitParam.dz); // TODO refforceZ
+  double w = std::sqrt(g/gaitParam.refdz); // TODO refforceZ
   cnoid::Vector3 l = cnoid::Vector3::Zero();
-  l[2] = gaitParam.dz;
+  l[2] = gaitParam.refdz;
   cnoid::Vector3 tgtZmp;
   if(gaitParam.isSupportPhase(RLEG) || gaitParam.isSupportPhase(LLEG)){
     cnoid::Vector3 actDCM = gaitParam.actCog + gaitParam.actCogVel.value() / w;

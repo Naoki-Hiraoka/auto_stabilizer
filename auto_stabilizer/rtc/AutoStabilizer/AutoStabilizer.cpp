@@ -374,7 +374,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
 
   // FootOrigin座標系を用いてrefRobotRawをgenerate frameに投影しrefRobotとする
   refToGenFrameConverter.convertFrame(refRobotRaw, gaitParam,
-                                      refRobot, gaitParam.refEEPose, gaitParam.refEEWrench, gaitParam.dz);
+                                      refRobot, gaitParam.refEEPose, gaitParam.refEEWrench, gaitParam.refdz);
 
 
   if(mode.isSyncToABCInit()){ // startAutoBalancer直後の初回

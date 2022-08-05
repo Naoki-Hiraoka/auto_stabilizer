@@ -29,7 +29,7 @@ bool RefToGenFrameConverter::initGenRobot(const cnoid::BodyPtr& refRobotRaw, con
 }
 
 bool RefToGenFrameConverter::convertFrame(const cnoid::BodyPtr& refRobotRaw, const GaitParam& gaitParam, // input
-                                         cnoid::BodyPtr& refRobot, std::vector<cnoid::Position>& o_refEEPose, std::vector<cnoid::Vector6>& o_refEEWrench, double& o_dz) const{ // output
+                                         cnoid::BodyPtr& refRobot, std::vector<cnoid::Position>& o_refEEPose, std::vector<cnoid::Vector6>& o_refEEWrench, double& o_refdz) const{ // output
   cnoidbodyutil::copyRobotState(refRobotRaw, refRobot);
 
   /*
@@ -39,10 +39,10 @@ bool RefToGenFrameConverter::convertFrame(const cnoid::BodyPtr& refRobotRaw, con
       - handControlWeight = 0なら、位置も姿勢もfootMidCoords
   */
   cnoid::Position refFootMidCoords = this->calcRefFootMidCoords(refRobot, gaitParam);
-  double dz = (refFootMidCoords.inverse() * refRobot->centerOfMass())[2]; // ref重心高さ
+  double refdz = (refFootMidCoords.inverse() * refRobot->centerOfMass())[2]; // ref重心高さ
   cnoid::Vector3 genCog_genFootMidCoordsLocal = gaitParam.footMidCoords.value().linear().transpose() * (gaitParam.genCog - gaitParam.footMidCoords.value().translation());
   genCog_genFootMidCoordsLocal[1] *= (1.0 - handFixMode.value());
-  genCog_genFootMidCoordsLocal[2] -= dz;
+  genCog_genFootMidCoordsLocal[2] -= refdz;
   cnoid::Position genFootMidCoords;
   genFootMidCoords.linear() = gaitParam.footMidCoords.value().linear();
   genFootMidCoords.translation() = gaitParam.footMidCoords.value().translation() + gaitParam.footMidCoords.value().linear() * genCog_genFootMidCoordsLocal;
@@ -66,7 +66,7 @@ bool RefToGenFrameConverter::convertFrame(const cnoid::BodyPtr& refRobotRaw, con
 
   o_refEEPose = refEEPose;
   o_refEEWrench = refEEWrench;
-  o_dz = dz;
+  o_refdz = refdz;
 
   return true;
 }
