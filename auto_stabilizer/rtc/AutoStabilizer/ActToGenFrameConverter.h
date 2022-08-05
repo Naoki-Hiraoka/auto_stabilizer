@@ -2,7 +2,6 @@
 #define ACTTOGENFRAMECONVERTER_H
 
 #include "GaitParam.h"
-#include "EndEffectorParam.h"
 #include <cnoid/Body>
 
 class ActToGenFrameConverter {
@@ -25,7 +24,7 @@ public:
    */
 
   // actual frameで表現されたactRobotRawをgenerate frameに投影しactRobotとし、各種actual値をgenerate frameに変換する
-  bool convertFrame(const cnoid::BodyPtr& actRobotRaw, const EndEffectorParam& endEffectorParams, const GaitParam& gaitParam, double dt, // input
+  bool convertFrame(const cnoid::BodyPtr& actRobotRaw, const GaitParam& gaitParam, double dt, // input
                     cnoid::BodyPtr& actRobot, std::vector<cnoid::Position>& o_actPose, std::vector<cnoid::Vector6>& o_actWrench, cnoid::Vector3& o_actCog, cpp_filters::FirstOrderLowPassFilter<cnoid::Vector3>& o_actCogVel) const; // output
 };
 

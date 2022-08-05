@@ -3,7 +3,7 @@
 #include "MathUtil.h"
 #include <cnoid/ForceSensor>
 
-bool ActToGenFrameConverter::convertFrame(const cnoid::BodyPtr& actRobotRaw, const EndEffectorParam& endEffectorParams, const GaitParam& gaitParam, double dt,// input
+bool ActToGenFrameConverter::convertFrame(const cnoid::BodyPtr& actRobotRaw, const GaitParam& gaitParam, double dt,// input
                                           cnoid::BodyPtr& actRobot, std::vector<cnoid::Position>& o_actPose, std::vector<cnoid::Vector6>& o_actWrench, cnoid::Vector3& o_actCog, cpp_filters::FirstOrderLowPassFilter<cnoid::Vector3>& o_actCogVel) const {
 
   {
@@ -17,12 +17,12 @@ bool ActToGenFrameConverter::convertFrame(const cnoid::BodyPtr& actRobotRaw, con
     double rlegweight = gaitParam.isSupportPhase(RLEG)? 1.0 : 0.0;
     double llegweight = gaitParam.isSupportPhase(LLEG)? 1.0 : 0.0;
     if(!gaitParam.isSupportPhase(RLEG) && !gaitParam.isSupportPhase(LLEG)) rlegweight = llegweight = 1.0;
-    cnoid::Position actrleg = actRobot->link(endEffectorParams.parentLink[RLEG])->T()*endEffectorParams.localT[RLEG];
-    cnoid::Position actlleg = actRobot->link(endEffectorParams.parentLink[LLEG])->T()*endEffectorParams.localT[LLEG];
+    cnoid::Position actrleg = actRobot->link(gaitParam.eeParentLink[RLEG])->T()*gaitParam.eeLocalT[RLEG];
+    cnoid::Position actlleg = actRobot->link(gaitParam.eeParentLink[LLEG])->T()*gaitParam.eeLocalT[LLEG];
     cnoid::Position actFootMidCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{actrleg, actlleg},
                                                                std::vector<double>{rlegweight, llegweight});
     cnoid::Position actFootOriginCoords = mathutil::orientCoordToAxis(actFootMidCoords, cnoid::Vector3::UnitZ());
-    cnoid::Position genFootMidCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{endEffectorParams.abcTargetPose[RLEG], endEffectorParams.abcTargetPose[LLEG]},
+    cnoid::Position genFootMidCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{gaitParam.abcEETargetPose[RLEG], gaitParam.abcEETargetPose[LLEG]},
                                                                std::vector<double>{rlegweight, llegweight});  // 1周期前のabcTargetPoseを使っているが、abcTargetPoseは不連続に変化するものではないのでよい
     cnoid::Position genFootOriginCoords = mathutil::orientCoordToAxis(genFootMidCoords, cnoid::Vector3::UnitZ());
     cnoidbodyutil::moveCoords(actRobot, genFootOriginCoords, actFootOriginCoords);
@@ -30,22 +30,22 @@ bool ActToGenFrameConverter::convertFrame(const cnoid::BodyPtr& actRobotRaw, con
     actRobot->calcCenterOfMass();
   }
 
-  std::vector<cnoid::Position> actPose(endEffectorParams.name.size(), cnoid::Position::Identity());
-  std::vector<cnoid::Vector6> actWrench(endEffectorParams.name.size(), cnoid::Vector6::Zero());
+  std::vector<cnoid::Position> actPose(gaitParam.eeName.size(), cnoid::Position::Identity());
+  std::vector<cnoid::Vector6> actWrench(gaitParam.eeName.size(), cnoid::Vector6::Zero());
   {
     // 各エンドエフェクタのactualの位置・力を計算
-    for(int i=0;i<endEffectorParams.name.size(); i++){
-      actPose[i] = actRobot->link(endEffectorParams.parentLink[i])->T() * endEffectorParams.localT[i];
-      if(endEffectorParams.forceSensor[i] != ""){
-        cnoid::ForceSensorPtr sensor = actRobot->findDevice<cnoid::ForceSensor>(endEffectorParams.forceSensor[i]);
+    for(int i=0;i<gaitParam.eeName.size(); i++){
+      actPose[i] = actRobot->link(gaitParam.eeParentLink[i])->T() * gaitParam.eeLocalT[i];
+      if(gaitParam.eeForceSensor[i] != ""){
+        cnoid::ForceSensorPtr sensor = actRobot->findDevice<cnoid::ForceSensor>(gaitParam.eeForceSensor[i]);
         cnoid::Vector6 senF = sensor->F();
         cnoid::Position senPose = sensor->link()->T() * sensor->T_local();
-        cnoid::Position eefTosenPose = endEffectorParams.actPose[i].inverse() * senPose;
+        cnoid::Position eefTosenPose = gaitParam.actEEPose[i].inverse() * senPose;
         cnoid::Vector6 eefF; // endeffector frame. endeffector origin.
         eefF.head<3>() = eefTosenPose.linear() * senF.head<3>();
         eefF.tail<3>() = eefTosenPose.linear() * senF.tail<3>() + eefTosenPose.translation().cross(eefF.head<3>());
-        actWrench[i].head<3>() = endEffectorParams.actPose[i].linear() * eefF.head<3>();
-        actWrench[i].tail<3>() = endEffectorParams.actPose[i].linear() * eefF.tail<3>();
+        actWrench[i].head<3>() = gaitParam.actEEPose[i].linear() * eefF.head<3>();
+        actWrench[i].tail<3>() = gaitParam.actEEPose[i].linear() * eefF.tail<3>();
       }
     }
   }

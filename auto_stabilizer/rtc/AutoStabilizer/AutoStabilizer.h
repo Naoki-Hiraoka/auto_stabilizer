@@ -30,7 +30,6 @@
 // #include <joint_limit_table/JointLimitTable.h>
 
 #include "AutoStabilizerService_impl.h"
-#include "EndEffectorParam.h"
 #include "GaitParam.h"
 #include "RefToGenFrameConverter.h"
 #include "ActToGenFrameConverter.h"
@@ -218,7 +217,6 @@ protected:
   };
   std::vector<JointParam> jointParams_; // 要素数robot->numJoints(). jointIdの順.
 
-  EndEffectorParam endEffectorParams_;
   GaitParam gaitParam_;
 
   RefToGenFrameConverter refToGenFrameConverter_;
@@ -234,8 +232,8 @@ protected:
 
   static void moveCoords(cnoid::BodyPtr robot, const cnoid::Position& target, const cnoid::Position& at);
 
-  static bool readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobotRaw, cnoid::BodyPtr actRobotRaw, EndEffectorParam& endEffectorParams);
-  static bool execAutoStabilizer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobotRaw, cnoid::BodyPtr& refRobot, const cnoid::BodyPtr& actRobotRaw, cnoid::BodyPtr& actRobot, cnoid::BodyPtr& genRobot, cnoid::BodyPtr& actRobotTqc, EndEffectorParam& endEffectorParams, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ActToGenFrameConverter& actToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer);
+  static bool readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobotRaw, cnoid::BodyPtr actRobotRaw, GaitParam& gaitParam);
+  static bool execAutoStabilizer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobotRaw, cnoid::BodyPtr& refRobot, const cnoid::BodyPtr& actRobotRaw, cnoid::BodyPtr& actRobot, cnoid::BodyPtr& genRobot, cnoid::BodyPtr& actRobotTqc, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ActToGenFrameConverter& actToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer);
   class FullbodyIKParam {
   public:
     cnoid::VectorX jlim_avoid_weight;
@@ -245,7 +243,7 @@ protected:
     std::shared_ptr<IK::AngularMomentumConstraint> angularMomentumConstraint = std::make_shared<IK::AngularMomentumConstraint>();
   };
   FullbodyIKParam fullbodyIKParam_;
-  static bool solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::BodyPtr& refRobot, EndEffectorParam& endEffectorParams, AutoStabilizer::FullbodyIKParam& fullbodyIKParam, double dt, const std::vector<JointParam>& jointParams, const GaitParam& gaitParam);
+  static bool solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::BodyPtr& refRobot, AutoStabilizer::FullbodyIKParam& fullbodyIKParam, double dt, const std::vector<JointParam>& jointParams, const GaitParam& gaitParam);
   class OutputOffsetInterpolators {
   public:
     cpp_filters::TwoPointInterpolatorSE3 genBasePoseInterpolator = cpp_filters::TwoPointInterpolatorSE3(cnoid::Position::Identity(),cnoid::Vector6::Zero(),cnoid::Vector6::Zero(),cpp_filters::HOFFARBIB);

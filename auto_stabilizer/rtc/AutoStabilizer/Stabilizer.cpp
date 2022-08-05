@@ -3,7 +3,7 @@
 #include <cnoid/JointPath>
 #include <cnoid/Jacobian>
 
-bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobot, const cnoid::BodyPtr actRobot, const cnoid::BodyPtr genRobot, const GaitParam& gaitParam, const EndEffectorParam& endEffectorParam, double dt, double g, double mass,
+bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobot, const cnoid::BodyPtr actRobot, const cnoid::BodyPtr genRobot, const GaitParam& gaitParam, double dt, double g, double mass,
                                 cnoid::BodyPtr& actRobotTqc, cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stOffset /*generate frame, endeffector origin*/) const{
   // - root attitude control
   // - 現在のactual重心位置から、目標ZMPを計算
@@ -18,20 +18,20 @@ bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobot, const cnoid::Body
   // 現在のactual重心位置から、目標ZMPを計算
   cnoid::Vector3 tgtZmp; // generate frame
   cnoid::Vector3 tgtForce; // generate frame
-  this->calcZMP(gaitParam, endEffectorParam, dt, g, mass, // input
+  this->calcZMP(gaitParam, dt, g, mass, // input
                 tgtZmp, tgtForce); // output
 
   // 目標ZMPを満たすように目標EndEffector反力を計算
   std::vector<cnoid::Vector6> tgtWrench; // 要素数EndEffector数. generate frame. EndEffector origin
-  this->calcWrench(gaitParam, endEffectorParam, tgtZmp, tgtForce, // input
+  this->calcWrench(gaitParam, tgtZmp, tgtForce, // input
                    tgtWrench); // output
 
   // 目標反力を満たすように重力補償+仮想仕事の原理
-  this->calcTorque(actRobot, dt, endEffectorParam, tgtWrench, // input
+  this->calcTorque(actRobot, dt, gaitParam, tgtWrench, // input
                    actRobotTqc); // output
 
   // 目標足裏反力を満たすようにDamping Control
-  this->calcDampingControl(dt, gaitParam, endEffectorParam, tgtWrench, // input
+  this->calcDampingControl(dt, gaitParam, tgtWrench, // input
                            o_stOffset); // output
 
   return true;
@@ -55,7 +55,7 @@ bool Stabilizer::moveBasePosRotForBodyRPYControl(const cnoid::BodyPtr refRobot, 
   return true;
 }
 
-bool Stabilizer::calcZMP(const GaitParam& gaitParam, const EndEffectorParam& endEffectorParam, double dt, double g, double mass,
+bool Stabilizer::calcZMP(const GaitParam& gaitParam, double dt, double g, double mass,
                          cnoid::Vector3& o_tgtZmp, cnoid::Vector3& o_tgtForce) const{
   double w = std::sqrt(g/gaitParam.dz); // TODO refforceZ
   cnoid::Vector3 l = cnoid::Vector3::Zero();
@@ -71,7 +71,7 @@ bool Stabilizer::calcZMP(const GaitParam& gaitParam, const EndEffectorParam& end
       for(int i=0;i<NUM_LEGS;i++){
         if(!gaitParam.isSupportPhase(i)) continue;
         for(int j=0;j<gaitParam.legHull[i].size();j++){
-          vertices.push_back(endEffectorParam.actPose[i]*gaitParam.legHull[i][j]);
+          vertices.push_back(gaitParam.actEEPose[i]*gaitParam.legHull[i][j]);
         }
       }
       tgtZmp = mathutil::calcInsidePointOfPolygon3D(tgtZmp,vertices,gaitParam.actCog);
@@ -89,13 +89,13 @@ bool Stabilizer::calcZMP(const GaitParam& gaitParam, const EndEffectorParam& end
   return true;
 }
 
-bool Stabilizer::calcWrench(const GaitParam& gaitParam, const EndEffectorParam& endEffectorParam, const cnoid::Vector3& tgtZmp/*generate座標系*/, const cnoid::Vector3& tgtForce/*generate座標系 ロボットが受ける力*/,
+bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tgtZmp/*generate座標系*/, const cnoid::Vector3& tgtForce/*generate座標系 ロボットが受ける力*/,
                             std::vector<cnoid::Vector6>& o_tgtWrench) const{
-  std::vector<cnoid::Vector6> tgtWrench(endEffectorParam.name.size(), cnoid::Vector6::Zero()); /* 要素数EndEffector数. generate frame. EndEffector origin*/
+  std::vector<cnoid::Vector6> tgtWrench(gaitParam.eeName.size(), cnoid::Vector6::Zero()); /* 要素数EndEffector数. generate frame. EndEffector origin*/
 
   // leg以外はref値をそのまま
-  for(int i = NUM_LEGS;i<endEffectorParam.name.size();i++){
-    tgtWrench[i] = endEffectorParam.refWrench[i];
+  for(int i = NUM_LEGS;i<gaitParam.eeName.size();i++){
+    tgtWrench[i] = gaitParam.refEEWrench[i];
   }
 
   /*
@@ -120,11 +120,11 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const EndEffectorParam& 
   if(gaitParam.isSupportPhase(RLEG) && !gaitParam.isSupportPhase(LLEG)){
     tgtWrench[LLEG].setZero();
     tgtWrench[RLEG].head<3>() = tgtForce;
-    tgtWrench[RLEG].tail<3>() = (tgtZmp - endEffectorParam.actPose[RLEG].translation()).cross(tgtForce);
+    tgtWrench[RLEG].tail<3>() = (tgtZmp - gaitParam.actEEPose[RLEG].translation()).cross(tgtForce);
   }else if(!gaitParam.isSupportPhase(RLEG) && gaitParam.isSupportPhase(LLEG)){
     tgtWrench[RLEG].setZero();
     tgtWrench[LLEG].head<3>() = tgtForce;
-    tgtWrench[LLEG].tail<3>() = (tgtZmp - endEffectorParam.actPose[LLEG].translation()).cross(tgtForce);
+    tgtWrench[LLEG].tail<3>() = (tgtZmp - gaitParam.actEEPose[LLEG].translation()).cross(tgtForce);
   }else if(!gaitParam.isSupportPhase(RLEG) && !gaitParam.isSupportPhase(LLEG)){
     tgtWrench[RLEG].setZero();
     tgtWrench[LLEG].setZero();
@@ -161,7 +161,7 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const EndEffectorParam& 
       int idx = 0;
       for(int i=0;i<NUM_LEGS;i++){
         for(int j=0;j<gaitParam.legHull[i].size();j++){
-          cnoid::Vector3 pos = endEffectorParam.actPose[i].translation() + endEffectorParam.actPose[i].linear() * gaitParam.legHull[i][j];
+          cnoid::Vector3 pos = gaitParam.actEEPose[i].translation() + gaitParam.actEEPose[i].linear() * gaitParam.legHull[i][j];
           cnoid::Vector3 a = tgtForceDir.cross( (pos - tgtZmp).cross(tgtForce));
           for(int k=0;k<3;k++) this->tgtZmpTask_->A().insert(k,idx) = a[k];
           idx ++;
@@ -185,14 +185,14 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const EndEffectorParam& 
       // 各EndEffectorとtgtZmpの距離を用いてalphaを求める
       std::vector<double> alpha(2);
       {
-        cnoid::Vector3 rleg2leg = endEffectorParam.actPose[LLEG].translation() - endEffectorParam.actPose[RLEG].translation();
+        cnoid::Vector3 rleg2leg = gaitParam.actEEPose[LLEG].translation() - gaitParam.actEEPose[RLEG].translation();
         rleg2leg[2] = 0.0;
         if(rleg2leg.norm() == 0.0){
           alpha[RLEG] = alpha[LLEG] = 0.5;
         }else{
           cnoid::Vector3 rleg2legDir = rleg2leg.normalized();
           double rleg2llegDistance = rleg2leg.norm();
-          double rleg2tgtZmpRatio = rleg2legDir.dot(tgtZmp - endEffectorParam.actPose[RLEG].translation()) / rleg2llegDistance;
+          double rleg2tgtZmpRatio = rleg2legDir.dot(tgtZmp - gaitParam.actEEPose[RLEG].translation()) / rleg2llegDistance;
           alpha[RLEG] = mathutil::clamp(1.0 - rleg2tgtZmpRatio, 0.05, 1.0-0.05);
           alpha[LLEG] = mathutil::clamp(rleg2tgtZmpRatio, 0.05, 1.0-0.05);
         }
@@ -201,9 +201,9 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const EndEffectorParam& 
       this->copTask_->A() = Eigen::SparseMatrix<double,Eigen::RowMajor>(3*NUM_LEGS,dim);
       int idx = 0;
       for(int i=0;i<NUM_LEGS;i++) {
-        cnoid::Vector3 cop = endEffectorParam.actPose[i].translation() + endEffectorParam.actPose[i].linear() * gaitParam.copOffset[i];
+        cnoid::Vector3 cop = gaitParam.actEEPose[i].translation() + gaitParam.actEEPose[i].linear() * gaitParam.copOffset[i];
         for(int j=0;j<gaitParam.legHull[i].size();j++){
-          cnoid::Vector3 pos = endEffectorParam.actPose[i].translation() + endEffectorParam.actPose[i].linear() * gaitParam.legHull[i][j];
+          cnoid::Vector3 pos = gaitParam.actEEPose[i].translation() + gaitParam.actEEPose[i].linear() * gaitParam.legHull[i][j];
           cnoid::Vector3 a = (pos - cop) / alpha[i];
           for(int k=0;k<3;k++) this->copTask_->A().insert(i*3+k,idx) = a[k];
           idx ++;
@@ -236,7 +236,7 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const EndEffectorParam& 
       for(int i=0;i<NUM_LEGS;i++){
         for(int j=0;j<gaitParam.legHull[i].size();j++){
           tgtWrench[i].head<3>() += tgtForce * result[idx];
-          tgtWrench[i].tail<3>() += (endEffectorParam.actPose[i].linear() * gaitParam.legHull[i][j]).cross(tgtForce * result[idx]);
+          tgtWrench[i].tail<3>() += (gaitParam.actEEPose[i].linear() * gaitParam.legHull[i][j]).cross(tgtForce * result[idx]);
           idx ++;
         }
       }
@@ -247,7 +247,7 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const EndEffectorParam& 
   return true;
 }
 
-bool Stabilizer::calcTorque(const cnoid::BodyPtr actRobot, double dt, const EndEffectorParam& endEffectorParam, const std::vector<cnoid::Vector6>& tgtWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/,
+bool Stabilizer::calcTorque(const cnoid::BodyPtr actRobot, double dt, const GaitParam& gaitParam, const std::vector<cnoid::Vector6>& tgtWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/,
                             cnoid::BodyPtr& actRobotTqc) const{
   // 速度・加速度を考慮しない重力補償
   actRobotTqc->rootLink()->T() = actRobot->rootLink()->T();
@@ -263,10 +263,10 @@ bool Stabilizer::calcTorque(const cnoid::BodyPtr actRobot, double dt, const EndE
   actRobotTqc->calcForwardKinematics(true, true); // actRobotTqc->joint()->u()に書き込まれる
 
   // tgtWrench
-  for(int i=0;i<endEffectorParam.name.size();i++){
-    cnoid::JointPath jointPath(actRobotTqc->rootLink(), actRobotTqc->link(endEffectorParam.parentLink[i]));
+  for(int i=0;i<gaitParam.eeName.size();i++){
+    cnoid::JointPath jointPath(actRobotTqc->rootLink(), actRobotTqc->link(gaitParam.eeParentLink[i]));
     cnoid::MatrixXd J = cnoid::MatrixXd::Zero(6,jointPath.numJoints()); // generate frame. endeffector origin
-    cnoid::setJacobian<0x3f,0,0,true>(jointPath,actRobotTqc->link(endEffectorParam.parentLink[i]),endEffectorParam.localT[i].translation(), // input
+    cnoid::setJacobian<0x3f,0,0,true>(jointPath,actRobotTqc->link(gaitParam.eeParentLink[i]),gaitParam.eeLocalT[i].translation(), // input
                                       J); // output
     cnoid::VectorX tau = - J.transpose() * tgtWrench[i];
     for(int j=0;j<jointPath.numJoints();j++){
@@ -277,12 +277,12 @@ bool Stabilizer::calcTorque(const cnoid::BodyPtr actRobot, double dt, const EndE
   return true;
 }
 
-bool Stabilizer::calcDampingControl(double dt, const GaitParam& gaitParam, const EndEffectorParam& endEffectorParam, const std::vector<cnoid::Vector6>& tgtWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/,
+bool Stabilizer::calcDampingControl(double dt, const GaitParam& gaitParam, const std::vector<cnoid::Vector6>& tgtWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/,
                                     std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stOffset /*generate frame, endeffector origin*/) const{
 
   std::vector<cnoid::Vector6> wrenchError(NUM_LEGS); // generate frame. endEffector origin.
   for(int i=0;i<NUM_LEGS;i++){
-    wrenchError[i] = endEffectorParam.actWrench[i] - tgtWrench[i];
+    wrenchError[i] = gaitParam.actEEWrench[i] - tgtWrench[i];
   }
   // force difference control
   if(gaitParam.isSupportPhase(RLEG) && !gaitParam.isSupportPhase(LLEG)) wrenchError[RLEG][2] = 0.0;
@@ -297,9 +297,9 @@ bool Stabilizer::calcDampingControl(double dt, const GaitParam& gaitParam, const
 
     cnoid::Vector6 offsetPrev; // generate frame. endEffector origin
     cnoid::Vector6 dOffsetPrev; // generate frame. endEffector origin
-    endEffectorParam.stOffset[i].value(offsetPrev, dOffsetPrev);
+    gaitParam.stEEOffset[i].value(offsetPrev, dOffsetPrev);
 
-    cnoid::Matrix3 eeR = cnoid::AngleAxisd(offsetPrev.tail<3>().norm(),(offsetPrev.tail<3>().norm()>0)?offsetPrev.tail<3>().normalized() : cnoid::Vector3::UnitX()) * endEffectorParam.abcTargetPose[i].linear();
+    cnoid::Matrix3 eeR = cnoid::AngleAxisd(offsetPrev.tail<3>().norm(),(offsetPrev.tail<3>().norm()>0)?offsetPrev.tail<3>().normalized() : cnoid::Vector3::UnitX()) * gaitParam.abcEETargetPose[i].linear();
 
     cnoid::Vector6 wrenchErrorLocal; //endEffector frame. endeffector origin
     wrenchErrorLocal.head<3>() = eeR.transpose() * wrenchError[i].head<3>();

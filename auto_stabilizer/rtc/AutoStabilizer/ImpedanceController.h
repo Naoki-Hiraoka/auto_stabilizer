@@ -1,7 +1,7 @@
 #ifndef IMPEDANCE_CONTROLLER_H
 #define IMPEDANCE_CONTROLLER_H
 
-#include "EndEffectorParam.h"
+#include "GaitParam.h"
 
 class ImpedanceController {
 public:
@@ -35,7 +35,7 @@ public:
     for(int i=0;i<this->isImpedanceMode.size();i++) this->isImpedanceMode[i] = false;
   }
 
-  bool calcImpedanceControl(double dt, const EndEffectorParam& endEffectorParam,
+  bool calcImpedanceControl(double dt, const GaitParam& gaitParam,
                             std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& icOffset /*generate frame, endeffector origin*/) const;
 };
 
