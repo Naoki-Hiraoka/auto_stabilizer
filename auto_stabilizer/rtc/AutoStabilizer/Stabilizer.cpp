@@ -115,7 +115,7 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const EndEffectorParam& 
     3. 各脚の各頂点のノルムの重心がCOPOffsetと一致 (fzの値でスケールされてしまうので、alphaを用いて左右をそろえる)
     4. ノルムの2乗和の最小化 (3の中で微小な重みで一緒にやる)
   */
-  // 計算時間は、tgtZmpが支持領域内に無いと遅くなるみたいなので、事前に支持領域内に入るように修正しておくこと
+  // 計算時間は、tgtZmpが支持領域内に無いと遅くなるなので、事前に支持領域内に入るように修正しておくこと
 
   if(gaitParam.isSupportPhase(RLEG) && !gaitParam.isSupportPhase(LLEG)){
     tgtWrench[LLEG].setZero();
@@ -128,7 +128,7 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const EndEffectorParam& 
   }else if(!gaitParam.isSupportPhase(RLEG) && !gaitParam.isSupportPhase(LLEG)){
     tgtWrench[RLEG].setZero();
     tgtWrench[LLEG].setZero();
-  }else if(tgtForce.norm() == 0){// たぶん無いが念の為
+  }else if(tgtForce.norm() == 0){
     tgtWrench[RLEG].setZero();
     tgtWrench[LLEG].setZero();
   }else{
@@ -176,7 +176,7 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const EndEffectorParam& 
       this->tgtZmpTask_->wc() = cnoid::VectorX::Ones(0);
 
       this->tgtZmpTask_->w() = cnoid::VectorX::Ones(dim) * 1e-6;
-      this->tgtZmpTask_->toSolve() = true;
+      this->tgtZmpTask_->toSolve() = false; // 常にtgtZmpが支持領域内にあるなら解く必要がないので高速化のためfalseにする. ない場合があるならtrueにする. calcWrenchでtgtZmpをtruncateしているのでfalseでよい
       this->tgtZmpTask_->solver().settings()->setVerbosity(0);
     }
     {
@@ -228,6 +228,7 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const EndEffectorParam& 
                                    result,
                                    0 // debuglevel
                                    )){
+      // QP fail. 目標力を何も入れないよりはマシなので適当に入れる.
       tgtWrench[RLEG].head<3>() = tgtForce / 2;
       tgtWrench[LLEG].head<3>() = tgtForce / 2;
     }else{

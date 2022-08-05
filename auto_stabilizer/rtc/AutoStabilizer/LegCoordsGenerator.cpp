@@ -185,7 +185,28 @@ void LegCoordsGenerator::calcCOMCoords(const GaitParam& gaitParam, double dt, do
   if(gaitParam.isSupportPhase(RLEG) || gaitParam.isSupportPhase(LLEG)){
     cnoid::Vector3 genDCM = gaitParam.genCog + gaitParam.genCogVel / w;
     genZmp = footguidedcontroller::calcFootGuidedControl(w,l,genDCM,gaitParam.refZmpTraj);
-    // check zmp in polygon TODO. polygon外に出たとしてもcogを進行方向に少しでもいいから動かすことが重要. そうしないと破綻する恐れあり. COMより低く. 角運動量オフセット
+    if(genZmp[2] >= gaitParam.genCog[2]) genZmp = gaitParam.genCog; // 下向きの力は受けられないので
+    else{
+      cnoid::Vector3 genZmpOrg = genZmp;
+      // truncate zmp inside polygon.
+      std::vector<cnoid::Vector3> vertices; // generate frame. 支持点の集合
+      for(int i=0;i<NUM_LEGS;i++){
+        if(!gaitParam.isSupportPhase(i)) continue;
+        for(int j=0;j<gaitParam.legHull[i].size();j++){
+          vertices.push_back(gaitParam.genCoords[i].value()*gaitParam.legHull[i][j]);
+        }
+      }
+      genZmp = mathutil::calcInsidePointOfPolygon3D(genZmp,vertices,gaitParam.genCog);
+      //zmpがpolygon外に出たとしてもcogを進行方向に少しでもいいから動かす. そうしないとcogが無限遠に発散する恐れあり.
+      for(int i=0;i<2;i++){
+        if((genZmpOrg[i]-gaitParam.genCog[i]) > 0.001){
+          if((genZmp[i]-gaitParam.genCog[i]) < 0.001) genZmp[i] = gaitParam.genCog[i] + 0.001;
+        }else if((genZmpOrg[i]-gaitParam.genCog[i]) < -0.001){
+          if((genZmp[i]-gaitParam.genCog[i]) > -0.001) genZmp[i] = gaitParam.genCog[i] - 0.001;
+        }
+      }
+      // TODO 角運動量オフセット
+    }
   }else{ // 跳躍期
     genZmp = gaitParam.genCog;
   }
