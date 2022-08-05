@@ -13,7 +13,7 @@ public:
 
   double defaultDoubleSupportTime = 0.12; // [s]. defaultStepTime未満である必要がある.
   double defaultStepHeight = 0.07; // [s].
-  unsigned int goVelocityStepNum = 3; // 1以上
+  unsigned int goVelocityStepNum = 6; // 1以上
   bool modifyFootSteps = false; // 着地位置修正を行うかどうか
   bool isEmergencyStepMode = false; // footstepNodesList[0]が末尾の要素でかつ現在のdstCoordsのままだとバランスが取れないなら、footstepNodesList[1]に両脚が横に並ぶ位置に一歩歩くnodeが末尾に入る. (modifyFootSteps=trueのときのみ有効)
 
@@ -91,17 +91,19 @@ public:
 
   */
   bool calcFootSteps(const GaitParam& gaitParam, const double& dt,
-                     std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords) const;
+                     std::vector<GaitParam::FootStepNodes>& o_footstepNodesList) const;
 
 
 protected:
-  // footstepNodesの次の一歩を作る. 両脚が地面についた状態で終わる. RLEGとLLEGどちらをswingすべきかも決める
-  GaitParam::FootStepNodes calcDefaultNextStep(const GaitParam::FootStepNodes& footstepNodes, const std::vector<cnoid::Vector3>& defaultTranslatePos, const cnoid::Vector3& offset = cnoid::Vector3::Zero()) const;
-  // footstepNodesの次の一歩を作る. 両脚が地面についた状態で終わる
-  GaitParam::FootStepNodes calcDefaultNextStep(const int& swingLeg, const GaitParam::FootStepNodes& footstepNodes, const std::vector<cnoid::Vector3>& defaultTranslatePos, const cnoid::Vector3& offset = cnoid::Vector3::Zero()) const;
-
-  // footstepNodesListの終了時の状態が両脚支持でかつその期間の時間がdefaultDoubleSupportTimeよりも短いなら延長する
-  void extendDoubleSupportTime(GaitParam::FootStepNodes& footstepNodes) const;
+  // footstepNodesList[1:]の着地位置をcmdVelに基づき更新する
+  void updateGoVelocitySteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cnoid::Vector3>& defaultTranslatePos) const;
+  // footstepNodesList[idx:] idxより先のstepの位置をgenerate frameでtransformだけ動かす
+  void transformFutureSteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, int index, const cnoid::Position& transform) const;
+  // footstepNodesの次の一歩を作る. RLEGとLLEGどちらをswingすべきかも決める
+  void calcDefaultNextStep(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cnoid::Vector3>& defaultTranslatePos, const cnoid::Vector3& offset = cnoid::Vector3::Zero()) const;
+  // footstepNodesの次の一歩を作る.
+  GaitParam::FootStepNodes calcDefaultSwingStep(const int& swingLeg, const GaitParam::FootStepNodes& footstepNodes, const std::vector<cnoid::Vector3>& defaultTranslatePos, const cnoid::Vector3& offset = cnoid::Vector3::Zero(), bool startWithSingleSupport = false) const;
+  GaitParam::FootStepNodes calcDefaultDoubleSupportStep(const GaitParam::FootStepNodes& footstepNodes) const;
 };
 
 #endif

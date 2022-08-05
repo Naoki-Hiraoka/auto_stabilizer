@@ -34,16 +34,24 @@ public:
 
   class FootStepNodes {
   public:
-    std::vector<cnoid::Position> dstCoords = std::vector<cnoid::Position>(NUM_LEGS,cnoid::Position::Identity()); // 要素数2. rleg: 0. lleg: 1. generate frame. 終了時の位置
-    std::vector<double> supportTime = std::vector<double>(NUM_LEGS,std::numeric_limits<double>::max()); // 要素数2. rleg: 0. lleg: 1. remainTimeがこの値以下なら、support期. ずっとsupport期の場合はinfinity(remainTimeが後から長くなることがあるので), ずっとswing期の場合はマイナスにするとよい. swing期の間に、curCoordsからdstCoordsに移動しきるようにswing軌道が生成される. support期のときは、curCoordsからdstCoordsまで直線的に補間がなされる. footstepNodesList[0]については、一度remainTime<=supportTimeが成り立つと、再びremainTime>supportTimeとなるようにremainTimeまたはsupportTimeが変更されることは無い. footstepNodesList[0]については、supportTimeとremainTimeの大小関係が変化することは時間経過によるもの以外はない. 両足のsupportTimeがともにマイナスであることはない(終了時は必ずsupport期の足が一つ以上ある)
-    double remainTime = 1.0; // step time. 必ず0より大きい. footstepNodesListの末尾の要素のみ、0であることがありえる
+    /*
+      各足につきそれぞれ、remainTime 後に dstCoordsに動く.
+
+      footstepNodesList[0]のisSupportPhaseは、変更されない
+      footstepNodesList[0]のdstCoordsを変更する場合には、footstepNodesList[0]のremainTimeが小さい場合は延長した方が安全
+      footstepNodesList[0]のremainTimeを変更する場合には、小さい値に変更することは避けたほうが安全
+      footstepNodesList[1]のisSupportPhaseを変更する場合には、footstepNodesList[0]のremainTimeが小さい場合はを延長した方が安全
+    */
+    std::vector<cnoid::Position> dstCoords = std::vector<cnoid::Position>(NUM_LEGS,cnoid::Position::Identity()); // 要素数2. rleg: 0. lleg: 1. generate frame.
+    std::vector<bool> isSupportPhase = std::vector<bool>(NUM_LEGS, true); // 要素数2. rleg: 0. lleg: 1. footstepNodesListの末尾の要素が両方falseであることは無い
+    double remainTime;
 
     // 遊脚軌道用パラメータ
     std::vector<std::vector<double> > stepHeight = std::vector<std::vector<double> >(NUM_LEGS,std::vector<double>(2,0)); // 要素数2. rleg: 0. lleg: 1. swing期には、srcCoordsの高さ+[0]とdstCoordsの高さ+[1]の高い方に上げるような軌道を生成する
   };
   std::vector<FootStepNodes> footstepNodesList = std::vector<FootStepNodes>(1); // 要素数1以上. 0番目が現在の状態. 末尾の要素以降は、末尾の状態がずっと続くとして扱われる.
-  std::vector<cnoid::Position> srcCoords = std::vector<cnoid::Position>(NUM_LEGS,cnoid::Position::Identity()); // 要素数2. rleg: 0. lleg: 1. generate frame. footstepNodesList[0]開始時の位置を保持する. 基本的にはfootstepNodesList[-1]のdstCoordsと同じ
   std::vector<cpp_filters::TwoPointInterpolatorSE3> genCoords = std::vector<cpp_filters::TwoPointInterpolatorSE3>(NUM_LEGS, cpp_filters::TwoPointInterpolatorSE3(cnoid::Position::Identity(),cnoid::Vector6::Zero(),cnoid::Vector6::Zero(),cpp_filters::HOFFARBIB)); // 要素数2. rleg: 0. lleg: 1. generate frame. 現在の位置
+  std::vector<cnoid::Position> srcCoords = std::vector<cnoid::Position>(NUM_LEGS,cnoid::Position::Identity()); // 要素数2. rleg: 0. lleg: 1. generate frame.. 現在のfootstep開始時の位置
   std::vector<footguidedcontroller::LinearTrajectory<cnoid::Vector3> > refZmpTraj = {footguidedcontroller::LinearTrajectory<cnoid::Vector3>(cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),0.0)}; // 要素数1以上. generate frame. footstepNodesListを単純に線形補間して計算される現在の目標zmp軌道
   cpp_filters::TwoPointInterpolatorSE3 footMidCoords = cpp_filters::TwoPointInterpolatorSE3(cnoid::Position::Identity(),cnoid::Vector6::Zero(),cnoid::Vector6::Zero(),cpp_filters::HOFFARBIB); // generate frame. Z軸は鉛直. footstepNodesListの各要素終了時の支持脚の位置姿勢(Z軸は鉛直)にdefaultTranslatePosを適用したものの間をつなぐ. interpolatorによって連続的に変化する. reference frameとgenerate frameの対応付けに用いられる
   std::vector<bool> prevSupportPhase = std::vector<bool>{true, true}; // 要素数2. rleg: 0. lleg: 1. 一つ前の周期でSupportPhaseだったかどうか
@@ -72,21 +80,6 @@ public:
   std::vector<cnoid::Vector6> refEEWrenchOrigin; // 要素数と順序はeeNameと同じ.FootOrigin frame. EndEffector origin. ロボットが受ける力
 
 public:
-  bool isSupportPhase(int leg) const{ // 今がSupportPhaseかどうか
-    return isSupportPhaseStart(this->footstepNodesList[0], leg);
-  }
-  static bool isSupportPhase(const FootStepNodes& footstepNodes, int leg, double remainTime){ // footStepNodesのlegは、remainTimeのときにSupportPhaseかどうか
-    assert(0<=leg && leg<NUM_LEGS); assert(0<=remainTime && remainTime <= footstepNodes.remainTime);
-    return remainTime <= footstepNodes.supportTime[leg];
-  }
-  static bool isSupportPhaseEnd(const FootStepNodes& footstepNodes, int leg){ // footStepNodesのlegは、終了時にSupportPhaseかどうか
-    assert(0<=leg && leg<NUM_LEGS);
-    return isSupportPhase(footstepNodes, leg, 0);
-  }
-  static bool isSupportPhaseStart(const FootStepNodes& footstepNodes, int leg){ // footStepNodesのlegは、開始時にSupportPhaseかどうか
-    assert(0<=leg && leg<NUM_LEGS);
-    return isSupportPhase(footstepNodes, leg, footstepNodes.remainTime);
-  }
   bool isStatic() const{ // 現在static状態かどうか
     this->footstepNodesList.size() == 1 && this->footstepNodesList[0].remainTime == 0.0;
   }

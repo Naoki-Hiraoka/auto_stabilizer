@@ -384,9 +384,8 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
       cnoid::Position llegCoords = genRobot->link(gaitParam.eeParentLink[LLEG])->T()*gaitParam.eeLocalT[LLEG];
       gaitParam.footstepNodesList.resize(1);
       gaitParam.footstepNodesList[0].dstCoords = {rlegCoords, llegCoords};
-      gaitParam.footstepNodesList[0].supportTime = {std::numeric_limits<double>::max(), std::numeric_limits<double>::max()};
+      gaitParam.footstepNodesList[0].isSupportPhase = {true, true};
       gaitParam.footstepNodesList[0].remainTime = 0.0;
-      gaitParam.srcCoords = {rlegCoords, llegCoords};
       gaitParam.genCoords.clear();
       gaitParam.genCoords.emplace_back(rlegCoords, cnoid::Vector6::Zero(), cnoid::Vector6::Zero(), cpp_filters::HOFFARBIB);
       gaitParam.genCoords.emplace_back(llegCoords, cnoid::Vector6::Zero(), cnoid::Vector6::Zero(), cpp_filters::HOFFARBIB);
@@ -396,7 +395,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
     }
 
     for(int i=0;i<NUM_LEGS;i++){
-      gaitParam.prevSupportPhase[i] = gaitParam.isSupportPhase(i);
+      gaitParam.prevSupportPhase[i] = gaitParam.footstepNodesList[0].isSupportPhase[i];
     }
 
     for(int i=0;i<gaitParam.eeName.size();i++){
@@ -422,7 +421,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
 
   // AutoBalancer
   footStepGenerator.calcFootSteps(gaitParam, dt,
-                                  gaitParam.footstepNodesList, gaitParam.srcCoords);
+                                  gaitParam.footstepNodesList);
   legCoordsGenerator.calcLegCoords(gaitParam, dt,
                                    gaitParam.refZmpTraj, gaitParam.genCoords, gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.footMidCoords, gaitParam.prevSupportPhase);
   legCoordsGenerator.calcCOMCoords(gaitParam, dt, 9.80665, genRobot->mass(),
@@ -720,6 +719,8 @@ bool AutoStabilizer::goStop(){
   if(this->mode_.isABCRunning()){
     this->footStepGenerator_.isGoVelocityMode = false;
     this->footStepGenerator_.cmdVel.setZero();
+    this->footStepGenerator_.goStop(this->gaitParam_,
+                                    this->gaitParam_.footstepNodesList);
   }else{
     return false;
   }

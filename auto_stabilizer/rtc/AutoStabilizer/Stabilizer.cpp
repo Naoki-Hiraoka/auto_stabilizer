@@ -61,7 +61,7 @@ bool Stabilizer::calcZMP(const GaitParam& gaitParam, double dt, double g, double
   cnoid::Vector3 l = cnoid::Vector3::Zero();
   l[2] = gaitParam.refdz;
   cnoid::Vector3 tgtZmp;
-  if(gaitParam.isSupportPhase(RLEG) || gaitParam.isSupportPhase(LLEG)){
+  if(gaitParam.footstepNodesList[0].isSupportPhase[RLEG] || gaitParam.footstepNodesList[0].isSupportPhase[LLEG]){
     cnoid::Vector3 actDCM = gaitParam.actCog + gaitParam.actCogVel.value() / w;
     tgtZmp = footguidedcontroller::calcFootGuidedControl(w,l,actDCM,gaitParam.refZmpTraj);
     if(tgtZmp[2] >= gaitParam.actCog[2]) tgtZmp = gaitParam.actCog; // 下向きの力は受けられないので
@@ -69,7 +69,7 @@ bool Stabilizer::calcZMP(const GaitParam& gaitParam, double dt, double g, double
       // truncate zmp inside polygon. actual robotの関節角度を用いて計算する
       std::vector<cnoid::Vector3> vertices; // generate frame. 支持点の集合
       for(int i=0;i<NUM_LEGS;i++){
-        if(!gaitParam.isSupportPhase(i)) continue;
+        if(!gaitParam.footstepNodesList[0].isSupportPhase[i]) continue;
         for(int j=0;j<gaitParam.legHull[i].size();j++){
           vertices.push_back(gaitParam.actEEPose[i]*gaitParam.legHull[i][j]);
         }
@@ -117,15 +117,15 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
   */
   // 計算時間は、tgtZmpが支持領域内に無いと遅くなるなので、事前に支持領域内に入るように修正しておくこと
 
-  if(gaitParam.isSupportPhase(RLEG) && !gaitParam.isSupportPhase(LLEG)){
+  if(gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && !gaitParam.footstepNodesList[0].isSupportPhase[LLEG]){
     tgtEEWrench[LLEG].setZero();
     tgtEEWrench[RLEG].head<3>() = tgtForce;
     tgtEEWrench[RLEG].tail<3>() = (tgtZmp - gaitParam.actEEPose[RLEG].translation()).cross(tgtForce);
-  }else if(!gaitParam.isSupportPhase(RLEG) && gaitParam.isSupportPhase(LLEG)){
+  }else if(!gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && gaitParam.footstepNodesList[0].isSupportPhase[LLEG]){
     tgtEEWrench[RLEG].setZero();
     tgtEEWrench[LLEG].head<3>() = tgtForce;
     tgtEEWrench[LLEG].tail<3>() = (tgtZmp - gaitParam.actEEPose[LLEG].translation()).cross(tgtForce);
-  }else if(!gaitParam.isSupportPhase(RLEG) && !gaitParam.isSupportPhase(LLEG)){
+  }else if(!gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && !gaitParam.footstepNodesList[0].isSupportPhase[LLEG]){
     tgtEEWrench[RLEG].setZero();
     tgtEEWrench[LLEG].setZero();
   }else if(tgtForce.norm() == 0){
@@ -285,9 +285,9 @@ bool Stabilizer::calcDampingControl(double dt, const GaitParam& gaitParam, const
     wrenchError[i] = gaitParam.actEEWrench[i] - tgtEEWrench[i];
   }
   // force difference control
-  if(gaitParam.isSupportPhase(RLEG) && !gaitParam.isSupportPhase(LLEG)) wrenchError[RLEG][2] = 0.0;
-  else if(!gaitParam.isSupportPhase(RLEG) && gaitParam.isSupportPhase(LLEG)) wrenchError[LLEG][2] = 0.0;
-  else if(gaitParam.isSupportPhase(RLEG) && gaitParam.isSupportPhase(LLEG)) {
+  if(gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && !gaitParam.footstepNodesList[0].isSupportPhase[LLEG]) wrenchError[RLEG][2] = 0.0;
+  else if(!gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && gaitParam.footstepNodesList[0].isSupportPhase[LLEG]) wrenchError[LLEG][2] = 0.0;
+  else if(gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && gaitParam.footstepNodesList[0].isSupportPhase[LLEG]) {
     double averageFzError = (wrenchError[RLEG][2] + wrenchError[LLEG][2]) / 2.0;
     wrenchError[RLEG][2] -= averageFzError;
     wrenchError[LLEG][2] -= averageFzError;

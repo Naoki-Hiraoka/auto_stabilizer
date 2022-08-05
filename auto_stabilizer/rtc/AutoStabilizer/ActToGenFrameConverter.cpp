@@ -14,9 +14,9 @@ bool ActToGenFrameConverter::convertFrame(const cnoid::BodyPtr& actRobotRaw, con
     for(int i=0;i<actForceSensors.size();i++){
       actOriginForceSensors[i]->F() = actForceSensors[i]->F();
     }
-    double rlegweight = gaitParam.isSupportPhase(RLEG)? 1.0 : 0.0;
-    double llegweight = gaitParam.isSupportPhase(LLEG)? 1.0 : 0.0;
-    if(!gaitParam.isSupportPhase(RLEG) && !gaitParam.isSupportPhase(LLEG)) rlegweight = llegweight = 1.0;
+    double rlegweight = gaitParam.footstepNodesList[0].isSupportPhase[RLEG]? 1.0 : 0.0;
+    double llegweight = gaitParam.footstepNodesList[0].isSupportPhase[LLEG]? 1.0 : 0.0;
+    if(!gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && !gaitParam.footstepNodesList[0].isSupportPhase[LLEG]) rlegweight = llegweight = 1.0;
     cnoid::Position actrleg = actRobot->link(gaitParam.eeParentLink[RLEG])->T()*gaitParam.eeLocalT[RLEG];
     cnoid::Position actlleg = actRobot->link(gaitParam.eeParentLink[LLEG])->T()*gaitParam.eeLocalT[LLEG];
     cnoid::Position actFootMidCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{actrleg, actlleg},
@@ -56,7 +56,7 @@ bool ActToGenFrameConverter::convertFrame(const cnoid::BodyPtr& actRobotRaw, con
     // actCogを計算
     bool genContactState_changed = false;
     for(int i=0;i<NUM_LEGS;i++){
-      if(gaitParam.isSupportPhase(i) != gaitParam.prevSupportPhase[i]) genContactState_changed = true;
+      if(gaitParam.footstepNodesList[0].isSupportPhase[i] != gaitParam.prevSupportPhase[i]) genContactState_changed = true;
     }
     if(genContactState_changed){
       //座標系が飛んでいるので、gaitParam.actCogVel は前回の周期の値をそのままつかう
