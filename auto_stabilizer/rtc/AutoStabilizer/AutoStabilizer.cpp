@@ -112,7 +112,6 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
 
   {
     // load end_effector
-    cnoid::DeviceList<cnoid::ForceSensor> forceSensors(this->refRobotRaw_->devices());
     std::string endEffectors; this->getProperty("end_effectors", endEffectors);
     std::stringstream ss_endEffectors(endEffectors);
     std::string buf;
@@ -149,23 +148,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
       localT.translation() = localp;
       localT.linear() = localR;
 
-      // 各EndEffectorsから親リンク側に遡っていき、最初に見つかったForceSensorをEndEffectorに対応付ける. 以後、ForceSensorの値を座標変換したものがEndEffectorが受けている力とみなされる. 見つからなければ受けている力は常に0とみなされる
-      std::string forceSensor = "";
-      {
-        cnoid::LinkPtr link = this->refRobotRaw_->link(parentLink);
-        bool found = false;
-        while (link != nullptr && found == false) {
-          for (size_t j = 0; j < forceSensors.size(); j++) {
-            if(forceSensors[j]->link() == link) {
-              forceSensor = forceSensors[j]->name();
-              found = true;
-              break;
-            }
-          }
-        }
-      }
-
-      this->gaitParam_.push_backEE(name, parentLink, localT, forceSensor);
+      this->gaitParam_.push_backEE(name, parentLink, localT);
     }
   }
 
@@ -214,6 +197,28 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
       if(joint->dq_upper() - joint->dq_lower() > 0.02){
         joint->setJointVelocityRange(joint->dq_lower()+0.01,joint->dq_upper()-0.01);
       }
+    }
+  }
+
+  {
+    // generate ActToGenFrameConverter
+    this->actToGenFrameConverter_.eeForceSensor.resize(this->gaitParam_.eeName.size());
+    cnoid::DeviceList<cnoid::ForceSensor> forceSensors(this->refRobotRaw_->devices());
+    for(int i=0;i<this->gaitParam_.eeName.size();i++){
+      // 各EndEffectorsから親リンク側に遡っていき、最初に見つかったForceSensorをEndEffectorに対応付ける. 以後、ForceSensorの値を座標変換したものがEndEffectorが受けている力とみなされる. 見つからなければ受けている力は常に0とみなされる
+      std::string forceSensor = "";
+      cnoid::LinkPtr link = this->refRobotRaw_->link(this->gaitParam_.eeParentLink[i]);
+      bool found = false;
+      while (link != nullptr && found == false) {
+        for (size_t j = 0; j < forceSensors.size(); j++) {
+          if(forceSensors[j]->link() == link) {
+            forceSensor = forceSensors[j]->name();
+            found = true;
+            break;
+          }
+        }
+      }
+      this->actToGenFrameConverter_.eeForceSensor[i] = forceSensor;
     }
   }
 

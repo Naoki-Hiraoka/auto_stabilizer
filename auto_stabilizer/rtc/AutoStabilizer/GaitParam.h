@@ -16,7 +16,6 @@ public:
   std::vector<std::string> eeName; // constant. 要素数2以上. 0番目がrleg, 1番目がllegという名前である必要がある
   std::vector<std::string> eeParentLink; // constant. 要素数と順序はeeNameと同じ. 必ずrobot->link(parentLink)がnullptrではないことを約束する. そのため、毎回robot->link(parentLink)がnullptrかをチェックしなくても良い
   std::vector<cnoid::Position> eeLocalT; // constant. 要素数と順序はeeNameと同じ. Parent Link Frame
-  std::vector<std::string> eeForceSensor; // constant. 要素数と順序はeeNameと同じ. actualのForceSensorの値を座標変換したものがEndEffectorが受けている力とみなされる. forceSensorが""ならば受けている力は常に0とみなされる. forceSensorが""で無いならばrobot->findDevice<cnoid::ForceSensor>(endEffectorParams[i].forceSensor)がnullptrでは無いことを約束するので、毎回nullptrかをチェックしなくても良い
 
 public:
   // AutoStabilizerの中で計算更新される.
@@ -93,11 +92,10 @@ public:
   }
 
 public:
-  void push_backEE(const std::string& name_, const std::string& parentLink_, const cnoid::Position& localT_, const std::string& forceSensor_){
+  void push_backEE(const std::string& name_, const std::string& parentLink_, const cnoid::Position& localT_){
     eeName.push_back(name_);
     eeParentLink.push_back(parentLink_);
     eeLocalT.push_back(localT_);
-    eeForceSensor.push_back(forceSensor_);
     refEEWrenchOrigin.push_back(cnoid::Vector6::Zero());
     refEEPose.push_back(cnoid::Position::Identity());
     refEEWrench.push_back(cnoid::Vector6::Zero());

@@ -8,6 +8,10 @@ class ActToGenFrameConverter {
 public:
   // ActToGenFrameConverterだけでつかうパラメータ
 
+public:
+  // constant
+  std::vector<std::string> eeForceSensor; // constant. 要素数と順序はGaitParam.eeNameと同じ. actualのForceSensorの値を座標変換したものがEndEffectorが受けている力とみなされる. eeForceSensorが""ならば受けている力は常に0とみなされる. eeForceSensorが""で無いならばrobot->findDevice<cnoid::ForceSensor>(eeForceSensor)がnullptrでは無いことを約束するので、毎回nullptrかをチェックしなくても良い
+
 protected:
   // 内部で変更されるパラメータ. tartAutoBalancer時にリセットされる
   mutable bool isInitial = true;

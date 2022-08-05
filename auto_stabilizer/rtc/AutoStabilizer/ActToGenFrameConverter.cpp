@@ -36,8 +36,8 @@ bool ActToGenFrameConverter::convertFrame(const cnoid::BodyPtr& actRobotRaw, con
     // 各エンドエフェクタのactualの位置・力を計算
     for(int i=0;i<gaitParam.eeName.size(); i++){
       actEEPose[i] = actRobot->link(gaitParam.eeParentLink[i])->T() * gaitParam.eeLocalT[i];
-      if(gaitParam.eeForceSensor[i] != ""){
-        cnoid::ForceSensorPtr sensor = actRobot->findDevice<cnoid::ForceSensor>(gaitParam.eeForceSensor[i]);
+      if(this->eeForceSensor[i] != ""){
+        cnoid::ForceSensorPtr sensor = actRobot->findDevice<cnoid::ForceSensor>(this->eeForceSensor[i]);
         cnoid::Vector6 senF = sensor->F();
         cnoid::Position senPose = sensor->link()->T() * sensor->T_local();
         cnoid::Position eefTosenPose = gaitParam.actEEPose[i].inverse() * senPose;
