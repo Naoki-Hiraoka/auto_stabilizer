@@ -13,7 +13,7 @@ public:
   double defaultDoubleSupportTime = 0.12; // [s]. defaultStepTime未満である必要がある.
   double defaultStepHeight = 0.07; // [s].
   unsigned int goVelocityStepNum = 6; // 1以上
-  bool isModifyFootSteps = false; // 着地位置時間修正を行うかどうか
+  bool isModifyFootSteps = true; // 着地位置時間修正を行うかどうか
   bool isEmergencyStepMode = false; // footstepNodesList[0]が末尾の要素でかつ現在のdstCoordsのままだとバランスが取れないなら、footstepNodesList[1]に両脚が横に並ぶ位置に一歩歩くnodeが末尾に入る. (modifyFootSteps=trueのときのみ有効)
   double overwritableMinTime = 0.3; // 0より大きい. 次indexまでの残り時間がこの値未満の場合は着地位置時間修正を行わない. また、次indexまでの残り時間がこの値を下回るようには着地時間修正を行わない
   double overwritableMaxTime = 1.0; // overwritableMinTimeより大きい. 次indexまでの残り時間がこの値を上回るようには着地時間修正を行わない

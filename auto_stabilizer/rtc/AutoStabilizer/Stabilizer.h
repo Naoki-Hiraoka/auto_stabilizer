@@ -18,7 +18,7 @@ public:
 
   Stabilizer(){
     for(int i=0;i<NUM_LEGS;i++){
-      dampingCompensationLimit[i] << 0.08, 0.08, 0.08, 0.05, 0.05, 0.05;
+      dampingCompensationLimit[i] << 0.08, 0.08, 0.08, 0.174533, 0.174533, 0.174533; // 0.174533rad = 5deg
       dampingGain[i] << 33600, 33600, 7839, 60, 60, 1e5;
       dampingTimeConst[i] << 3.0/1.1, 3.0/1.1, 1.5/1.1, 1.5/1.1, 1.5/1.1, 1.5/1.1;
       dampingWrenchErrorLimit[i] << 200, 200, 200, 15, 15, 15;

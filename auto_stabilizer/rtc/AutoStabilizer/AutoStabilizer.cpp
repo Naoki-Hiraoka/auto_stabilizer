@@ -399,6 +399,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
   // AutoBalancer
   footStepGenerator.calcFootSteps(gaitParam, dt,
                                   gaitParam.footstepNodesList);
+  std::cerr << gaitParam << std::endl;
   legCoordsGenerator.calcLegCoords(gaitParam, dt,
                                    gaitParam.refZmpTraj, gaitParam.genCoords, gaitParam.footMidCoords);
   legCoordsGenerator.calcCOMCoords(gaitParam, dt, genRobot->mass(),
