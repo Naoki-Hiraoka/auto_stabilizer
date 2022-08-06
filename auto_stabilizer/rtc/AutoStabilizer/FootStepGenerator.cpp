@@ -287,6 +287,9 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
   // 次indexまでの残り時間がこの値未満の場合は着地位置時間修正を行わない.
   if(footstepNodesList[0].remainTime < this->overwritableMinTime) return;
 
+  // DOWN_PHASEになったらfootstepNodesList[0]のdstCoords, remainTimeは変更されない
+  if(footstepNodesList[0].swingState[footstepNodesList[0].isSupportPhase[RLEG] ? LLEG : RLEG] ==GaitParam::FootStepNodes::DOWN_PHASE) return;
+
   // one step capturabilityに基づき、footstepNodesList[0]のremainTimeとdstCoordsを修正する.
   int swingLeg = footstepNodesList[0].isSupportPhase[RLEG] ? LLEG : RLEG;
   int supportLeg = (swingLeg == RLEG) ? LLEG : RLEG;
@@ -346,8 +349,8 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
 
     if(candidates.size() == 0) candidates.emplace_back(std::vector<cnoid::Vector3>{footstepNodesList[0].dstCoords[swingLeg].translation()}, footstepNodesList[0].remainTime); // まず起こらないと思うが念の為
   }
-  std::cerr << "strideLimitation と reachable" << std::endl;
-  std::cerr << candidates << std::endl;
+  //std::cerr << "strideLimitation と reachable" << std::endl;
+  //std::cerr << candidates << std::endl;
 
   // 2. steppable: 達成不可の場合は、考慮しない
   // TODO. Z高さの扱い
@@ -394,8 +397,8 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
     }
   }
 
-  std::cerr << "capturable" << std::endl;
-  std::cerr << candidates << std::endl;
+  // std::cerr << "capturable" << std::endl;
+  // std::cerr << candidates << std::endl;
 
   // 4. もとの着地位置: 達成不可の場合は、各hullの中の最も近い位置をそれぞれ求めて、進行方向優先
   {
@@ -426,8 +429,8 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
     }
   }
 
-  std::cerr << "pos" << std::endl;
-  std::cerr << candidates << std::endl;
+  // std::cerr << "pos" << std::endl;
+  // std::cerr << candidates << std::endl;
 
   // 5. もとの着地時刻(remainTime): 達成不可の場合は、可能な限り近い時刻
   {
@@ -447,8 +450,8 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
     candidates = nextCandidates;
   }
 
-  std::cerr << "time" << std::endl;
-  std::cerr << candidates << std::endl;
+  // std::cerr << "time" << std::endl;
+  // std::cerr << candidates << std::endl;
 
   // 修正を適用
   cnoid::Vector3 nextDstCoordsPos = candidates[0].first[0];

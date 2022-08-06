@@ -21,7 +21,7 @@ void LegCoordsGenerator::initLegCoords(const GaitParam& gaitParam,
 }
 
 void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt,
-                                       std::vector<footguidedcontroller::LinearTrajectory<cnoid::Vector3> >& o_refZmpTraj, std::vector<cpp_filters::TwoPointInterpolatorSE3>& o_genCoords, cpp_filters::TwoPointInterpolatorSE3& o_footMidCoords) const{
+                                       std::vector<footguidedcontroller::LinearTrajectory<cnoid::Vector3> >& o_refZmpTraj, std::vector<cpp_filters::TwoPointInterpolatorSE3>& o_genCoords, cpp_filters::TwoPointInterpolatorSE3& o_footMidCoords, std::vector<GaitParam::FootStepNodes::SwingState_enum>& o_swingState) const{
   // swing期は、remainTime - supportTime - delayTimeOffset後にdstCoordsに到達するようなantececdent軌道を生成し(genCoords.getGoal()の値)、その軌道にdelayTimeOffset遅れで滑らかに追従するような軌道(genCoords.value()の値)を生成する.
   //   rectangle以外の軌道タイプや跳躍についてはひとまず考えない TODO
   //   srcCoordsとdstCoordsを結ぶ軌道を生成する. srcCoordsの高さ+[0]とdstCoordsの高さ+[1]の高い方(heightとおく)に上げるようなrectangle軌道を生成する
@@ -98,6 +98,7 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt,
 
   // genCoordsを進める
   std::vector<cpp_filters::TwoPointInterpolatorSE3> genCoords = gaitParam.genCoords;
+  std::vector<GaitParam::FootStepNodes::SwingState_enum> swingState = gaitParam.footstepNodesList[0].swingState;
   for(int i=0;i<NUM_LEGS;i++){
     if(gaitParam.footstepNodesList[0].isSupportPhase[i]) { // 支持脚
       cnoid::Position nextCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{genCoords[i].value(),gaitParam.footstepNodesList[0].dstCoords[i]},
@@ -110,41 +111,66 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt,
       cnoid::Position srcCoords = gaitParam.srcCoords[i];
       cnoid::Position dstCoords = gaitParam.footstepNodesList[0].dstCoords[i];
       cnoid::Position antecedentCoords = genCoords[i].getGoal(); // 今のantecedent軌道の位置
-      if(swingTime <= this->delayTimeOffset) {
-        genCoords[i].setGoal(dstCoords, swingTime);
-        genCoords[i].interpolate(dt);
+      double touchDownTime = (antecedentCoords.translation()[2] - dstCoords.translation()[2]) / this->touchVel; // 地面につくのに要する時間
+      // phase transition
+      if(swingState[i] == GaitParam::FootStepNodes::LIFT_PHASE){
+        if(swingTime <= this->delayTimeOffset) swingState[i] = GaitParam::FootStepNodes::DOWN_PHASE;
+        else if(antecedentCoords.translation()[2] >= height) swingState[i] = GaitParam::FootStepNodes::SWING_PHASE;
+      }else if(swingState[i] == GaitParam::FootStepNodes::SWING_PHASE){
+        if(swingTime <= this->delayTimeOffset) swingState[i] = GaitParam::FootStepNodes::DOWN_PHASE;
+        else if(antecedentCoords.translation()[2] < dstCoords.translation()[2]) swingState[i] = GaitParam::FootStepNodes::LIFT_PHASE;
+        else if((antecedentCoords.translation() - dstCoords.translation()).head<2>().norm() <= 1e-3 &&
+                swingTime - this->delayTimeOffset <= touchDownTime) swingState[i] = GaitParam::FootStepNodes::DOWN_PHASE;
       }else{
-        double antecedentRemainTime = swingTime - this->delayTimeOffset; // antecedent軌道はこの時間後にdstCoordsにつく
-        double touchDownTime = (antecedentCoords.translation()[2] - dstCoords.translation()[2]) / this->touchVel; // 地面につくのに要する時間
-        cnoid::Position nextCoords;
-        if(antecedentRemainTime <= touchDownTime){ // 地面に直線的につきにいく
-          nextCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{antecedentCoords,dstCoords},
-                                               std::vector<double>{std::max(0.0,antecedentRemainTime - dt), dt}); // このfootstepNode終了時にdstCoordsに行くように線形補間
+        // 一度DOWN_PHASEになったら別のPHASEになることはない
+      }
+      if(swingState[i] == GaitParam::FootStepNodes::LIFT_PHASE){
+        double length0 = std::abs(height - antecedentCoords.translation()[2]);
+        double length1 = (dstCoords.translation() - antecedentCoords.translation()).head<2>().norm();
+        double length2 = std::abs(height - dstCoords.translation()[2]);
+        double totalLength = length0 + length1 + length2;
+        double ratio = std::min(dt / (swingTime - this->delayTimeOffset), 1.0); // LIFT_PHASEのとき必ずswingTime - this->delayTimeOffset>0
+        cnoid::Vector3 goal;
+        if(ratio * totalLength <= length0){
+          goal = antecedentCoords.translation();
+          goal[2] += ratio * totalLength;
+        }else if(ratio * totalLength <= length0 + length1){
+          goal = antecedentCoords.translation();
+          goal[2] = height;
+          goal.head<2>() += (dstCoords.translation() - antecedentCoords.translation()).head<2>().normalized() * (ratio * totalLength - length0);
         }else{
-          cnoid::Position preTouchCoords = dstCoords; // dstCoords の上空
-          preTouchCoords.translation()[2] = height;
-          double preTouchDownRemainTime = antecedentRemainTime - (height - dstCoords.translation()[2]) / this->touchVel; // preTouchCoordsにつくまでの時間
-          if(preTouchDownRemainTime <= 0.0) {
-            // 地面に直線的につきにいく
-            nextCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{antecedentCoords,dstCoords},
-                                                 std::vector<double>{std::max(0.0,antecedentRemainTime - dt), dt}); // このfootstepNode終了時にdstCoordsに行くように線形補間
-          }else{
-            // preTouchDownRemainTime の値が小さいときに不安定. delayTimeOffsetでごまかしている. TODO
-            if(antecedentCoords.translation()[2] >= height){ // preTouchCoordsまで直線で移動する
-              nextCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{antecedentCoords,preTouchCoords},
-                                                   std::vector<double>{std::max(0.0,preTouchDownRemainTime - dt), dt}); // preTouchDownRemainTime後にpreTouchCoordsに行くように線形補間
-            }else{ // heightの高さまで上げてからpreTouchCoordsまで直線で移動する. 回転は2つの区間の間一定の速度で動き続ける
-              cnoid::Vector3 viaPos = antecedentCoords.translation(); // heightの高さまで上げた位置
-              viaPos[2] = height;
-              double viaTime = preTouchDownRemainTime * (viaPos - antecedentCoords.translation()).norm() / ((viaPos - antecedentCoords.translation()).norm() + (preTouchCoords.translation() - viaPos).norm()); // viaPosにつくまでの時間
-              nextCoords.translation() = mathutil::calcMidPos(std::vector<cnoid::Vector3>{antecedentCoords.translation(),viaPos},
-                                                              std::vector<double>{std::max(0.0,viaTime - dt), dt}); // viaTime後にviaPosに行くように線形補間
-              nextCoords.linear() =  mathutil::calcMidRot(std::vector<cnoid::Matrix3>{antecedentCoords.linear(),preTouchCoords.linear()},
-                                                          std::vector<double>{std::max(0.0,preTouchDownRemainTime - dt), dt}); // preTouchDownRemainTime後にpreTouchCoordsの傾きになるように線形補間
-            }
-          }
+          goal = dstCoords.translation();
+          goal[2] = height - (ratio * totalLength - length0 - length1);
         }
+        cnoid::Position nextCoords;
+        nextCoords.translation() = goal;
+        nextCoords.linear() = mathutil::calcMidRot(std::vector<cnoid::Matrix3>{antecedentCoords.linear(),dstCoords.linear()},
+                                                   std::vector<double>{std::max(0.0,swingTime - this->delayTimeOffset - dt), dt}); // dstCoordsの傾きになるように線形補間
         genCoords[i].setGoal(nextCoords, this->delayTimeOffset);
+        genCoords[i].interpolate(dt);
+      }else if(swingState[i] == GaitParam::FootStepNodes::SWING_PHASE){
+        cnoid::Vector3 viaPos = dstCoords.translation();
+        viaPos[2] = height;
+        double length1 = (viaPos - antecedentCoords.translation()).norm();
+        double length2 = std::abs(height - dstCoords.translation()[2]);
+        double totalLength = length1 + length2;
+        double ratio = std::min(dt / (swingTime - this->delayTimeOffset), 1.0); // SWING_PHASEのとき必ずswingTime - this->delayTimeOffset>0
+        cnoid::Vector3 goal;
+        if(ratio * totalLength <= length1){
+          goal = antecedentCoords.translation();
+          goal += (viaPos - antecedentCoords.translation()).normalized() * (ratio * totalLength);
+        }else{
+          goal = dstCoords.translation();
+          goal[2] = height - (ratio * totalLength - length1);
+        }
+        cnoid::Position nextCoords;
+        nextCoords.translation() = goal;
+        nextCoords.linear() = mathutil::calcMidRot(std::vector<cnoid::Matrix3>{antecedentCoords.linear(),dstCoords.linear()},
+                                                   std::vector<double>{std::max(0.0,swingTime - this->delayTimeOffset - dt), dt}); // dstCoordsの傾きになるように線形補間
+        genCoords[i].setGoal(nextCoords, this->delayTimeOffset);
+        genCoords[i].interpolate(dt);
+      }else{ // DOWN_PHASE
+        genCoords[i].setGoal(dstCoords, std::min(this->delayTimeOffset, swingTime));
         genCoords[i].interpolate(dt);
       }
     }
@@ -207,6 +233,7 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt,
   o_refZmpTraj = refZmpTraj;
   o_genCoords = genCoords;
   o_footMidCoords = footMidCoords;
+  o_swingState = swingState;
 }
 
 void LegCoordsGenerator::calcCOMCoords(const GaitParam& gaitParam, double dt, double mass, cnoid::Vector3& o_genNextCog, cnoid::Vector3& o_genNextCogVel) const{

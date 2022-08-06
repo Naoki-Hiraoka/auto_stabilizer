@@ -53,6 +53,9 @@ public:
 
     // 遊脚軌道用パラメータ
     std::vector<std::vector<double> > stepHeight = std::vector<std::vector<double> >(NUM_LEGS,std::vector<double>(2,0)); // 要素数2. rleg: 0. lleg: 1. swing期には、srcCoordsの高さ+[0]とdstCoordsの高さ+[1]の高い方に上げるような軌道を生成する
+    // 遊脚軌道用変数.
+    enum SwingState_enum{LIFT_PHASE, SWING_PHASE, DOWN_PHASE};
+    std::vector<SwingState_enum> swingState = std::vector<SwingState_enum>(NUM_LEGS,LIFT_PHASE); // 要素数2. rleg: 0. lleg: 0. footstepNodesList[1:]は全てLIFT_PHASEにしておく. footstepNodesList[0]は, isSupportPhase = falseの脚は、LIFT_PHASE->SWING_PHASE->DOWN_PHASEと遷移する. 一度DOWN_PHASEになったら別のPHASEになることはない. DOWN_PHASEになったらfootstepNodesList[0]のdstCoords, remainTimeは変更されない
   };
   std::vector<FootStepNodes> footstepNodesList = std::vector<FootStepNodes>(1); // 要素数1以上. 0番目が現在の状態. 末尾の要素以降は、末尾の状態がずっと続くとして扱われる.
   std::vector<cnoid::Position> srcCoords = std::vector<cnoid::Position>(NUM_LEGS,cnoid::Position::Identity()); // 要素数2. rleg: 0. lleg: 1. generate frame. 現在のfootstep開始時の位置
