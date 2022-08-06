@@ -21,6 +21,7 @@ public:
   std::vector<std::vector<cnoid::Vector3> > safeLegHull = std::vector<std::vector<cnoid::Vector3> >(2, std::vector<cnoid::Vector3>{cnoid::Vector3(0.075,0.065,0.0),cnoid::Vector3(-0.075,0.065,0.0),cnoid::Vector3(-0.075,-0.065,0.0),cnoid::Vector3(0.075,-0.065,0.0)}); // 要素数2. rleg: 0. lleg: 1. leg frame.  凸形状で,上から見て半時計回り. Z成分はあったほうが計算上扱いやすいからありにしているが、0でなければならない. 大きさはgaitParam.legHull以下
   std::vector<std::vector<cnoid::Vector3> > overwritableStrideLimitationHull = std::vector<std::vector<cnoid::Vector3> >{std::vector<cnoid::Vector3>{cnoid::Vector3(0.3,-0.18,0),cnoid::Vector3(-0.3,-0.18,0),cnoid::Vector3(-0.3,-0.45,0),cnoid::Vector3(0.3,-0.45,0)},std::vector<cnoid::Vector3>{cnoid::Vector3(0.3,0.45,0),cnoid::Vector3(-0.3,0.45,0),cnoid::Vector3(-0.3,0.18,0),cnoid::Vector3(0.3,0.18,0)}}; // 要素数2. 0: rleg用, 1: lleg用. 着地位置修正時に自動生成されるfootstepの上下限の凸包. 反対の脚のEndEffector frame(Z軸は鉛直)で表現した着地可能領域(自己干渉やIKの考慮が含まれる). あったほうが扱いやすいのでZ成分があるが、Z成分は0でないといけない. 凸形状で,上から見て半時計回り. thetaとは独立に評価されるので、defaultStrideLimitationThetaだけ傾いていても大丈夫なようにせよ.
   double contactDecisionThreshold = 25.0; // [N]. generate frameで遊脚が着地時に鉛直方向にこの大きさ以上の力を受けたら接地とみなす
+  double goalOffset = 0.0; // [m]. 遊脚軌道生成時に、generate frameで鉛直方向に, 目標着地位置に対して加えるオフセット. FootStepGeneratorのcheckEarlyTouchDownと組み合わせて使う
 
   // FootStepGeneratorでしか使わないパラメータ. startAutoBalancer時に初期化が必要
   bool isGoVelocityMode = false; // 進行方向に向けてfootStepNodesList[1] ~ footStepNodesList[goVelocityStepNum]の要素をfootstepNodesList[0]から機械的に計算してどんどん位置修正&末尾appendしていく.

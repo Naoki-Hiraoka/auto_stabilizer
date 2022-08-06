@@ -20,7 +20,7 @@ void LegCoordsGenerator::initLegCoords(const GaitParam& gaitParam,
   o_genCoords = genCoords;
 }
 
-void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt,
+void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bool useActStates,
                                        std::vector<footguidedcontroller::LinearTrajectory<cnoid::Vector3> >& o_refZmpTraj, std::vector<cpp_filters::TwoPointInterpolatorSE3>& o_genCoords, cpp_filters::TwoPointInterpolatorSE3& o_footMidCoords, std::vector<GaitParam::FootStepNodes::SwingState_enum>& o_swingState) const{
   // swing期は、remainTime - supportTime - delayTimeOffset後にdstCoordsに到達するようなantececdent軌道を生成し(genCoords.getGoal()の値)、その軌道にdelayTimeOffset遅れで滑らかに追従するような軌道(genCoords.value()の値)を生成する.
   //   rectangle以外の軌道タイプや跳躍についてはひとまず考えない TODO
@@ -110,6 +110,7 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt,
                                gaitParam.footstepNodesList[0].dstCoords[i].translation()[2] + gaitParam.footstepNodesList[0].stepHeight[i][1]); // 足上げ高さ. generate frame
       cnoid::Position srcCoords = gaitParam.srcCoords[i];
       cnoid::Position dstCoords = gaitParam.footstepNodesList[0].dstCoords[i];
+      dstCoords.translation()[2] += gaitParam.footstepNodesList[0].goalOffset[i];
       cnoid::Position antecedentCoords = genCoords[i].getGoal(); // 今のantecedent軌道の位置
       double touchDownTime = (antecedentCoords.translation()[2] - dstCoords.translation()[2]) / this->touchVel; // 地面につくのに要する時間
       // phase transition

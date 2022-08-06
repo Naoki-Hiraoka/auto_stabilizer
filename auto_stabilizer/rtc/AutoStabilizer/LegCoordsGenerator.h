@@ -11,12 +11,11 @@ public:
   double touchVel = 0.3; // 0より大きい. 足を下ろすときの速さ(この値より速く下ろす) [m/s]
   //cnoid::Vector3 goal_off; // TODO
 
-
 public:
   void initLegCoords(const GaitParam& gaitParam,
                      std::vector<footguidedcontroller::LinearTrajectory<cnoid::Vector3> >& o_refZmpTraj, std::vector<cpp_filters::TwoPointInterpolatorSE3>& o_genCoords) const;
 
-  void calcLegCoords(const GaitParam& gaitParam, double dt,
+  void calcLegCoords(const GaitParam& gaitParam, double dt, bool useActStates,
                      std::vector<footguidedcontroller::LinearTrajectory<cnoid::Vector3> >& o_refZmpTraj, std::vector<cpp_filters::TwoPointInterpolatorSE3>& o_genCoords, cpp_filters::TwoPointInterpolatorSE3& o_footMidCoords, std::vector<GaitParam::FootStepNodes::SwingState_enum>& o_swingState) const;
   // swingLegGainControl TODO
 

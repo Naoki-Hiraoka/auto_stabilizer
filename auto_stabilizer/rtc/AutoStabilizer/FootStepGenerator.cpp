@@ -495,5 +495,8 @@ void FootStepGenerator::checkEarlyTouchDown(std::vector<GaitParam::FootStepNodes
     cnoid::Position trans = gaitParam.genCoords[supportLeg].value() * footstepNodesList[0].dstCoords[supportLeg].inverse();
     this->transformCurrentSupportSteps(supportLeg, footstepNodesList, trans); // 支持脚を今の位置姿勢で止める
     footstepNodesList[0].remainTime = dt;
+    footstepNodesList[0].goalOffset[swingLeg] = 0.0;
+  }else{
+    footstepNodesList[0].goalOffset[swingLeg] = this->goalOffset;
   }
 }
