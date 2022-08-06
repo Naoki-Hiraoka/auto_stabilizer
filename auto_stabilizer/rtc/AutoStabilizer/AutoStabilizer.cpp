@@ -397,7 +397,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
   }
 
   // AutoBalancer
-  footStepGenerator.calcFootSteps(gaitParam, dt,
+  footStepGenerator.calcFootSteps(gaitParam, dt, mode.isSTRunning(),
                                   gaitParam.footstepNodesList);
   legCoordsGenerator.calcLegCoords(gaitParam, dt,
                                    gaitParam.refZmpTraj, gaitParam.genCoords, gaitParam.footMidCoords, gaitParam.footstepNodesList[0].swingState);
