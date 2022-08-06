@@ -51,8 +51,12 @@ namespace mathutil {
   // Z成分は無視する. hullは半時計回りの凸包. (返り値のZ成分はhullの値が入る)
   Eigen::Vector3d calcNearestPointOfHull(const Eigen::Vector3d& p_, const std::vector<Eigen::Vector3d>& hull);
 
+  // Z成分は無視する. P, Qは半時計回りの凸包. (返り値のZ成分はhullの値が入る)  PQが重なっている場合はP, Q上のどこかになる
+  double calcNearestPointOfTwoHull(const std::vector<Eigen::Vector3d>& P, const std::vector<Eigen::Vector3d>& Q, Eigen::Vector3d& p, Eigen::Vector3d& q);
+
   // originから見て、pがverticesの内部に入るようにする. pの高さのXY平面で考える
   Eigen::Vector3d calcInsidePointOfPolygon3D(const Eigen::Vector3d& p, const std::vector<Eigen::Vector3d>& vertices, const Eigen::Vector3d& origin);
+
 };
 
 

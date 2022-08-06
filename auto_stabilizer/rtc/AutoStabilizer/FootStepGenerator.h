@@ -51,7 +51,7 @@ public:
 public:
   // startAutoBalancer直後の初回で呼ばれる
   bool initFootStepNodesList(const cnoid::BodyPtr& genRobot, const GaitParam& gaitParam,
-                             std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<bool>& o_prevSupportPhase) const;
+                             std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<cnoid::Position>& o_dstCoordsOrg, std::vector<bool>& o_prevSupportPhase) const;
 
   class StepNode {
   public:
@@ -103,7 +103,7 @@ public:
 
   // footstepNodesListをdtだけ進める
   bool advanceFootStepNodesList(const GaitParam& gaitParam, double dt,
-                                std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<bool>& o_prevSupportPhase) const;
+                                std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<cnoid::Position>& o_dstCoordsOrg, std::vector<bool>& o_prevSupportPhase) const;
 
 protected:
   // footstepNodesList[1:]の着地位置(XYZ,yaw)をcmdVelに基づき更新する

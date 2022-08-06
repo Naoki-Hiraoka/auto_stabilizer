@@ -371,7 +371,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
     impedanceController.initImpedanceOutput(gaitParam,
                                             gaitParam.icEEOffset);
     footStepGenerator.initFootStepNodesList(genRobot, gaitParam,
-                                            gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.prevSupportPhase);
+                                            gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.dstCoordsOrg, gaitParam.prevSupportPhase);
     legCoordsGenerator.initLegCoords(gaitParam,
                                      gaitParam.refZmpTraj, gaitParam.genCoords);
     stabilizer.initStabilizerOutput(gaitParam,
@@ -430,7 +430,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
 
   // advence dt
   footStepGenerator.advanceFootStepNodesList(gaitParam, dt, // input
-                                             gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.prevSupportPhase); //output
+                                             gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.dstCoordsOrg, gaitParam.prevSupportPhase); //output
 
   return true;
 }

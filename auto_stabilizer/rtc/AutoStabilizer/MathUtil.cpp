@@ -106,6 +106,7 @@ namespace mathutil {
 
   // Z成分は無視する. P, Qは半時計回りの凸包
   std::vector<Eigen::Vector3d> calcIntersectConvexHull(const std::vector<Eigen::Vector3d>& P, const std::vector<Eigen::Vector3d>& Q){
+    if(P.size() == 0 || Q.size() == 0) return std::vector<Eigen::Vector3d>();
     const int n = P.size(), m = Q.size();
     int a = 0, b = 0, aa = 0, ba = 0;
     enum { Pin, Qin, Unknown } in = Unknown;
@@ -191,6 +192,36 @@ namespace mathutil {
       }
       return Eigen::Vector3d(nearestPoint[0],nearestPoint[1],0.0);
     }
+  }
+
+  // Z成分は無視する. P, Qは半時計回りの凸包. (返り値のZ成分はhullの値が入る). PQが重なっている場合はP, Q上のどこかになる
+  double calcNearestPointOfTwoHull(const std::vector<Eigen::Vector3d>& P, const std::vector<Eigen::Vector3d>& Q, Eigen::Vector3d& p, Eigen::Vector3d& q){
+    if(P.size() == 0 && Q.size() == 0) return 0.0;
+    if(P.size() == 0) {q = Q[0]; return 0.0;}
+    if(Q.size() == 0) {p = P[0]; return 0.0;}
+
+    double minDistance = std::numeric_limits<double>::max();
+    for(int i=0;i<P.size();i++){
+      Eigen::Vector3d p_ = P[i];
+      Eigen::Vector3d q_ = calcNearestPointOfHull(p_, Q);
+      double distance = (p_ - q_).head<2>().norm();
+      if(distance < minDistance){
+        minDistance = distance;
+        p = p_;
+        q = q_;
+      }
+    }
+    for(int i=0;i<Q.size();i++){
+      Eigen::Vector3d q_ = Q[i];
+      Eigen::Vector3d p_ = calcNearestPointOfHull(q_, P);
+      double distance = (p_ - q_).head<2>().norm();
+      if(distance < minDistance){
+        minDistance = distance;
+        p = p_;
+        q = q_;
+      }
+    }
+    return minDistance;
   }
 
   Eigen::Vector3d calcInsidePointOfPolygon3D(const Eigen::Vector3d& p, const std::vector<Eigen::Vector3d>& vertices, const Eigen::Vector3d& origin){
