@@ -104,8 +104,8 @@ public:
 protected:
   // footstepNodesList[1:]の着地位置をcmdVelに基づき更新する
   void updateGoVelocitySteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cnoid::Vector3>& defaultTranslatePos) const;
-  // footstepNodesList[idx:] idxより先のstepの位置をgenerate frameでtransformだけ動かす
-  void transformFutureSteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, int index, const cnoid::Position& transform) const;
+  // footstepNodesList[idx:] idxより先のstepの位置をtransformOrigin frameでtransformだけ動かす
+  void transformFutureSteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, int index, const cnoid::Position& transformOrigin/*generate frame*/, const cnoid::Position& transform/*transformOrigin frame*/) const;
   // footstepNodesの次の一歩を作る. RLEGとLLEGどちらをswingすべきかも決める
   void calcDefaultNextStep(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cnoid::Vector3>& defaultTranslatePos, const cnoid::Vector3& offset = cnoid::Vector3::Zero()) const;
   // footstepNodesの次の一歩を作る.

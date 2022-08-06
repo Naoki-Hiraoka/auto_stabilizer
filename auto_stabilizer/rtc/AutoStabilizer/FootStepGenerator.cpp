@@ -167,18 +167,20 @@ void FootStepGenerator::updateGoVelocitySteps(std::vector<GaitParam::FootStepNod
       cnoid::Position prevOrigin = mathutil::orientCoordToAxis(footstepNodesList[i-1].dstCoords[supportLeg], cnoid::Vector3::UnitZ());
       cnoid::Position dstCoords = prevOrigin * transform;
 
-      cnoid::Position displacement = dstCoords * footstepNodesList[i].dstCoords[swingLeg].inverse();
-      this->transformFutureSteps(footstepNodesList, i, displacement);
+      cnoid::Position origin = footstepNodesList[i].dstCoords[swingLeg];
+      cnoid::Position displacement = footstepNodesList[i].dstCoords[swingLeg].inverse() * dstCoords;
+      this->transformFutureSteps(footstepNodesList, i, origin, displacement);
     }
   }
 }
 
-void FootStepGenerator::transformFutureSteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, int index, const cnoid::Position& transform) const{
+void FootStepGenerator::transformFutureSteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, int index, const cnoid::Position& transformOrigin/*generate frame*/, const cnoid::Position& transform/*transform Origin frame*/) const{
+  cnoid::Position trans = transformOrigin * transform * transformOrigin.inverse();
   for(int l=0;l<NUM_LEGS;l++){
     bool swinged = false;
     for(int i=index;i<footstepNodesList.size();i++){
       if(!footstepNodesList[i].isSupportPhase[l]) swinged = true;
-      if(swinged) footstepNodesList[i].dstCoords[l] = transform * footstepNodesList[i].dstCoords[l];
+      if(swinged) footstepNodesList[i].dstCoords[l] = trans * footstepNodesList[i].dstCoords[l];
     }
   }
 }
