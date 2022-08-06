@@ -111,7 +111,7 @@ bool FootStepGenerator::calcFootSteps(const GaitParam& gaitParam, const double& 
 
   // goVelocityModeなら、進行方向に向けてfootStepNodesList[1] ~ footStepNodesList[goVelocityStepNum]の要素を機械的に計算してどんどん末尾appendしていく. cmdVelに応じてきまる
   if(this->isGoVelocityMode){
-    if(footstepNodesList[0].remainTime <= dt){ // footstepの切り替わりのタイミング
+    if(footstepNodesList[0].remainTime <= dt){ // footstepの切り替わりのタイミング. this->updateGoVelocityStepsを毎周期呼ぶと、数値誤差でだんだん変にずれてくるので
       this->updateGoVelocitySteps(footstepNodesList, gaitParam.defaultTranslatePos);
     }
     while(footstepNodesList.size() < this->goVelocityStepNum){
@@ -119,12 +119,12 @@ bool FootStepGenerator::calcFootSteps(const GaitParam& gaitParam, const double& 
     }
   }
 
-  if(this->modifyFootSteps && this->isEmergencyStepMode){
+  if(this->isModifyFootSteps && this->isEmergencyStepMode){
     // TODO
   }
 
-  if(this->modifyFootSteps){
-    // TODO
+  if(this->isModifyFootSteps){
+    this->modifyFootSteps(footstepNodesList, gaitParam);
   }
 
   o_footstepNodesList = footstepNodesList;
@@ -167,8 +167,8 @@ void FootStepGenerator::updateGoVelocitySteps(std::vector<GaitParam::FootStepNod
       cnoid::Position prevOrigin = mathutil::orientCoordToAxis(footstepNodesList[i-1].dstCoords[supportLeg], cnoid::Vector3::UnitZ());
       cnoid::Position dstCoords = prevOrigin * transform;
 
-      cnoid::Position origin = footstepNodesList[i].dstCoords[swingLeg];
-      cnoid::Position displacement = footstepNodesList[i].dstCoords[swingLeg].inverse() * dstCoords;
+      cnoid::Position origin = mathutil::orientCoordToAxis(footstepNodesList[i].dstCoords[swingLeg], cnoid::Vector3::UnitZ());
+      cnoid::Position displacement = origin.inverse() * dstCoords;
       this->transformFutureSteps(footstepNodesList, i, origin, displacement);
     }
   }
@@ -200,17 +200,17 @@ void FootStepGenerator::calcDefaultNextStep(std::vector<GaitParam::FootStepNodes
         footstepNodesList.push_back(calcDefaultSwingStep(RLEG, footstepNodesList.back(), defaultTranslatePos, offset)); // RLEGをswingする
         footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back()));
       }
-    }else if(footstepNodesList[footstepNodesList.size()-2].isSupportPhase[RLEG]){
+    }else if(footstepNodesList[footstepNodesList.size()-2].isSupportPhase[RLEG]){ // 前回LLEGをswingした
         footstepNodesList.push_back(calcDefaultSwingStep(RLEG, footstepNodesList.back(), defaultTranslatePos, offset)); // RLEGをswingする
         footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back()));
-    }else{
+    }else{ // 前回RLEGをswingした
         footstepNodesList.push_back(calcDefaultSwingStep(LLEG, footstepNodesList.back(), defaultTranslatePos, offset)); // LLEGをswingする
         footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back()));
     }
-  }else if(footstepNodesList.back().isSupportPhase[RLEG] && !footstepNodesList.back().isSupportPhase[LLEG]){
+  }else if(footstepNodesList.back().isSupportPhase[RLEG] && !footstepNodesList.back().isSupportPhase[LLEG]){ // LLEGが浮いている
     footstepNodesList.push_back(calcDefaultSwingStep(LLEG, footstepNodesList.back(), defaultTranslatePos, offset, true)); // LLEGをswingする. startWithSingleSupport
     footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back()));
-  }else if(!footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG]){
+  }else if(!footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG]){ // RLEGが浮いている
     footstepNodesList.push_back(calcDefaultSwingStep(RLEG, footstepNodesList.back(), defaultTranslatePos, offset, true)); // RLEGをswingする. startWithSingleSupport
     footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back()));
   }// footstepNodesListの末尾の要素が両方falseであることは無い
@@ -245,4 +245,88 @@ GaitParam::FootStepNodes FootStepGenerator::calcDefaultDoubleSupportStep(const G
   }
   fs.remainTime = this->defaultDoubleSupportTime;
   return fs;
+}
+
+void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const GaitParam& gaitParam) const{
+  // 現在片足支持期で、次が両足支持期であるときのみ、行う
+  if(!(footstepNodesList.size() > 1 &&
+       (footstepNodesList[1].isSupportPhase[RLEG] && footstepNodesList[1].isSupportPhase[LLEG]) &&
+       (footstepNodesList[0].isSupportPhase[RLEG] && !footstepNodesList[0].isSupportPhase[LLEG]) || (!footstepNodesList[0].isSupportPhase[RLEG] && footstepNodesList[0].isSupportPhase[LLEG])))
+     return;
+
+  // 次indexまでの残り時間がこの値未満の場合は着地位置時間修正を行わない.
+  if(footstepNodesList[0].remainTime < this->overwritableMinTime) return;
+
+  // one step capturabilityに基づき、footstepNodesList[0]のremainTimeとdstCoordsを修正する.
+  int swingLeg = footstepNodesList[0].isSupportPhase[RLEG] ? LLEG : RLEG;
+  int supportLeg = (swingLeg == RLEG) ? LLEG : RLEG;
+  cnoid::Position swingPose = gaitParam.genCoords[swingLeg].value();
+  cnoid::Position supportPose = gaitParam.genCoords[supportLeg].value();
+  cnoid::Position supportPoseHorizontal = mathutil::orientCoordToAxis(supportPose, cnoid::Vector3::UnitZ());
+
+  // dx = w ( x - z - l)
+  double w = std::sqrt(gaitParam.g/gaitParam.refdz); // TODO refforceZ
+  cnoid::Vector3 l = cnoid::Vector3::Zero();
+  l[2] = gaitParam.refdz;
+  cnoid::Vector3 actDCM = gaitParam.actCog + gaitParam.actCogVel.value() / w;
+
+  /*
+    capturable: ある時刻t(overwritableMinTime<=t<=overwritableMaxTime)が存在し、時刻tに着地すれば転倒しないような着地位置.
+    reachable: ある時刻t(overwritableMinTime<=t<=overwritableMaxTime)が存在し、今の脚の位置からの距離が時刻tに着地することができる範囲である着地位置.
+    strideLimitation: overwritableStrideLimitationHullの範囲内の着地位置(自己干渉・IKの考慮が含まれる).
+    steppable: 着地可能な地形であるような着地位置
+
+    * capturableとreachableの積集合を考えるときは、各時刻のtごとで考える
+
+    優先度(小さいほうが高い)
+    1. strideLimitation: 絶対満たす
+    1. reachable: 絶対満たす
+    2. steppable: 達成不可の場合は、考慮しない
+    3. capturable: 達成不可の場合は、(次の一歩に期待)
+    4. もとの着地位置: 達成不可の場合は、可能な限り近く. 複数ある場合は進行方向優先
+    5. もとの着地時刻: 達成不可の場合は、可能な限り近く
+   */
+
+  std::vector<cnoid::Vector3> capturableReachableHull; // generate frame. ある時刻tが存在し、今の脚の位置からの距離が時刻tに着地することができる範囲内で、かつ、時刻tに着地すれば転倒しないような着地位置の凸包. Zは成分はてきとうで良い
+  {
+    std::vector<std::vector<cnoid::Vector3> > capturableReachableHulls; // generate frame. ある時刻tが存在し、今の脚の位置からの距離が時刻tに着地することができる範囲内で、かつ、時刻tに着地すれば転倒しないような着地位置の凸包の集合. Z成分はてきとうで良い
+    std::vector<double> samplingTimes;
+    samplingTimes.push_back(footstepNodesList[0].remainTime);
+    for(int i=0;i<=10;i++) samplingTimes.push_back(this->overwritableMinTime + (this->overwritableMaxTime - this->overwritableMinTime) * 0.1 * i);
+    for(int i=0;i<samplingTimes.size();i++){
+      double t = samplingTimes[i];
+      std::vector<cnoid::Vector3> reachableHull; // generate frame. 今の脚の位置からの距離が時刻tに着地することができる範囲. Z成分には0を入れる
+      for(int j=0; j < 16; j++){
+        reachableHull.emplace_back(swingPose.translation()[0] + this->overwritableMaxSwingVelocity * t * std::cos(M_PI / 8 * j),
+                                   swingPose.translation()[1] + this->overwritableMaxSwingVelocity * t * std::sin(M_PI / 8 * j),
+                                   0.0);
+      }
+      std::vector<cnoid::Vector3> capturableVetices; // generate frame. 時刻tに着地すれば転倒しないような着地位置. Z成分には0を入れる
+      for(int j=0;j<this->safeLegHull[supportLeg].size();j++){
+        cnoid::Vector3 zmp = supportPose * this->safeLegHull[supportLeg][j];// generate frame
+        cnoid::Vector3 endDCM = (actDCM - zmp - l) * std::exp(w * t) + zmp + l; // generate frame. 着地時のDCM
+        for(int k=0;k<this->safeLegHull[swingLeg].size();k++){
+          cnoid::Vector3 p = endDCM - swingPose.linear() * this->safeLegHull[swingLeg][k];
+          capturableVetices.emplace_back(p[0], p[1], 0.0);
+        }
+      }
+      std::vector<cnoid::Vector3> capturableHull = mathutil::calcConvexHull(capturableVetices); // generate frame. 時刻tに着地すれば転倒しないような着地位置. Z成分には0を入れる
+      capturableReachableHulls.push_back(mathutil::calcIntersectConvexHull(reachableHull, capturableHull));
+    }
+    std::vector<cnoid::Vector3> capturableReachableVertices;
+    for(int i=0;i<capturableReachableHulls.size();i++){
+      std::copy(capturableReachableHulls[i].begin(), capturableReachableHulls[i].end(), std::back_inserter(capturableReachableVertices));
+    }
+    capturableReachableHull = mathutil::calcConvexHull(capturableReachableVertices);
+  }
+
+  std::vector<cnoid::Vector3> strideLimitationHull; // generate frame. overwritableStrideLimitationHullの範囲内の着地位置(自己干渉・IKの考慮が含まれる). Z成分には0を入れる
+  for(int i=0;i<this->overwritableStrideLimitationHull[swingLeg].size();i++){
+    cnoid::Vector3 p = supportPoseHorizontal * this->overwritableStrideLimitationHull[swingLeg][i];
+    strideLimitationHull.emplace_back(p[0],p[1],0.0);
+  }
+
+  std::vector<cnoid::Vector3> capturableStepHullStrideLimited = mathutil::calcIntersectConvexHull(capturableReachableHull,strideLimitationHull); // generate frame.
+
+  // TODO vision
 }

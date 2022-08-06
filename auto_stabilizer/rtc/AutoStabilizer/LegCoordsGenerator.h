@@ -20,7 +20,7 @@ public:
                      std::vector<footguidedcontroller::LinearTrajectory<cnoid::Vector3> >& o_refZmpTraj, std::vector<cpp_filters::TwoPointInterpolatorSE3>& o_genCoords, cpp_filters::TwoPointInterpolatorSE3& o_footMidCoords) const;
   // swingLegGainControl TODO
 
-  void calcCOMCoords(const GaitParam& gaitParam, double dt, double g, double mass,
+  void calcCOMCoords(const GaitParam& gaitParam, double dt, double mass,
                      cnoid::Vector3& o_genNextCog, cnoid::Vector3& o_genNextCogVel) const;
 
 };

@@ -38,13 +38,17 @@ namespace mathutil {
 
   Eigen::Matrix3d cross(const Eigen::Vector3d& m);
 
-  // Z成分は無視する.
+  // Z成分は無視する
+  bool isIntersect (Eigen::Vector3d& r, const Eigen::Vector3d& a0, const Eigen::Vector3d& a1, const Eigen::Vector3d& b0, const Eigen::Vector3d& b1);
+  // Z成分は無視する.(0が入る)
   std::vector<Eigen::Vector3d> calcConvexHull(const std::vector<Eigen::Vector3d>& vertices);
+  // Z成分は無視する. P, Qは半時計回りの凸包. (P,QのZ成分が0なら、RのZ成分にも0が入る)
+  std::vector<Eigen::Vector3d> calcIntersectConvexHull(const std::vector<Eigen::Vector3d>& P, const std::vector<Eigen::Vector3d>& Q);
 
-  // Z成分は無視する. hullは半時計回りの凸包
+  // Z成分は無視する. hullは半時計回りの凸包.
   bool isInsideHull(const Eigen::Vector3d& p, const std::vector<Eigen::Vector3d>& hull);
 
-  // Z成分は無視する. hullは半時計回りの凸包
+  // Z成分は無視する. hullは半時計回りの凸包. (返り値のZ成分はhullの値が入る)
   Eigen::Vector3d calcNearestPointOfHull(const Eigen::Vector3d& p_, const std::vector<Eigen::Vector3d>& hull);
 
   // originから見て、pがverticesの内部に入るようにする. pの高さのXY平面で考える

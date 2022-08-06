@@ -209,8 +209,8 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt,
   o_footMidCoords = footMidCoords;
 }
 
-void LegCoordsGenerator::calcCOMCoords(const GaitParam& gaitParam, double dt, double g, double mass, cnoid::Vector3& o_genNextCog, cnoid::Vector3& o_genNextCogVel) const{
-  double w = std::sqrt(g/gaitParam.refdz); // TODO refforceZ
+void LegCoordsGenerator::calcCOMCoords(const GaitParam& gaitParam, double dt, double mass, cnoid::Vector3& o_genNextCog, cnoid::Vector3& o_genNextCogVel) const{
+  double w = std::sqrt(gaitParam.g/gaitParam.refdz); // TODO refforceZ
   cnoid::Vector3 l = cnoid::Vector3::Zero();
   l[2] = gaitParam.refdz;
   cnoid::Vector3 genZmp;

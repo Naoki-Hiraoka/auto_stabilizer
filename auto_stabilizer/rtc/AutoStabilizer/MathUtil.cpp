@@ -78,6 +78,16 @@ namespace mathutil {
     return ret;
   }
 
+  // Z成分は無視する
+  bool isIntersect (Eigen::Vector3d& r, const Eigen::Vector3d& a0, const Eigen::Vector3d& a1, const Eigen::Vector3d& b0, const Eigen::Vector3d& b1){
+    double D =  (a1 - a0).cross(b1 - b0)[2];
+    if (D == 0.0) return false;
+    double t =  (b0 - a0).cross(b1 - b0)[2] / D;
+    double s = -(a0 - b0).cross(a1 - a0)[2] / D;
+    r = a0 + t * (a1 - a0);
+    return (t >= 0.0 && t <= 1.0 && s >= 0.0 && s <= 1.0);
+  }
+
   std::vector<Eigen::Vector3d> calcConvexHull(const std::vector<Eigen::Vector3d>& vertices){
     // Z成分は無視する.
     std::vector<Eigen::Vector3d> tmpVertices(vertices.size());
@@ -92,6 +102,41 @@ namespace mathutil {
       while (n_ch >= j && (convexHull[n_ch-1] - convexHull[n_ch-2]).cross(tmpVertices[i] - convexHull[n_ch-2])[2] <= 0) n_ch--;
     convexHull.resize(n_ch-1);
     return convexHull;
+  }
+
+  // Z成分は無視する. P, Qは半時計回りの凸包
+  std::vector<Eigen::Vector3d> calcIntersectConvexHull(const std::vector<Eigen::Vector3d>& P, const std::vector<Eigen::Vector3d>& Q){
+    const int n = P.size(), m = Q.size();
+    int a = 0, b = 0, aa = 0, ba = 0;
+    enum { Pin, Qin, Unknown } in = Unknown;
+    std::vector<Eigen::Vector3d> R;
+    do {
+      int a1 = (a+n-1) % n, b1 = (b+m-1) % m;
+      double C = (P[a] - P[a1]).cross(Q[b] - Q[b1])[2];
+      double A = (P[a1] - Q[b]).cross(P[a] - Q[b])[2];
+      double B = (Q[b1] - P[a]).cross(Q[b] - P[a])[2];
+      Eigen::Vector3d r;
+      if (isIntersect(r, P[a1], P[a], Q[b1], Q[b])) {
+        if (in == Unknown) aa = ba = 0;
+        R.push_back(r);
+        in = B > 0 ? Pin : A > 0 ? Qin : in;
+      }
+      if (C == 0 && B == 0 && A == 0) {
+        if (in == Pin) { b = (b + 1) % m; ++ba; }
+        else           { a = (a + 1) % m; ++aa; }
+      } else if (C >= 0) {
+        if (A > 0) { if (in == Pin) R.push_back(P[a]); a = (a+1)%n; ++aa; }
+        else       { if (in == Qin) R.push_back(Q[b]); b = (b+1)%m; ++ba; }
+      } else {
+        if (B > 0) { if (in == Qin) R.push_back(Q[b]); b = (b+1)%m; ++ba; }
+        else       { if (in == Pin) R.push_back(P[a]); a = (a+1)%n; ++aa; }
+      }
+    } while ( (aa < n || ba < m) && aa < 2*n && ba < 2*m );
+    if (in == Unknown) {
+      if (isInsideHull(P[0], Q)) return P;
+      if (isInsideHull(Q[0], P)) return Q;
+    }
+    return R;
   }
 
   bool isInsideHull(const Eigen::Vector3d& p, const std::vector<Eigen::Vector3d>& hull){

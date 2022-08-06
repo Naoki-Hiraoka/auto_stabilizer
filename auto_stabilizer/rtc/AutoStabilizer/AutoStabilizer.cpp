@@ -401,7 +401,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
                                   gaitParam.footstepNodesList);
   legCoordsGenerator.calcLegCoords(gaitParam, dt,
                                    gaitParam.refZmpTraj, gaitParam.genCoords, gaitParam.footMidCoords);
-  legCoordsGenerator.calcCOMCoords(gaitParam, dt, 9.80665, genRobot->mass(),
+  legCoordsGenerator.calcCOMCoords(gaitParam, dt, genRobot->mass(),
                                    gaitParam.genCog, gaitParam.genCogVel);
   for(int i=0;i<gaitParam.eeName.size();i++){
     if(i<NUM_LEGS) gaitParam.abcEETargetPose[i] = gaitParam.genCoords[i].value();
@@ -410,7 +410,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
 
   // Stabilizer
   if(mode.isSTRunning()){
-    stabilizer.execStabilizer(refRobot, actRobot, genRobot, gaitParam, dt, 9.80665, genRobot->mass(),
+    stabilizer.execStabilizer(refRobot, actRobot, genRobot, gaitParam, dt, genRobot->mass(),
                               actRobotTqc, gaitParam.stOffsetRootRpy, gaitParam.stEEOffset);
   }else if(mode.isSyncToStopST()){ // stopST直後の初回
     gaitParam.stOffsetRootRpy.setGoal(cnoid::Vector3::Zero(),mode.remainTime());

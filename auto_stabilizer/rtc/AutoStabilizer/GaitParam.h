@@ -17,6 +17,7 @@ public:
   std::vector<std::string> eeParentLink; // constant. 要素数と順序はeeNameと同じ. 必ずrobot->link(parentLink)がnullptrではないことを約束する. そのため、毎回robot->link(parentLink)がnullptrかをチェックしなくても良い
   std::vector<cnoid::Position> eeLocalT; // constant. 要素数と順序はeeNameと同じ. Parent Link Frame
 
+  double g = 9.80665; // 重力加速度
 public:
   // AutoStabilizerの中で計算更新される.
 
