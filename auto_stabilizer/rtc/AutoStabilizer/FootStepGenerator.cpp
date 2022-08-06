@@ -1,6 +1,29 @@
 #include "FootStepGenerator.h"
 #include "MathUtil.h"
 
+bool FootStepGenerator::initFootStepNodesList(const cnoid::BodyPtr& genRobot, const GaitParam& gaitParam,
+                                              std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<bool>& o_prevSupportPhase) const{
+  // footStepNodesListを初期化する
+  std::vector<GaitParam::FootStepNodes> footstepNodesList(1);
+  std::vector<cnoid::Position> srcCoords(NUM_LEGS);
+  cnoid::Position rlegCoords = genRobot->link(gaitParam.eeParentLink[RLEG])->T()*gaitParam.eeLocalT[RLEG];
+  cnoid::Position llegCoords = genRobot->link(gaitParam.eeParentLink[LLEG])->T()*gaitParam.eeLocalT[LLEG];
+  footstepNodesList[0].dstCoords = {rlegCoords, llegCoords};
+  footstepNodesList[0].isSupportPhase = {true, true};
+  footstepNodesList[0].remainTime = 0.0;
+
+  std::vector<bool> prevSupportPhase(NUM_LEGS);
+  for(int i=0;i<NUM_LEGS;i++){
+    prevSupportPhase[i] = footstepNodesList[0].isSupportPhase[i];
+  }
+
+  o_prevSupportPhase = prevSupportPhase;
+  o_footstepNodesList = footstepNodesList;
+  o_srcCoords = srcCoords;
+
+  return true;
+}
+
 bool FootStepGenerator::setFootSteps(const GaitParam& gaitParam, const std::vector<StepNode>& footsteps,
                                      std::vector<GaitParam::FootStepNodes>& o_footstepNodesList) const{
   if(footsteps.size() <= 1) { // 何もしない
@@ -105,6 +128,28 @@ bool FootStepGenerator::calcFootSteps(const GaitParam& gaitParam, const double& 
   }
 
   o_footstepNodesList = footstepNodesList;
+  return true;
+}
+
+bool FootStepGenerator::advanceFootStepNodesList(const GaitParam& gaitParam, double dt,
+                                                 std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<bool>& o_prevSupportPhase) const{
+  // prevSupportPhaseを記録
+  std::vector<bool> prevSupportPhase(2);
+  for(int i=0;i<NUM_LEGS;i++) prevSupportPhase[i] = gaitParam.footstepNodesList[0].isSupportPhase[i];
+
+  // footstepNodesListを進める
+  std::vector<GaitParam::FootStepNodes> footstepNodesList = gaitParam.footstepNodesList;
+  std::vector<cnoid::Position> srcCoords = gaitParam.srcCoords;
+  footstepNodesList[0].remainTime = std::max(0.0, footstepNodesList[0].remainTime - dt);
+  if(footstepNodesList[0].remainTime <= 0.0 && footstepNodesList.size() > 1){
+    for(int i=0;i<NUM_LEGS;i++) srcCoords[i] = gaitParam.genCoords[i].value();
+    footstepNodesList.erase(footstepNodesList.begin()); // vectorではなくlistにするべき?
+  }
+
+  o_prevSupportPhase = prevSupportPhase;
+  o_footstepNodesList = footstepNodesList;
+  o_srcCoords = srcCoords;
+
   return true;
 }
 

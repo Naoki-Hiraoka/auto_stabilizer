@@ -45,6 +45,10 @@ public:
       modifyFootStepsなら、footstepNodesList[0]の現在のdstCoordsのままだとバランスが取れないか、今swing期でfootstepNodesList[0]終了時に着地する予定の要素のdstCoordsが着地可能領域上にないなら、footstepNodesList[0]の、今swing期でfootstepNodesList[0]終了時に着地する予定の要素を修正する. また、それ以降一回でもswingする要素の位置を平行移動する
   */
 public:
+  // startAutoBalancer直後の初回で呼ばれる
+  bool initFootStepNodesList(const cnoid::BodyPtr& genRobot, const GaitParam& gaitParam,
+                             std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<bool>& o_prevSupportPhase) const;
+
   class StepNode {
   public:
     int l_r; // 0: RLEG. 1: LLEG
@@ -93,6 +97,9 @@ public:
   bool calcFootSteps(const GaitParam& gaitParam, const double& dt,
                      std::vector<GaitParam::FootStepNodes>& o_footstepNodesList) const;
 
+  // footstepNodesListをdtだけ進める
+  bool advanceFootStepNodesList(const GaitParam& gaitParam, double dt,
+                                std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<bool>& o_prevSupportPhase) const;
 
 protected:
   // footstepNodesList[1:]の着地位置をcmdVelに基づき更新する

@@ -3,8 +3,25 @@
 
 #define DEBUG true
 
+void LegCoordsGenerator::initLegCoords(const GaitParam& gaitParam,
+                                       std::vector<footguidedcontroller::LinearTrajectory<cnoid::Vector3> >& o_refZmpTraj, std::vector<cpp_filters::TwoPointInterpolatorSE3>& o_genCoords) const{
+  std::vector<footguidedcontroller::LinearTrajectory<cnoid::Vector3> > refZmpTraj;
+  std::vector<cpp_filters::TwoPointInterpolatorSE3> genCoords;
+
+  cnoid::Position rlegCoords = gaitParam.footstepNodesList[0].dstCoords[RLEG];
+  cnoid::Position llegCoords = gaitParam.footstepNodesList[0].dstCoords[LLEG];
+
+  genCoords.emplace_back(rlegCoords, cnoid::Vector6::Zero(), cnoid::Vector6::Zero(), cpp_filters::HOFFARBIB);
+  genCoords.emplace_back(llegCoords, cnoid::Vector6::Zero(), cnoid::Vector6::Zero(), cpp_filters::HOFFARBIB);
+  cnoid::Vector3 zmp = 0.5 * (rlegCoords.translation() + rlegCoords.linear()*gaitParam.copOffset[RLEG]) + 0.5 * (llegCoords.translation() + llegCoords.linear()*gaitParam.copOffset[LLEG]);
+  refZmpTraj.push_back(footguidedcontroller::LinearTrajectory<cnoid::Vector3>(zmp,zmp,0.0));
+
+  o_refZmpTraj = refZmpTraj;
+  o_genCoords = genCoords;
+}
+
 void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt,
-                                       std::vector<footguidedcontroller::LinearTrajectory<cnoid::Vector3> >& o_refZmpTraj, std::vector<cpp_filters::TwoPointInterpolatorSE3>& o_genCoords, std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, cpp_filters::TwoPointInterpolatorSE3& o_footMidCoords, std::vector<bool>& o_prevSupportPhase) const{
+                                       std::vector<footguidedcontroller::LinearTrajectory<cnoid::Vector3> >& o_refZmpTraj, std::vector<cpp_filters::TwoPointInterpolatorSE3>& o_genCoords, cpp_filters::TwoPointInterpolatorSE3& o_footMidCoords) const{
   // swing期は、remainTime - supportTime - delayTimeOffset後にdstCoordsに到達するようなantececdent軌道を生成し(genCoords.getGoal()の値)、その軌道にdelayTimeOffset遅れで滑らかに追従するような軌道(genCoords.value()の値)を生成する.
   //   rectangle以外の軌道タイプや跳躍についてはひとまず考えない TODO
   //   srcCoordsとdstCoordsを結ぶ軌道を生成する. srcCoordsの高さ+[0]とdstCoordsの高さ+[1]の高い方(heightとおく)に上げるようなrectangle軌道を生成する
@@ -13,10 +30,6 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt,
   //                     今の位置がheight - eps(ひとまず0)以上であれば、dstCoordsの上空(XYと回転はdstCoordsと同じ)まで直線で移動する軌道を,残りの自由に使える時間で実行する
   //                     両者はチャタリングしそうだが、delayTimeOffset遅れで滑らかに追従するので大丈夫
   // support期は、現FootStepNodesの終了時にdstCoordsに到達するような軌道を線形補間によって生成する.
-
-  // prevSupportPhaseを記録
-  std::vector<bool> prevSupportPhase(2);
-  for(int i=0;i<NUM_LEGS;i++) prevSupportPhase[i] = gaitParam.footstepNodesList[0].isSupportPhase[i];
 
   // refZmpTrajを更新し進める
   std::vector<footguidedcontroller::LinearTrajectory<cnoid::Vector3> > refZmpTraj = gaitParam.refZmpTraj;
@@ -191,21 +204,9 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt,
     footMidCoords.interpolate(dt);
   }
 
-  // footstepNodesListを進める
-  std::vector<GaitParam::FootStepNodes> footstepNodesList = gaitParam.footstepNodesList;
-  std::vector<cnoid::Position> srcCoords = gaitParam.srcCoords;
-  footstepNodesList[0].remainTime = std::max(0.0, footstepNodesList[0].remainTime - dt);
-  if(footstepNodesList[0].remainTime <= 0.0 && footstepNodesList.size() > 1){
-    for(int i=0;i<NUM_LEGS;i++) srcCoords[i] = gaitParam.genCoords[i].value();
-    footstepNodesList.erase(footstepNodesList.begin()); // vectorではなくlistにするべき?
-  }
-
   o_refZmpTraj = refZmpTraj;
   o_genCoords = genCoords;
-  o_footstepNodesList = footstepNodesList;
-  o_srcCoords = srcCoords;
   o_footMidCoords = footMidCoords;
-  o_prevSupportPhase = prevSupportPhase;
 }
 
 void LegCoordsGenerator::calcCOMCoords(const GaitParam& gaitParam, double dt, double g, double mass, cnoid::Vector3& o_genNextCog, cnoid::Vector3& o_genNextCogVel) const{

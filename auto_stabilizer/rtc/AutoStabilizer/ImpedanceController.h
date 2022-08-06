@@ -35,8 +35,11 @@ public:
     for(int i=0;i<this->isImpedanceMode.size();i++) this->isImpedanceMode[i] = false;
   }
 
+  void initImpedanceOutput(const GaitParam& gaitParam,
+                           std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_icEEOffset /*generate frame, endeffector origin*/) const;
+
   bool calcImpedanceControl(double dt, const GaitParam& gaitParam,
-                            std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& icEEOffset /*generate frame, endeffector origin*/) const;
+                            std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_icEEOffset /*generate frame, endeffector origin*/) const;
 };
 
 #endif

@@ -365,45 +365,22 @@ bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr
 
 // static function
 bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobotRaw, cnoid::BodyPtr& refRobot, const cnoid::BodyPtr& actRobotRaw, cnoid::BodyPtr& actRobot, cnoid::BodyPtr& genRobot, cnoid::BodyPtr& actRobotTqc, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ActToGenFrameConverter& actToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer) {
-  if(mode.isSyncToABCInit()){ // startAutoBalancer直後の初回
-
-    // FootOrigin座標系を用いてrefRobotRawをgenerate frameに投影しgenRobotとする
+  if(mode.isSyncToABCInit()){ // startAutoBalancer直後の初回. gaitParamのリセット
     refToGenFrameConverter.initGenRobot(refRobotRaw, gaitParam,
                                         genRobot, gaitParam.footMidCoords, gaitParam.genCog, gaitParam.genCogVel);
+    impedanceController.initImpedanceOutput(gaitParam,
+                                            gaitParam.icEEOffset);
+    footStepGenerator.initFootStepNodesList(genRobot, gaitParam,
+                                            gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.prevSupportPhase);
+    legCoordsGenerator.initLegCoords(gaitParam,
+                                     gaitParam.refZmpTraj, gaitParam.genCoords);
+    stabilizer.initStabilizerOutput(gaitParam,
+                                    gaitParam.stOffsetRootRpy, gaitParam.stEEOffset);
   }
 
   // FootOrigin座標系を用いてrefRobotRawをgenerate frameに投影しrefRobotとする
   refToGenFrameConverter.convertFrame(refRobotRaw, gaitParam,
                                       refRobot, gaitParam.refEEPose, gaitParam.refEEWrench, gaitParam.refdz);
-
-
-  if(mode.isSyncToABCInit()){ // startAutoBalancer直後の初回
-    {
-      // footStepNodesListを初期化する
-      cnoid::Position rlegCoords = genRobot->link(gaitParam.eeParentLink[RLEG])->T()*gaitParam.eeLocalT[RLEG];
-      cnoid::Position llegCoords = genRobot->link(gaitParam.eeParentLink[LLEG])->T()*gaitParam.eeLocalT[LLEG];
-      gaitParam.footstepNodesList.resize(1);
-      gaitParam.footstepNodesList[0].dstCoords = {rlegCoords, llegCoords};
-      gaitParam.footstepNodesList[0].isSupportPhase = {true, true};
-      gaitParam.footstepNodesList[0].remainTime = 0.0;
-      gaitParam.genCoords.clear();
-      gaitParam.genCoords.emplace_back(rlegCoords, cnoid::Vector6::Zero(), cnoid::Vector6::Zero(), cpp_filters::HOFFARBIB);
-      gaitParam.genCoords.emplace_back(llegCoords, cnoid::Vector6::Zero(), cnoid::Vector6::Zero(), cpp_filters::HOFFARBIB);
-      cnoid::Vector3 zmp = 0.5 * (rlegCoords.translation() + rlegCoords.linear()*gaitParam.copOffset[RLEG]) + 0.5 * (llegCoords.translation() + llegCoords.linear()*gaitParam.copOffset[LLEG]);
-      gaitParam.refZmpTraj.clear();
-      gaitParam.refZmpTraj.push_back(footguidedcontroller::LinearTrajectory<cnoid::Vector3>(zmp,zmp,0.0));
-    }
-
-    for(int i=0;i<NUM_LEGS;i++){
-      gaitParam.prevSupportPhase[i] = gaitParam.footstepNodesList[0].isSupportPhase[i];
-    }
-
-    for(int i=0;i<gaitParam.eeName.size();i++){
-      gaitParam.icEEOffset[i].reset(cnoid::Vector6::Zero());
-      gaitParam.stEEOffset[i].reset(cnoid::Vector6::Zero());
-    }
-    gaitParam.stOffsetRootRpy.reset(cnoid::Vector3::Zero());
-  }
 
   // FootOrigin座標系を用いてactRobotRawをgenerate frameに投影しactRobotとする
   actToGenFrameConverter.convertFrame(actRobotRaw, gaitParam, dt,
@@ -423,7 +400,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
   footStepGenerator.calcFootSteps(gaitParam, dt,
                                   gaitParam.footstepNodesList);
   legCoordsGenerator.calcLegCoords(gaitParam, dt,
-                                   gaitParam.refZmpTraj, gaitParam.genCoords, gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.footMidCoords, gaitParam.prevSupportPhase);
+                                   gaitParam.refZmpTraj, gaitParam.genCoords, gaitParam.footMidCoords);
   legCoordsGenerator.calcCOMCoords(gaitParam, dt, 9.80665, genRobot->mass(),
                                    gaitParam.genCog, gaitParam.genCogVel);
   for(int i=0;i<gaitParam.eeName.size();i++){
@@ -451,6 +428,9 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
     gaitParam.stEETargetPose[i].linear() = cnoid::AngleAxisd(stOffset.tail<3>().norm(),(stOffset.tail<3>().norm()>0)?stOffset.tail<3>().normalized() : cnoid::Vector3::UnitX()) * gaitParam.abcEETargetPose[i].linear();
   }
 
+  // advence dt
+  footStepGenerator.advanceFootStepNodesList(gaitParam, dt, // input
+                                             gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.prevSupportPhase); //output
 
   return true;
 }
@@ -669,7 +649,7 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
   if(!this->mode_.isABCRunning()) {
     cnoidbodyutil::copyRobotState(this->refRobotRaw_, this->genRobot_);
   }else{
-    if(this->mode_.isSyncToABCInit()){ // startAutoBalancer直後の初回
+    if(this->mode_.isSyncToABCInit()){ // startAutoBalancer直後の初回. 内部パラメータのリセット
       this->refToGenFrameConverter_.reset();
       this->actToGenFrameConverter_.reset();
       this->footStepGenerator_.reset();

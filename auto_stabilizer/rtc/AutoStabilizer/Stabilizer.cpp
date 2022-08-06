@@ -3,6 +3,15 @@
 #include <cnoid/JointPath>
 #include <cnoid/Jacobian>
 
+void Stabilizer::initStabilizerOutput(const GaitParam& gaitParam,
+                                      cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffset /*generate frame, endeffector origin*/) const{
+
+  for(int i=0;i<gaitParam.eeName.size();i++){
+    o_stEEOffset[i].reset(cnoid::Vector6::Zero());
+  }
+  o_stOffsetRootRpy.reset(cnoid::Vector3::Zero());
+}
+
 bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobot, const cnoid::BodyPtr actRobot, const cnoid::BodyPtr genRobot, const GaitParam& gaitParam, double dt, double g, double mass,
                                 cnoid::BodyPtr& actRobotTqc, cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffset /*generate frame, endeffector origin*/) const{
   // - root attitude control

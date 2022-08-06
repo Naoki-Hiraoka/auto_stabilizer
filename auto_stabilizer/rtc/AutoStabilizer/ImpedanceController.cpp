@@ -1,6 +1,13 @@
 #include "ImpedanceController.h"
 #include "MathUtil.h"
 
+void ImpedanceController::initImpedanceOutput(const GaitParam& gaitParam,
+                                              std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_icEEOffset /*generate frame, endeffector origin*/) const{
+  for(int i=0;i<gaitParam.eeName.size();i++){
+    o_icEEOffset[i].reset(cnoid::Vector6::Zero());
+  }
+}
+
 bool ImpedanceController::calcImpedanceControl(double dt, const GaitParam& gaitParam,
                                                std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_icEEOffset /*generate frame, endeffector origin*/) const{
   for(int i=0;i<gaitParam.eeName.size();i++){
