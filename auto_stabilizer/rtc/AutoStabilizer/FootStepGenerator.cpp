@@ -400,21 +400,27 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
       if(hull.size() > 0) nextCandidates.emplace_back(hull, candidates[i].second);
     }
     if(nextCandidates.size() > 0) candidates = nextCandidates;
-    else{ // 達成不可の場合は、可能な限り近い位置. 複数ある場合は時間が速い方優先
+    else{
+      // 達成不可の場合は、時間が速い方優先(次の一歩に期待). 複数ある場合は可能な限り近い位置.
+      //   どうせこの一歩ではバランスがとれないので、位置よりも速く次の一歩に移ることを優先したほうが良い
+      double minTime = std::numeric_limits<double>::max();
       double minDistance = std::numeric_limits<double>::max();
       cnoid::Vector3 minp;
-      double minTime;
       for(int i=0;i<candidates.size();i++){
-        cnoid::Vector3 p, q;
-        double distance = mathutil::calcNearestPointOfTwoHull(candidates[i].first, capturableHulls[i], p, q);
-        if(distance < minDistance ||
-           (distance == minDistance && candidates[i].second < minTime)){
-          minDistance = distance;
-          minp = p;
-          minTime = candidates[i].second;
+        if(candidates[i].second <= minTime){
+          std::vector<cnoid::Vector3> p, q;
+          double distance = mathutil::calcNearestPointOfTwoHull(candidates[i].first, capturableHulls[i], p, q); // candidates[i].first, capturableHulls[i]は重なっていない・接していない
+          if(candidates[i].second < minTime ||
+             (candidates[i].second == minTime && distance < minDistance)){
+            minTime = candidates[i].second;
+            minDistance = distance;
+            nextCandidates.clear();
+            nextCandidates.emplace_back(p,minTime); // pは、最近傍が点の場合はその点が入っていて、最近傍が線分の場合はその線分の両端点が入っている
+          }else if(candidates[i].second == minTime && distance == minDistance){
+            nextCandidates.emplace_back(p,minTime);
+          }
         }
       }
-      nextCandidates.emplace_back(std::vector<cnoid::Vector3>{minp},minTime);
       candidates = nextCandidates;
     }
   }

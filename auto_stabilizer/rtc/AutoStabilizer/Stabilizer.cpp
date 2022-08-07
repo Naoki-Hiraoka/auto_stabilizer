@@ -45,8 +45,8 @@ bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobot, const cnoid::Body
                            o_stEEOffsetDampingControl); // output
 
   // 目標遊脚位置を満たすように、SwingEEModification
-  // this->calcSwingEEModification(dt, gaitParam, //input
-  //                               o_stEEOffsetSwingEEModification); //output
+  this->calcSwingEEModification(dt, gaitParam, //input
+                                o_stEEOffsetSwingEEModification); //output
 
   return true;
 }

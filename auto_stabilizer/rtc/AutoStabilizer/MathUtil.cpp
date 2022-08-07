@@ -195,10 +195,22 @@ namespace mathutil {
   }
 
   // Z成分は無視する. P, Qは半時計回りの凸包. (返り値のZ成分はhullの値が入る). PQが重なっている場合はP, Q上のどこかになる
-  double calcNearestPointOfTwoHull(const std::vector<Eigen::Vector3d>& P, const std::vector<Eigen::Vector3d>& Q, Eigen::Vector3d& p, Eigen::Vector3d& q){
-    if(P.size() == 0 && Q.size() == 0) return 0.0;
-    if(P.size() == 0) {q = Q[0]; return 0.0;}
-    if(Q.size() == 0) {p = P[0]; return 0.0;}
+  double calcNearestPointOfTwoHull(const std::vector<Eigen::Vector3d>& P, const std::vector<Eigen::Vector3d>& Q, std::vector<Eigen::Vector3d>& p, std::vector<Eigen::Vector3d>& q){
+    if(P.size() == 0 && Q.size() == 0) {
+      p.clear();
+      q.clear();
+      return 0.0;
+    }
+    if(P.size() == 0) {
+      p.clear();
+      q = std::vector<Eigen::Vector3d>{Q[0]};
+      return 0.0;
+    }
+    if(Q.size() == 0) {
+      p = std::vector<Eigen::Vector3d>{P[0]};
+      q.clear();
+      return 0.0;
+    }
 
     double minDistance = std::numeric_limits<double>::max();
     for(int i=0;i<P.size();i++){
@@ -207,8 +219,13 @@ namespace mathutil {
       double distance = (p_ - q_).head<2>().norm();
       if(distance < minDistance){
         minDistance = distance;
-        p = p_;
-        q = q_;
+        p = std::vector<Eigen::Vector3d>{p_};
+        q = std::vector<Eigen::Vector3d>{q_};
+      }else if (distance == minDistance){
+        if(p.size() == 1 && q.size() == 1 && (p[0] != p_ || q[0] != q_)){
+          p.push_back(p_);
+          q.push_back(q_);
+        }
       }
     }
     for(int i=0;i<Q.size();i++){
@@ -217,8 +234,13 @@ namespace mathutil {
       double distance = (p_ - q_).head<2>().norm();
       if(distance < minDistance){
         minDistance = distance;
-        p = p_;
-        q = q_;
+        p = std::vector<Eigen::Vector3d>{p_};
+        q = std::vector<Eigen::Vector3d>{q_};
+      }else if (distance == minDistance){
+        if(p.size() == 1 && q.size() == 1 && (p[0] != p_ || q[0] != q_)){
+          p.push_back(p_);
+          q.push_back(q_);
+        }
       }
     }
     return minDistance;

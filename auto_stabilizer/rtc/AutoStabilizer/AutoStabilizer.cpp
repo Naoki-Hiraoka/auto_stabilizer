@@ -460,7 +460,7 @@ bool AutoStabilizer::solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::Body
     gaitParam.ikEEPositionConstraint[i]->B_localpos() = gaitParam.stEETargetPose[i];
     gaitParam.ikEEPositionConstraint[i]->maxError() << 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt;
     gaitParam.ikEEPositionConstraint[i]->precision() << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0; // 強制的にIKをmax loopまで回す
-    if(i<NUM_LEGS) gaitParam.ikEEPositionConstraint[i]->weight() << 9.0, 9.0, 9.0, 9.0, 9.0, 9.0;
+    if(i<NUM_LEGS) gaitParam.ikEEPositionConstraint[i]->weight() << 10.0, 10.0, 10.0, 10.0, 10.0, 10.0;
     else gaitParam.ikEEPositionConstraint[i]->weight() << 1.0, 1.0, 1.0, 1.0, 1.0, 1.0;
     gaitParam.ikEEPositionConstraint[i]->eval_link() = nullptr;
     gaitParam.ikEEPositionConstraint[i]->eval_localR() = gaitParam.ikEEPositionConstraint[i]->B_localpos().linear();
@@ -475,7 +475,7 @@ bool AutoStabilizer::solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::Body
     fullbodyIKParam.comConstraint->B_localp() = gaitParam.genCog;
     fullbodyIKParam.comConstraint->maxError() << 10.0*dt, 10.0*dt, 10.0*dt;
     fullbodyIKParam.comConstraint->precision() << 0.0, 0.0, 0.0; // 強制的にIKをmax loopまで回す
-    fullbodyIKParam.comConstraint->weight() << 3.0, 3.0, 3.0;
+    fullbodyIKParam.comConstraint->weight() << 3.0, 3.0, 1.0;
     fullbodyIKParam.comConstraint->eval_R() = cnoid::Matrix3::Identity();
     ikConstraint.push_back(fullbodyIKParam.comConstraint);
   }
