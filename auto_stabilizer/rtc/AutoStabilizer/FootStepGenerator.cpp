@@ -383,10 +383,12 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
         for(int j=0;j<this->safeLegHull[supportLeg].size();j++){
           cnoid::Vector3 zmp = supportPose * this->safeLegHull[supportLeg][j];// generate frame
           cnoid::Vector3 endDCM = (actDCM - zmp - l) * std::exp(w * t) + zmp + l; // generate frame. 着地時のDCM
-          for(int k=0;k<this->safeLegHull[swingLeg].size();k++){
-            cnoid::Vector3 p = endDCM - footstepNodesList[0].dstCoords[swingLeg].linear() * this->safeLegHull[swingLeg][k];
-            capturableVetices.emplace_back(p[0], p[1], 0.0);
-          }
+          // for(int k=0;k<this->safeLegHull[swingLeg].size();k++){
+          //   cnoid::Vector3 p = endDCM - footstepNodesList[0].dstCoords[swingLeg].linear() * this->safeLegHull[swingLeg][k]; // こっちのほうが厳密であり、着地位置時刻修正を最小限にできるが、ロバストさに欠ける
+          //   capturableVetices.emplace_back(p[0], p[1], 0.0);
+          // }
+          cnoid::Vector3 p = endDCM - footstepNodesList[0].dstCoords[swingLeg].linear() * gaitParam.copOffset[swingLeg];
+          capturableVetices.emplace_back(p[0], p[1], 0.0);
         }
       }
       capturableHulls.push_back(mathutil::calcConvexHull(capturableVetices)); // generate frame. 時刻tに着地すれば転倒しないような着地位置. Z成分には0を入れる
