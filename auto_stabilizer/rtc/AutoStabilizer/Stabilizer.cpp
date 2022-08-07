@@ -4,16 +4,17 @@
 #include <cnoid/Jacobian>
 
 void Stabilizer::initStabilizerOutput(const GaitParam& gaitParam,
-                                      cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffset /*generate frame, endeffector origin*/) const{
+                                      cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/) const{
 
   for(int i=0;i<gaitParam.eeName.size();i++){
-    o_stEEOffset[i].reset(cnoid::Vector6::Zero());
+    o_stEEOffsetDampingControl[i].reset(cnoid::Vector6::Zero());
+    o_stEEOffsetSwingEEModification[i].reset(cnoid::Vector6::Zero());
   }
   o_stOffsetRootRpy.reset(cnoid::Vector3::Zero());
 }
 
 bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobot, const cnoid::BodyPtr actRobot, const cnoid::BodyPtr genRobot, const GaitParam& gaitParam, double dt, double mass,
-                                cnoid::BodyPtr& actRobotTqc, cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffset /*generate frame, endeffector origin*/) const{
+                                cnoid::BodyPtr& actRobotTqc, cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/) const{
   // - root attitude control
   // - 現在のactual重心位置から、目標ZMPを計算
   // - 目標ZMPを満たすように目標足裏反力を計算
@@ -41,7 +42,11 @@ bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobot, const cnoid::Body
 
   // 目標足裏反力を満たすようにDamping Control
   this->calcDampingControl(dt, gaitParam, tgtEEWrench, // input
-                           o_stEEOffset); // output
+                           o_stEEOffsetDampingControl); // output
+
+  // 目標遊脚位置を満たすように、SwingEEModification
+  this->calcSwingEEModification(dt, gaitParam, //input
+                                o_stEEOffsetSwingEEModification); //output
 
   return true;
 }
@@ -287,7 +292,7 @@ bool Stabilizer::calcTorque(const cnoid::BodyPtr actRobot, double dt, const Gait
 }
 
 bool Stabilizer::calcDampingControl(double dt, const GaitParam& gaitParam, const std::vector<cnoid::Vector6>& tgtEEWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/,
-                                    std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffset /*generate frame, endeffector origin*/) const{
+                                    std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/) const{
 
   std::vector<cnoid::Vector6> wrenchError(NUM_LEGS); // generate frame. endEffector origin.
   for(int i=0;i<NUM_LEGS;i++){
@@ -306,7 +311,7 @@ bool Stabilizer::calcDampingControl(double dt, const GaitParam& gaitParam, const
 
     cnoid::Vector6 offsetPrev; // generate frame. endEffector origin
     cnoid::Vector6 dOffsetPrev; // generate frame. endEffector origin
-    gaitParam.stEEOffset[i].value(offsetPrev, dOffsetPrev);
+    gaitParam.stEEOffsetDampingControl[i].value(offsetPrev, dOffsetPrev);
 
     cnoid::Matrix3 eeR = cnoid::AngleAxisd(offsetPrev.tail<3>().norm(),(offsetPrev.tail<3>().norm()>0)?offsetPrev.tail<3>().normalized() : cnoid::Vector3::UnitX()) * gaitParam.abcEETargetPose[i].linear();
 
@@ -339,9 +344,29 @@ bool Stabilizer::calcDampingControl(double dt, const GaitParam& gaitParam, const
 
     cnoid::Vector6 offset = offsetPrev + dOffset;
     offset = mathutil::clampMatrix<cnoid::Vector6>(offset, this->dampingCompensationLimit[i]);
-    o_stEEOffset[i].reset(offset, dOffset/dt);
+    o_stEEOffsetDampingControl[i].reset(offset, dOffset/dt);
   }
 
 
+  return true;
+}
+
+bool Stabilizer::calcSwingEEModification(double dt, const GaitParam& gaitParam,
+                                         std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/) const{
+  for(int i=0;i<NUM_LEGS;i++){
+    cnoid::Vector6 offset = o_stEEOffsetSwingEEModification[i].value();
+    offset -= offset.cwiseQuotient(this->springTimeConst[i]) * dt;
+    if(!gaitParam.footstepNodesList[0].isSupportPhase[i]){
+      cnoid::Vector6 diff; // generage frame. endeffeector origin
+      diff.head<3>() = gaitParam.abcEETargetPose[i].translation() - gaitParam.actEEPose[i].translation();
+      Eigen::AngleAxisd diffR = Eigen::AngleAxisd(gaitParam.abcEETargetPose[i].linear() * gaitParam.actEEPose[i].linear().inverse());
+      diff.tail<3>() = diffR.angle() * diffR.axis();
+      cnoid::Vector6 dp = this->springGain[i].cwiseProduct(diff);
+      dp = mathutil::clampMatrix(dp, this->springCompensationVelocityLimit[i]);
+      offset += dp * dt;
+      offset = mathutil::clampMatrix(offset, this->springCompensationLimit[i]);
+      o_stEEOffsetSwingEEModification[i].reset(offset, dp);
+    }
+  }
   return true;
 }

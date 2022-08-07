@@ -9,12 +9,17 @@ public:
   // Stabilizerでしか使わないパラメータ
   std::vector<double> bodyAttitudeControlGain=std::vector<double>{0.5, 0.5}; // 要素数2. gaitParam.footMidCoords座標系X軸, Y軸. 単位は[/s]
   std::vector<double> bodyAttitudeControlTimeConst=std::vector<double>{1000, 1000}; // 要素数2. gaitParam.footMidCoords座標系X軸, Y軸. 単位は[s]
-  std::vector<double> rootRotCompensationLimit=std::vector<double>{0.7,0.7}; //要素数2. gaitParam.footMidCoords座標系X軸, Y軸. 単位は[rad]
+  std::vector<double> rootRotCompensationLimit=std::vector<double>{0.7,0.7}; //要素数2. gaitParam.footMidCoords座標系X軸, Y軸. 単位は[rad]. STが動いている間は変更されない
 
-  std::vector<cnoid::Vector6> dampingCompensationLimit = std::vector<cnoid::Vector6>(NUM_LEGS); // 要素数2. [rleg, lleg]. generate frame. endEffector origin
+  std::vector<cnoid::Vector6> dampingCompensationLimit = std::vector<cnoid::Vector6>(NUM_LEGS); // 要素数2. [rleg, lleg]. generate frame. endEffector origin. STが動いている間は変更されない
   std::vector<cnoid::Vector6> dampingGain = std::vector<cnoid::Vector6>(NUM_LEGS); // 要素数2. [rleg. lleg].  EndEffector frame(offset+abcTargetPose). endEffector origin
   std::vector<cnoid::Vector6> dampingTimeConst = std::vector<cnoid::Vector6>(NUM_LEGS); // 要素数2. [rleg. lleg]. EndEffector frame(offset+abcTargetPose). endEffector origin
   std::vector<cnoid::Vector6> dampingWrenchErrorLimit = std::vector<cnoid::Vector6>(NUM_LEGS); // 要素数2. [rleg. lleg]. EndEffector frame(offset+abcTargetPose). endEffector origin
+
+  std::vector<cnoid::Vector6> springCompensationLimit = std::vector<cnoid::Vector6>(NUM_LEGS); // 要素数2. [rleg, lleg]. generate frame. endEffector origin. STが動いている間は変更されない
+  std::vector<cnoid::Vector6> springCompensationVelocityLimit = std::vector<cnoid::Vector6>(NUM_LEGS); // 要素数2. [rleg, lleg]. generate frame. endEffector origin
+  std::vector<cnoid::Vector6> springGain = std::vector<cnoid::Vector6>(NUM_LEGS); // 要素数2. [rleg. lleg].  EndEffector frame(offset+abcTargetPose). endEffector origin
+  std::vector<cnoid::Vector6> springTimeConst = std::vector<cnoid::Vector6>(NUM_LEGS); // 要素数2. [rleg. lleg]. EndEffector frame(offset+abcTargetPose). endEffector origin. 単位は[s]
 
   Stabilizer(){
     for(int i=0;i<NUM_LEGS;i++){
@@ -22,6 +27,11 @@ public:
       dampingGain[i] << 33600, 33600, 7839, 60, 60, 1e5;
       dampingTimeConst[i] << 3.0/1.1, 3.0/1.1, 1.5/1.1, 1.5/1.1, 1.5/1.1, 1.5/1.1;
       dampingWrenchErrorLimit[i] << 200, 200, 200, 15, 15, 15;
+
+      springCompensationLimit[i] << 0.05, 0.05, 0.05, 0.523599, 0.523599, 0.523599; // 0.523599rad = 30deg
+      springCompensationVelocityLimit[i] << 0.05, 0.05, 0.05, 0.349066, 0.349066, 0.349066; // 0.349066rad/2 = 20deg/s
+      springGain[i] << 5.0, 5.0, 5.0, 5.0, 5.0, 5.0;
+      springTimeConst[i] << 1.0, 1.0, 1.0, 1.0, 1.0, 1.0;
     }
   }
 protected:
@@ -31,10 +41,10 @@ protected:
   mutable std::shared_ptr<prioritized_qp::Task> copTask_ = std::make_shared<prioritized_qp::Task>();;
 public:
   void initStabilizerOutput(const GaitParam& gaitParam,
-                            cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffset /*generate frame, endeffector origin*/) const;
+                            cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/) const;
 
   bool execStabilizer(const cnoid::BodyPtr refRobot, const cnoid::BodyPtr actRobot, const cnoid::BodyPtr genRobot, const GaitParam& gaitParam, double dt, double mass,
-                      cnoid::BodyPtr& actRobotTqc, cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffset /*generate frame, endeffector origin*/) const;
+                      cnoid::BodyPtr& actRobotTqc, cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/) const;
 
 protected:
   bool moveBasePosRotForBodyRPYControl(const cnoid::BodyPtr refRobot, const cnoid::BodyPtr actRobot, double dt, const GaitParam& gaitParam,
@@ -46,7 +56,9 @@ protected:
   bool calcTorque(const cnoid::BodyPtr actRobot, double dt, const GaitParam& gaitParam, const std::vector<cnoid::Vector6>& tgtEEWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/,
                   cnoid::BodyPtr& actRobotTqc) const;
   bool calcDampingControl(double dt, const GaitParam& gaitParam, const std::vector<cnoid::Vector6>& tgtEEWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/,
-                          std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffset /*generate frame, endeffector origin*/) const;
+                          std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/) const;
+  bool calcSwingEEModification(double dt, const GaitParam& gaitParam,
+                               std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/) const;
 };
 
 #endif
