@@ -15,7 +15,7 @@ public:
   unsigned int goVelocityStepNum = 6; // 1以上
   bool isModifyFootSteps = true; // 着地位置時間修正を行うかどうか
   bool isEmergencyStepMode = false; // footstepNodesList[0]が末尾の要素でかつ現在のdstCoordsのままだとバランスが取れないなら、footstepNodesList[1]に両脚が横に並ぶ位置に一歩歩くnodeが末尾に入る. (modifyFootSteps=trueのときのみ有効)
-  double overwritableMinTime = 0.4; // 0より大きい. 次indexまでの残り時間がこの値未満の場合は着地位置時間修正を行わない. また、次indexまでの残り時間がこの値を下回るようには着地時間修正を行わない. 最低限、この時間で足上げ足下げが行えるような時間にすること
+  double overwritableMinTime = 0.4; // 0より大きい. 次indexまでの残り時間がこの値未満の場合は着地時間修正を行わない. また、次indexまでの残り時間がこの値を下回るようには着地時間修正を行わない. 最低限、この時間で足上げ足下げが行えるような時間にすること
   double overwritableMaxTime = 1.0; // overwritableMinTimeより大きい. 次indexまでの残り時間がこの値を上回るようには着地時間修正を行わない
   double overwritableMaxSwingVelocity = 1.0; //0より大きい [m/s]. 今の遊脚の位置のXYから着地位置のXYまで移動するための速度がこの値を上回るようには着地位置時間修正を行わない
   std::vector<std::vector<cnoid::Vector3> > safeLegHull = std::vector<std::vector<cnoid::Vector3> >(2, std::vector<cnoid::Vector3>{cnoid::Vector3(0.075,0.065,0.0),cnoid::Vector3(-0.075,0.065,0.0),cnoid::Vector3(-0.075,-0.065,0.0),cnoid::Vector3(0.075,-0.065,0.0)}); // 要素数2. rleg: 0. lleg: 1. leg frame.  凸形状で,上から見て半時計回り. Z成分はあったほうが計算上扱いやすいからありにしているが、0でなければならない. 大きさはgaitParam.legHull以下

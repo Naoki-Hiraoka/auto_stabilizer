@@ -339,7 +339,12 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
   {
     std::vector<double> samplingTimes;
     samplingTimes.push_back(footstepNodesList[0].remainTime);
-    for(int i=0;i<=10;i++) samplingTimes.push_back(this->overwritableMinTime + (this->overwritableMaxTime - this->overwritableMinTime) * 0.1 * i);
+    if(footstepNodesList[0].remainTime >= this->overwritableMinTime){ // this->overwritableMinTimeを下回っていたら着地時刻修正を行わない.
+      for(int i=0;i<=10;i++) {
+        double t = this->overwritableMinTime + (this->overwritableMaxTime - this->overwritableMinTime) * 0.1 * i;
+        if(t != footstepNodesList[0].remainTime) samplingTimes.push_back(t); // this->overwritableMinTimeを下回ったりoverwritableMaxTimeを上回ったりするようには着地時刻修正を行わない
+      }
+    }
 
     std::vector<cnoid::Vector3> strideLimitationHull; // generate frame. overwritableStrideLimitationHullの範囲内の着地位置(自己干渉・IKの考慮が含まれる). Z成分には0を入れる
     for(int i=0;i<this->overwritableStrideLimitationHull[swingLeg].size();i++){
@@ -373,14 +378,15 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
   {
     std::vector<std::vector<cnoid::Vector3> > capturableHulls; // 要素数と順番はcandidatesに対応
     for(int i=0;i<candidates.size();i++){
-      double t = candidates[i].second;
       std::vector<cnoid::Vector3> capturableVetices; // generate frame. 時刻tに着地すれば転倒しないような着地位置. Z成分には0を入れる
-      for(int j=0;j<this->safeLegHull[supportLeg].size();j++){
-        cnoid::Vector3 zmp = supportPose * this->safeLegHull[supportLeg][j];// generate frame
-        cnoid::Vector3 endDCM = (actDCM - zmp - l) * std::exp(w * t) + zmp + l; // generate frame. 着地時のDCM
-        for(int k=0;k<this->safeLegHull[swingLeg].size();k++){
-          cnoid::Vector3 p = endDCM - footstepNodesList[0].dstCoords[swingLeg].linear() * this->safeLegHull[swingLeg][k];
-          capturableVetices.emplace_back(p[0], p[1], 0.0);
+      for(double t = candidates[i].second; t <= candidates[i].second + footstepNodesList[1].remainTime; t += footstepNodesList[1].remainTime){ // 接地する瞬間と、次の両足支持期の終了時.
+        for(int j=0;j<this->safeLegHull[supportLeg].size();j++){
+          cnoid::Vector3 zmp = supportPose * this->safeLegHull[supportLeg][j];// generate frame
+          cnoid::Vector3 endDCM = (actDCM - zmp - l) * std::exp(w * t) + zmp + l; // generate frame. 着地時のDCM
+          for(int k=0;k<this->safeLegHull[swingLeg].size();k++){
+            cnoid::Vector3 p = endDCM - footstepNodesList[0].dstCoords[swingLeg].linear() * this->safeLegHull[swingLeg][k];
+            capturableVetices.emplace_back(p[0], p[1], 0.0);
+          }
         }
       }
       capturableHulls.push_back(mathutil::calcConvexHull(capturableVetices)); // generate frame. 時刻tに着地すれば転倒しないような着地位置. Z成分には0を入れる
