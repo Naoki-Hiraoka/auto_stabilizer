@@ -45,8 +45,8 @@ bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobot, const cnoid::Body
                            o_stEEOffsetDampingControl); // output
 
   // 目標遊脚位置を満たすように、SwingEEModification
-  this->calcSwingEEModification(dt, gaitParam, //input
-                                o_stEEOffsetSwingEEModification); //output
+  // this->calcSwingEEModification(dt, gaitParam, //input
+  //                               o_stEEOffsetSwingEEModification); //output
 
   return true;
 }
@@ -318,7 +318,6 @@ bool Stabilizer::calcDampingControl(double dt, const GaitParam& gaitParam, const
     cnoid::Vector6 wrenchErrorLocal; //endEffector frame. endeffector origin
     wrenchErrorLocal.head<3>() = eeR.transpose() * wrenchError[i].head<3>();
     wrenchErrorLocal.tail<3>() = eeR.transpose() * wrenchError[i].tail<3>();
-    wrenchErrorLocal = mathutil::clampMatrix<cnoid::Vector6>(wrenchErrorLocal, this->dampingWrenchErrorLimit[i]);
 
     cnoid::Vector6 offsetPrevLocal; //endEffector frame. endeffector origin
     offsetPrevLocal.head<3>() = eeR.transpose() * offsetPrev.head<3>();

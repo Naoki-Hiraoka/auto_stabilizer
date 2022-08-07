@@ -14,7 +14,6 @@ public:
   std::vector<cnoid::Vector6> dampingCompensationLimit = std::vector<cnoid::Vector6>(NUM_LEGS); // 要素数2. [rleg, lleg]. generate frame. endEffector origin. STが動いている間は変更されない
   std::vector<cnoid::Vector6> dampingGain = std::vector<cnoid::Vector6>(NUM_LEGS); // 要素数2. [rleg. lleg].  EndEffector frame(offset+abcTargetPose). endEffector origin
   std::vector<cnoid::Vector6> dampingTimeConst = std::vector<cnoid::Vector6>(NUM_LEGS); // 要素数2. [rleg. lleg]. EndEffector frame(offset+abcTargetPose). endEffector origin
-  std::vector<cnoid::Vector6> dampingWrenchErrorLimit = std::vector<cnoid::Vector6>(NUM_LEGS); // 要素数2. [rleg. lleg]. EndEffector frame(offset+abcTargetPose). endEffector origin
 
   std::vector<cnoid::Vector6> springCompensationLimit = std::vector<cnoid::Vector6>(NUM_LEGS); // 要素数2. [rleg, lleg]. generate frame. endEffector origin. STが動いている間は変更されない
   std::vector<cnoid::Vector6> springCompensationVelocityLimit = std::vector<cnoid::Vector6>(NUM_LEGS); // 要素数2. [rleg, lleg]. generate frame. endEffector origin
@@ -26,7 +25,6 @@ public:
       dampingCompensationLimit[i] << 0.08, 0.08, 0.08, 0.523599, 0.523599, 0.523599; // 0.523599rad = 30deg
       dampingGain[i] << 33600, 33600, 7839, 60, 60, 1e5;
       dampingTimeConst[i] << 3.0/1.1, 3.0/1.1, 1.5/1.1, 1.5/1.1, 1.5/1.1, 1.5/1.1;
-      dampingWrenchErrorLimit[i] << 200, 200, 200, 15, 15, 15;
 
       springCompensationLimit[i] << 0.05, 0.05, 0.05, 0.523599, 0.523599, 0.523599; // 0.523599rad = 30deg
       springCompensationVelocityLimit[i] << 0.05, 0.05, 0.05, 0.349066, 0.349066, 0.349066; // 0.349066rad/2 = 20deg/s
