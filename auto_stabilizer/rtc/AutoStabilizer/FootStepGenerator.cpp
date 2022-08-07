@@ -297,12 +297,6 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
        (footstepNodesList[0].isSupportPhase[RLEG] && !footstepNodesList[0].isSupportPhase[LLEG]) || (!footstepNodesList[0].isSupportPhase[RLEG] && footstepNodesList[0].isSupportPhase[LLEG])))
      return;
 
-  // 次indexまでの残り時間がこの値未満の場合は着地位置時間修正を行わない.
-  if(footstepNodesList[0].remainTime < this->overwritableMinTime) return;
-
-  // DOWN_PHASEになったらfootstepNodesList[0]のdstCoords, remainTimeは変更されない
-  if(footstepNodesList[0].swingState[footstepNodesList[0].isSupportPhase[RLEG] ? LLEG : RLEG] ==GaitParam::FootStepNodes::DOWN_PHASE) return;
-
   // one step capturabilityに基づき、footstepNodesList[0]のremainTimeとdstCoordsを修正する.
   int swingLeg = footstepNodesList[0].isSupportPhase[RLEG] ? LLEG : RLEG;
   int supportLeg = (swingLeg == RLEG) ? LLEG : RLEG;
@@ -339,11 +333,11 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
   {
     std::vector<double> samplingTimes;
     samplingTimes.push_back(footstepNodesList[0].remainTime);
-    if(footstepNodesList[0].remainTime >= this->overwritableMinTime){ // this->overwritableMinTimeを下回っていたら着地時刻修正を行わない.
-      for(int i=0;i<=10;i++) {
-        double t = this->overwritableMinTime + (this->overwritableMaxTime - this->overwritableMinTime) * 0.1 * i;
-        if(t != footstepNodesList[0].remainTime) samplingTimes.push_back(t); // this->overwritableMinTimeを下回ったりoverwritableMaxTimeを上回ったりするようには着地時刻修正を行わない
-      }
+    int sample = 10;
+    for(int i=0;i<=sample;i++) {
+      double minTime = std::min(this->overwritableMinTime, footstepNodesList[0].remainTime); // 次indexまでの残り時間がthis->overwritableMinTimeを下回るようには着地時間修正を行わない. もともと下回っている場合には、その値を下回るようには着地時刻修正を行わない.
+      double t = minTime + (this->overwritableMaxTime - minTime) / sample * i; // overwritableMaxTimeを上回ったりするようには着地時刻修正を行わない
+      if(t != footstepNodesList[0].remainTime) samplingTimes.push_back(t);
     }
 
     std::vector<cnoid::Vector3> strideLimitationHull; // generate frame. overwritableStrideLimitationHullの範囲内の着地位置(自己干渉・IKの考慮が含まれる). Z成分には0を入れる
@@ -367,11 +361,11 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
 
     if(candidates.size() == 0) candidates.emplace_back(std::vector<cnoid::Vector3>{footstepNodesList[0].dstCoords[swingLeg].translation()}, footstepNodesList[0].remainTime); // まず起こらないと思うが念の為
   }
-  //std::cerr << "strideLimitation と reachable" << std::endl;
-  //std::cerr << candidates << std::endl;
+  // std::cerr << "strideLimitation と reachable" << std::endl;
+  // std::cerr << candidates << std::endl;
 
   // 2. steppable: 達成不可の場合は、考慮しない
-  // TODO. Z高さの扱い
+  // TODO. Z高さの扱い.(DOWN_PHASEのときはfootstepNodesList[0]のdstCoordsはgenCoordsよりも高い位置に変更されることはない) (高低差と時間の関係)
 
   // 3. capturable: 達成不可の場合は、可能な限り近い位置. 複数ある場合は時間が速い方優先. (次の一歩に期待) (角運動量 TODO)
   // 次の両足支持期終了時に入るケースでもOKにしたい
@@ -382,7 +376,7 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
       for(double t = candidates[i].second; t <= candidates[i].second + footstepNodesList[1].remainTime; t += footstepNodesList[1].remainTime){ // 接地する瞬間と、次の両足支持期の終了時. 片方だけだと特に横歩きのときに厳しすぎる.
         for(int j=0;j<this->safeLegHull[supportLeg].size();j++){
           cnoid::Vector3 zmp = supportPose * this->safeLegHull[supportLeg][j];// generate frame
-          cnoid::Vector3 endDCM = (actDCM - zmp - l) * std::exp(w * t) + zmp + l; // generate frame. 着地時のDCM
+          cnoid::Vector3 endDCM = (actDCM - zmp - l) * std::exp(w * (t + 0.1)) + zmp + l; // generate frame. 着地時のDCM
           // for(int k=0;k<this->safeLegHull[swingLeg].size();k++){
           //   cnoid::Vector3 p = endDCM - footstepNodesList[0].dstCoords[swingLeg].linear() * this->safeLegHull[swingLeg][k]; // こっちのほうが厳密であり、着地位置時刻修正を最小限にできるが、ロバストさに欠ける
           //   capturableVetices.emplace_back(p[0], p[1], 0.0);

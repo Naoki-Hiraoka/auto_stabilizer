@@ -56,7 +56,7 @@ public:
     std::vector<double> goalOffset = std::vector<double>(NUM_LEGS, 0.0); // [m]. 遊脚軌道生成時に、generate frameで鉛直方向に, 目標着地位置に対して加えるオフセット. FootStepGeneratorのcheckEarlyTouchDownと組み合わせて使う
     // 遊脚軌道用変数.
     enum SwingState_enum{LIFT_PHASE, SWING_PHASE, DOWN_PHASE};
-    std::vector<SwingState_enum> swingState = std::vector<SwingState_enum>(NUM_LEGS,LIFT_PHASE); // 要素数2. rleg: 0. lleg: 0. footstepNodesList[1:]は全てLIFT_PHASEにしておく. footstepNodesList[0]は, isSupportPhase = falseの脚は、LIFT_PHASE->SWING_PHASE->DOWN_PHASEと遷移する. 一度DOWN_PHASEになったら別のPHASEになることはない. DOWN_PHASEになったらfootstepNodesList[0]のdstCoords, remainTimeは変更されない
+    std::vector<SwingState_enum> swingState = std::vector<SwingState_enum>(NUM_LEGS,LIFT_PHASE); // 要素数2. rleg: 0. lleg: 0. footstepNodesList[1:]は全てLIFT_PHASEにしておく. footstepNodesList[0]は, isSupportPhase = falseの脚は、LIFT_PHASE->SWING_PHASE->DOWN_PHASEと遷移する. 一度DOWN_PHASEになったら別のPHASEになることはない. DOWN_PHASEのときはfootstepNodesList[0]のdstCoordsはgenCoordsよりも高い位置に変更されることはない
   };
   std::vector<FootStepNodes> footstepNodesList = std::vector<FootStepNodes>(1); // 要素数1以上. 0番目が現在の状態. 末尾の要素以降は、末尾の状態がずっと続くとして扱われる.
   std::vector<cnoid::Position> srcCoords = std::vector<cnoid::Position>(NUM_LEGS,cnoid::Position::Identity()); // 要素数2. rleg: 0. lleg: 1. generate frame. 現在のfootstep開始時の位置
@@ -83,7 +83,7 @@ public:
 
 public:
   // param
-  std::vector<cnoid::Vector3> copOffset = std::vector<cnoid::Vector3>{cnoid::Vector3(0.0,0.02,0.0),cnoid::Vector3(0.0,-0.02,0.0)}; // 要素数2. rleg: 0. lleg: 1. leg frame. 足裏COPの目標位置. 幾何的な位置はcopOffset無しで考えるが、目標COPを考えるときはcopOffsetを考慮する. 足裏は左右方向に小さいので、左右方向に転びやすいことから、内側にcopをオフセットさせておくとよい
+  std::vector<cnoid::Vector3> copOffset = std::vector<cnoid::Vector3>{cnoid::Vector3(0.0,0.02,0.0),cnoid::Vector3(0.0,-0.02,0.0)}; // 要素数2. rleg: 0. lleg: 1. leg frame. 足裏COPの目標位置. 幾何的な位置はcopOffset無しで考えるが、目標COPを考えるときはcopOffsetを考慮する. クロスできたりジャンプできたりする脚でないと左右方向(外側向き)の着地位置修正は難しいので、その方向に転びそうになることが極力ないように内側にcopをオフセットさせておくとよい
   std::vector<std::vector<cnoid::Vector3> > legHull = std::vector<std::vector<cnoid::Vector3> >(2, std::vector<cnoid::Vector3>{cnoid::Vector3(0.115,0.065,0.0),cnoid::Vector3(-0.115,0.065,0.0),cnoid::Vector3(-0.115,-0.065,0.0),cnoid::Vector3(0.115,-0.065,0.0)}); // 要素数2. rleg: 0. lleg: 1. leg frame.  凸形状で,上から見て半時計回り. Z成分はあったほうが計算上扱いやすいからありにしているが、0でなければならない
   std::vector<cnoid::Vector3> defaultTranslatePos = std::vector<cnoid::Vector3>(2,cnoid::Vector3::Zero()); // goPos, goVelocity, その場足踏みをするときの右脚と左脚の中心からの相対位置. あるいは、reference frameとgenerate frameの対応付けに用いられる. (Z軸は鉛直). Z成分はあったほうが計算上扱いやすいからありにしているが、0でなければならない
 
