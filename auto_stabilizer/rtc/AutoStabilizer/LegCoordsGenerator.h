@@ -9,7 +9,7 @@ public:
 
   double delayTimeOffset = 0.2; // 0以上. swing期は、remainTime - supportTime - delayTimeOffset後にdstCoordsに到達するようなrectangle軌道を生成し、その軌道にdelayTimeOffset遅れで滑らかに追従するような軌道を生成する
   double touchVel = 0.3; // 0より大きい. 足を下ろすときの速さ(この値より速く下ろす) [m/s]
-  //cnoid::Vector3 goal_off; // TODO
+  double finalDistanceWeight = 3.0; // 0より大きい. swing期のDOWN_PHASEの速さを、他のPHASEとくらべ何倍遅くするか. 着地時の衝撃をやわらげる
 
 public:
   void initLegCoords(const GaitParam& gaitParam,

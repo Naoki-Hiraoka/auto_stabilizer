@@ -369,6 +369,7 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
   // TODO. Z高さの扱い
 
   // 3. capturable: 達成不可の場合は、可能な限り近い位置. 複数ある場合は時間が速い方優先. (次の一歩に期待) (角運動量 TODO)
+  // 次の両足支持期終了時に入るケースでもOKにしたい
   {
     std::vector<std::vector<cnoid::Vector3> > capturableHulls; // 要素数と順番はcandidatesに対応
     for(int i=0;i<candidates.size();i++){

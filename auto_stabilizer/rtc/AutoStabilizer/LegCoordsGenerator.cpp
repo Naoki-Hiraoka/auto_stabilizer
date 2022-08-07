@@ -129,19 +129,19 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
         double length0 = std::abs(height - antecedentCoords.translation()[2]);
         double length1 = (dstCoords.translation() - antecedentCoords.translation()).head<2>().norm();
         double length2 = std::abs(height - dstCoords.translation()[2]);
-        double totalLength = length0 + length1 + length2;
+        double totalLength = length0 + length1 + length2 * this->finalDistanceWeight;
         double ratio = std::min(dt / (swingTime - this->delayTimeOffset), 1.0); // LIFT_PHASEのとき必ずswingTime - this->delayTimeOffset>0
         cnoid::Vector3 goal;
-        if(ratio * totalLength <= length0){
+        if(ratio * totalLength < length0){
           goal = antecedentCoords.translation();
           goal[2] += ratio * totalLength;
-        }else if(ratio * totalLength <= length0 + length1){
+        }else if(ratio * totalLength < length0 + length1){
           goal = antecedentCoords.translation();
           goal[2] = height;
           goal.head<2>() += (dstCoords.translation() - antecedentCoords.translation()).head<2>().normalized() * (ratio * totalLength - length0);
         }else{
           goal = dstCoords.translation();
-          goal[2] = height - (ratio * totalLength - length0 - length1);
+          goal[2] = height - (ratio * totalLength - length0 - length1) / this->finalDistanceWeight;
         }
         cnoid::Position nextCoords;
         nextCoords.translation() = goal;
@@ -154,15 +154,15 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
         viaPos[2] = height;
         double length1 = (viaPos - antecedentCoords.translation()).norm();
         double length2 = std::abs(height - dstCoords.translation()[2]);
-        double totalLength = length1 + length2;
+        double totalLength = length1 + length2 * this->finalDistanceWeight;
         double ratio = std::min(dt / (swingTime - this->delayTimeOffset), 1.0); // SWING_PHASEのとき必ずswingTime - this->delayTimeOffset>0
         cnoid::Vector3 goal;
-        if(ratio * totalLength <= length1){
+        if(ratio * totalLength < length1){
           goal = antecedentCoords.translation();
           goal += (viaPos - antecedentCoords.translation()).normalized() * (ratio * totalLength);
         }else{
           goal = dstCoords.translation();
-          goal[2] = height - (ratio * totalLength - length1);
+          goal[2] = height - (ratio * totalLength - length1) / this->finalDistanceWeight;
         }
         cnoid::Position nextCoords;
         nextCoords.translation() = goal;
@@ -171,8 +171,19 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
         genCoords[i].setGoal(nextCoords, this->delayTimeOffset);
         genCoords[i].interpolate(dt);
       }else{ // DOWN_PHASE
-        genCoords[i].setGoal(dstCoords, std::min(this->delayTimeOffset, swingTime));
-        genCoords[i].interpolate(dt);
+        if(swingTime <= this->delayTimeOffset){
+          genCoords[i].setGoal(dstCoords, swingTime);
+          genCoords[i].interpolate(dt);
+        }else{
+          double ratio = std::min(dt / (swingTime - this->delayTimeOffset), 1.0); // swingTime - this->delayTimeOffset>0
+          cnoid::Vector3 goal = antecedentCoords.translation() + (dstCoords.translation() - antecedentCoords.translation()) * ratio;
+          cnoid::Position nextCoords;
+          nextCoords.translation() = goal;
+          nextCoords.linear() = mathutil::calcMidRot(std::vector<cnoid::Matrix3>{antecedentCoords.linear(),dstCoords.linear()},
+                                                     std::vector<double>{std::max(0.0,swingTime - this->delayTimeOffset - dt), dt}); // dstCoordsの傾きになるように線形補間
+          genCoords[i].setGoal(nextCoords, this->delayTimeOffset);
+          genCoords[i].interpolate(dt);
+        }
       }
     }
   }
