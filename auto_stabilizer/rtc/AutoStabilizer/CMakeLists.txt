@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
   #prioritized_inverse_kinematics_solver
   cpp_filters
   #ik_constraint_joint_limit_table
+  hrpsys_ros_bridge
   )
 find_package(choreonoid REQUIRED)
 find_package(OsqpEigen REQUIRED)
@@ -23,6 +24,10 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
   ${CHOREONOID_INCLUDE_DIRS}
   ${openrtm_aist_INCLUDE_DIRS}
+  $<TARGET_PROPERTY:OsqpEigen::OsqpEigen,INTERFACE_INCLUDE_DIRECTORIES>
+  )
+link_directories(
+  ${CHOREONOID_LIBRARY_DIRS}
   )
 
 add_library(AutoStabilizer SHARED
@@ -41,7 +46,8 @@ target_link_libraries(AutoStabilizer
   ${CHOREONOID_BODY_LIBRARIES}
   ${openrtm_aist_LIBRARIES}
   ${${PROJECT_NAME}_IDLLIBRARY_DIRS}
-  OsqpEigen::OsqpEigen
+  #OsqpEigen::OsqpEigen # -isystemでこのワークスペースのdevel/includeがinclude_directoriesに入るのだが、優先順位末尾に入ってしまう
+  $<TARGET_PROPERTY:OsqpEigen::OsqpEigen,INTERFACE_LINK_LIBRARIES>
   )
 set_target_properties(AutoStabilizer PROPERTIES PREFIX "")
 add_dependencies(AutoStabilizer RTMBUILD2_${PROJECT_NAME}_genrpc) # wait for rtmbuild2_genidl
