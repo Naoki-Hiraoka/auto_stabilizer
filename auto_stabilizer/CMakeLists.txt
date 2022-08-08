@@ -21,12 +21,11 @@ rtmbuild2_init(hrpsys_ros_bridge rtmbuild2)
 catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES auto_stabilizer
-#  CATKIN_DEPENDS other_catkin_pkg
+  CATKIN_DEPENDS hrpsys_ros_bridge rtmbuild2
 #  DEPENDS system_lib
 )
 
 # generate idl
-#set(rtm_idlflags ${rtm_idlflags} -I${hrpsys_IDL_DIR})
 rtmbuild2_genidl()
 
 # generate bridge
