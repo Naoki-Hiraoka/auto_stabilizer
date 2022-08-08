@@ -376,7 +376,7 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
       for(double t = candidates[i].second; t <= candidates[i].second + footstepNodesList[1].remainTime; t += footstepNodesList[1].remainTime){ // 接地する瞬間と、次の両足支持期の終了時. 片方だけだと特に横歩きのときに厳しすぎる.
         for(int j=0;j<this->safeLegHull[supportLeg].size();j++){
           cnoid::Vector3 zmp = supportPose * this->safeLegHull[supportLeg][j];// generate frame
-          cnoid::Vector3 endDCM = (actDCM - zmp - l) * std::exp(w * (t + 0.1)) + zmp + l; // generate frame. 着地時のDCM
+          cnoid::Vector3 endDCM = (actDCM - zmp - l) * std::exp(w * t) + zmp + l; // generate frame. 着地時のDCM
           // for(int k=0;k<this->safeLegHull[swingLeg].size();k++){
           //   cnoid::Vector3 p = endDCM - footstepNodesList[0].dstCoords[swingLeg].linear() * this->safeLegHull[swingLeg][k]; // こっちのほうが厳密であり、着地位置時刻修正を最小限にできるが、ロバストさに欠ける
           //   capturableVetices.emplace_back(p[0], p[1], 0.0);
@@ -497,7 +497,9 @@ void FootStepGenerator::checkEarlyTouchDown(std::vector<GaitParam::FootStepNodes
   // DOWN_PHASEのときのみ行う
   if(footstepNodesList[0].swingState[swingLeg] != GaitParam::FootStepNodes::DOWN_PHASE) return;
 
-  if(gaitParam.actEEWrench[swingLeg][2] > this->contactDecisionThreshold ){/*generate frame. ロボットが受ける力*/
+  if(gaitParam.actEEWrench[swingLeg][2] > this->contactDecisionThreshold /*generate frame. ロボットが受ける力*/ ||
+     footstepNodesList[0].remainTime <= dt // 地面につかないままswingphase終了
+     ){
     cnoid::Vector3 diff = gaitParam.genCoords[swingLeg].value().translation() - footstepNodesList[0].dstCoords[swingLeg].translation(); // generate frame
     this->transformFutureSteps(footstepNodesList, 0, diff); // 遊脚を今の位置でとめる
     footstepNodesList[0].dstCoords[swingLeg] = gaitParam.genCoords[swingLeg].value(); // 遊脚を今の傾きでとめる
