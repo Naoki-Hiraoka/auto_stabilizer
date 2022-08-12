@@ -323,7 +323,7 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
     1. reachable: 絶対満たす
     2. steppable: 達成不可の場合は、考慮しない
     3. capturable: 達成不可の場合は、可能な限り近い位置. 複数ある場合は時間が速い方優先. (次の一歩に期待) (角運動量 TODO)
-    4. もとの着地位置(dstCoordsOrg): 達成不可の場合は、各hullの中の最も近い位置をそれぞれ求めて、進行方向優先
+    4. もとの着地位置(dstCoordsOrg): 達成不可の場合は、各hullの中の最も近い位置をそれぞれ求めて、着地位置修正前の進行方向(遊脚のsrcCoordsからの方向)に最も進むもの優先 (支持脚からの方向にすると、横歩き時に後ろ足の方向が逆になってしまう)
     5. もとの着地時刻(remainTime): 達成不可の場合は、可能な限り近い時刻
    */
 
@@ -422,7 +422,7 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
   // std::cerr << "capturable" << std::endl;
   // std::cerr << candidates << std::endl;
 
-  // 4. もとの着地位置: 達成不可の場合は、各hullの中の最も近い位置をそれぞれ求めて、進行方向優先
+  // 4. もとの着地位置: 達成不可の場合は、各hullの中の最も近い位置をそれぞれ求めて、着地位置修正前の進行方向(遊脚のsrcCoordsからの方向)に最も進むもの優先 (支持脚からの方向にすると、横歩き時に後ろ足の方向が逆になってしまう)
   {
     std::vector<std::pair<std::vector<cnoid::Vector3>, double> > nextCandidates;
     for(int i=0;i<candidates.size();i++){
@@ -431,20 +431,36 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
       }
     }
     if(nextCandidates.size() > 0) candidates = nextCandidates;
-    else{ // 達成不可の場合は、各hullの中の最も近い位置をそれぞれ求めて、進行方向優先
-      cnoid::Vector3 dir = (gaitParam.dstCoordsOrg[swingLeg].translation() - supportPose.translation()).normalized(); dir[2] = 0.0;
-      double maxVel = - std::numeric_limits<double>::max();
-      std::vector<std::pair<cnoid::Vector3, double> > minimum;
-      for(int i=0;i<candidates.size();i++){
-        cnoid::Vector3 p = mathutil::calcNearestPointOfHull(gaitParam.dstCoordsOrg[swingLeg].translation(), candidates[i].first);
-        double vel = (p - supportPose.translation()).dot(dir);
-        if(vel > maxVel){
-          maxVel = vel;
-          nextCandidates.clear();
-          nextCandidates.emplace_back(std::vector<cnoid::Vector3>{p}, candidates[i].second);
-        }else if (vel == maxVel){
-          maxVel = vel;
-          nextCandidates.emplace_back(std::vector<cnoid::Vector3>{p}, candidates[i].second);
+    else{ // 達成不可の場合は、各hullの中の最も近い位置をそれぞれ求めて、着地位置修正前の進行方向(遊脚のsrcCoordsからの方向)に最も進むもの優先
+      cnoid::Vector3 dir = gaitParam.dstCoordsOrg[swingLeg].translation() - gaitParam.srcCoords[swingLeg].translation(); dir[2] = 0.0;
+      if(dir.norm() != 0){ //各hullの中の最も近い位置をそれぞれ求めて、着地位置修正前の進行方向(遊脚のsrcCoordsからの方向)に最も進むもの優先
+        dir = dir.normalized();
+        double maxVel = - std::numeric_limits<double>::max();
+        for(int i=0;i<candidates.size();i++){
+          cnoid::Vector3 p = mathutil::calcNearestPointOfHull(gaitParam.dstCoordsOrg[swingLeg].translation(), candidates[i].first);
+          double vel = (p - gaitParam.srcCoords[swingLeg].translation()).dot(dir);
+          if(vel > maxVel){
+            maxVel = vel;
+            nextCandidates.clear();
+            nextCandidates.emplace_back(std::vector<cnoid::Vector3>{p}, candidates[i].second);
+          }else if (vel == maxVel){
+            maxVel = vel;
+            nextCandidates.emplace_back(std::vector<cnoid::Vector3>{p}, candidates[i].second);
+          }
+        }
+      }else{ // 進行方向が定義できない. //各hullの中の最も近い位置をそれぞれ求めて、遊脚のsrcCoordsからの距離が最も小さいもの優先
+        double minVel = + std::numeric_limits<double>::max();
+        for(int i=0;i<candidates.size();i++){
+          cnoid::Vector3 p = mathutil::calcNearestPointOfHull(gaitParam.dstCoordsOrg[swingLeg].translation(), candidates[i].first);
+          double vel = (p - gaitParam.srcCoords[swingLeg].translation()).norm();
+          if(vel < minVel){
+            minVel = vel;
+            nextCandidates.clear();
+            nextCandidates.emplace_back(std::vector<cnoid::Vector3>{p}, candidates[i].second);
+          }else if (vel == minVel){
+            minVel = vel;
+            nextCandidates.emplace_back(std::vector<cnoid::Vector3>{p}, candidates[i].second);
+          }
         }
       }
       candidates = nextCandidates;
