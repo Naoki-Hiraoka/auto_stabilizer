@@ -20,6 +20,8 @@ bool ExternalForceHandler::handleExternalForce(const GaitParam& gaitParam, doubl
     COG - lの位置まわりのトルクのXY成分が、脚以外の目標反力と重心に加わる重力の合計がゼロになればよいとする(厳密な力の釣り合いを考えるなら、全く正確ではないが...)
     脚以外のエンドエフェクタは、RefToGenFrameConverterで、COG - lの位置からの相対位置が変化しないように動く.(HandFixModeは考えない).
     よって、脚以外の目標反力による今のCOG - lの位置まわりのトルクを計算して、ゼロになっていないぶんだけ、COGを動かしてやれば良い.
+
+    lは連続的に変化することが求められている(特にRefToGenFrameConverter). refEEPoseやrefEEWrenchが不連続に変化すると不連続に変化してしまうので注意. startAutoBalancer直後の初回は、refEEWrenchが非ゼロの場合に不連続に変化することは避けられない. startAutoBalancerのtransition_timeで補間してごまかす.
    */
 
   cnoid::Vector6 sumRefExternalWrench = cnoid::Vector6::Zero(); // generate frame. generate frame原点origin.
@@ -37,7 +39,7 @@ bool ExternalForceHandler::handleExternalForce(const GaitParam& gaitParam, doubl
   }
 
   double omega = std::sqrt((gaitParam.g-sumRefExternalWrench[2]/mass) / gaitParam.refdz);
-  cnoid::Vector3 l; // lは連続的に変化することが求められている. genCogは連続的に変化するのでよい. refExternalWrenchは、refEEPoseやrefEEWrenchが不連続に変化すると不連続に変化してしまうので注意.
+  cnoid::Vector3 l;
   l[0] = (-sumRefExternalWrench[4] / (mass * gaitParam.g));
   l[1] = (sumRefExternalWrench[3] / (mass * gaitParam.g));
   l[2] = gaitParam.refdz;
