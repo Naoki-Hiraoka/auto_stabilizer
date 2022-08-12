@@ -35,17 +35,18 @@ bool RefToGenFrameConverter::convertFrame(const cnoid::BodyPtr& refRobotRaw, con
   /*
     次の2つの座標系が一致するようにreference frameとgenerate frameを対応付ける
     - refRobotRawの、refFootOriginWeightとdefaultTranslatePosとcopOffsetに基づいて求めた足裏中間座標 (イメージとしては静止状態の目標ZMP位置にdefaultTranslatePosを作用させたもの)
-    - 位置XYはgenRobotの重心位置. 位置ZはgenRobotの重心位置 - dz. 姿勢はfootMidCoords. (ただしHandFixModeなら、位置のfootMidCoords座標系Y成分はfootMidCoordsの位置.)
+    - 位置はgenRobotの重心位置 - l. 姿勢はfootMidCoords. (ただしHandFixModeなら、位置のfootMidCoords座標系Y成分はfootMidCoordsの位置.)
       - handControlWeight = 0なら、位置も姿勢もfootMidCoords
   */
   cnoid::Position refFootMidCoords = this->calcRefFootMidCoords(refRobot, gaitParam);
   double refdz = (refFootMidCoords.inverse() * refRobot->centerOfMass())[2]; // ref重心高さ
-  cnoid::Vector3 genCog_genFootMidCoordsLocal = gaitParam.footMidCoords.value().linear().transpose() * (gaitParam.genCog - gaitParam.footMidCoords.value().translation());
-  genCog_genFootMidCoordsLocal[1] *= (1.0 - handFixMode.value());
-  genCog_genFootMidCoordsLocal[2] -= refdz;
+  if(refdz <= 0.0) refdz = gaitParam.refdz; // 倒立振子近似が成り立たないので計算が破綻する. 前回の値をそのまま使う
   cnoid::Position genFootMidCoords;
   genFootMidCoords.linear() = gaitParam.footMidCoords.value().linear();
-  genFootMidCoords.translation() = gaitParam.footMidCoords.value().translation() + gaitParam.footMidCoords.value().linear() * genCog_genFootMidCoordsLocal;
+  genFootMidCoords.translation() = gaitParam.genCog - gaitParam.l; // 1周期前のlを使っているtが、lは不連続に変化するものではないので良い
+  cnoid::Vector3 trans_footMidCoordsLocal = gaitParam.footMidCoords.value().linear().transpose() * (genFootMidCoords.translation() - gaitParam.footMidCoords.value().translation());
+  trans_footMidCoordsLocal[1] *= (1.0 - handFixMode.value());
+  genFootMidCoords.translation() = gaitParam.footMidCoords.value().translation() + gaitParam.footMidCoords.value().linear() * trans_footMidCoordsLocal;
   genFootMidCoords = mathutil::calcMidCoords({gaitParam.footMidCoords.value(), genFootMidCoords}, {1.0-handControlRatio.value(), handControlRatio.value()});
   cnoidbodyutil::moveCoords(refRobot, genFootMidCoords, refFootMidCoords); // 1周期前のfootMidCoordsを使っているが、footMidCoordsは不連続に変化するものではないのでよい
   refRobot->calcForwardKinematics();

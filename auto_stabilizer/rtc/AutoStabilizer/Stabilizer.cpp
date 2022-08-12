@@ -71,14 +71,11 @@ bool Stabilizer::moveBasePosRotForBodyRPYControl(const cnoid::BodyPtr refRobot, 
 
 bool Stabilizer::calcZMP(const GaitParam& gaitParam, double dt, double mass,
                          cnoid::Vector3& o_tgtZmp, cnoid::Vector3& o_tgtForce) const{
-  double w = std::sqrt(gaitParam.g/gaitParam.refdz); // TODO refforceZ
-  cnoid::Vector3 l = cnoid::Vector3::Zero();
-  l[2] = gaitParam.refdz;
   cnoid::Vector3 tgtZmp;
   if(gaitParam.footstepNodesList[0].isSupportPhase[RLEG] || gaitParam.footstepNodesList[0].isSupportPhase[LLEG]){
-    cnoid::Vector3 actDCM = gaitParam.actCog + gaitParam.actCogVel.value() / w;
-    tgtZmp = footguidedcontroller::calcFootGuidedControl(w,l,actDCM,gaitParam.refZmpTraj);
-    if(tgtZmp[2] >= gaitParam.actCog[2]) tgtZmp = gaitParam.actCog; // 下向きの力は受けられないので
+    cnoid::Vector3 actDCM = gaitParam.actCog + gaitParam.actCogVel.value() / gaitParam.omega;
+    tgtZmp = footguidedcontroller::calcFootGuidedControl(gaitParam.omega,gaitParam.l,actDCM,gaitParam.refZmpTraj);
+    if(tgtZmp[2] >= gaitParam.actCog[2]) tgtZmp = gaitParam.actCog - cnoid::Vector3(gaitParam.l[0],gaitParam.l[1], 0.0); // 下向きの力は受けられないので
     else{
       // truncate zmp inside polygon. actual robotの関節角度を用いて計算する
       std::vector<cnoid::Vector3> vertices; // generate frame. 支持点の集合
@@ -88,14 +85,14 @@ bool Stabilizer::calcZMP(const GaitParam& gaitParam, double dt, double mass,
           vertices.push_back(gaitParam.actEEPose[i]*gaitParam.legHull[i][j]);
         }
       }
-      tgtZmp = mathutil::calcInsidePointOfPolygon3D(tgtZmp,vertices,gaitParam.actCog);
+      tgtZmp = mathutil::calcInsidePointOfPolygon3D(tgtZmp,vertices,gaitParam.actCog - cnoid::Vector3(gaitParam.l[0],gaitParam.l[1], 0.0));
       // TODO. 角運動量オフセット.
     }
   }else{ // 跳躍期
-    tgtZmp = gaitParam.actCog;
+    tgtZmp = gaitParam.actCog - cnoid::Vector3(gaitParam.l[0],gaitParam.l[1], 0.0);
   }
   cnoid::Vector3 tgtCog,tgtCogVel,tgtForce;
-  footguidedcontroller::updateState(w,l,gaitParam.actCog,gaitParam.actCogVel.value(),tgtZmp,mass,dt,
+  footguidedcontroller::updateState(gaitParam.omega,gaitParam.l,gaitParam.actCog,gaitParam.actCogVel.value(),tgtZmp,mass,dt,
                                     tgtCog, tgtCogVel, tgtForce);
 
   o_tgtZmp = tgtZmp;
@@ -233,6 +230,7 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
 
       this->copTask_->w() = cnoid::VectorX::Ones(dim) * 1e-6;
       this->copTask_->toSolve() = true;
+      this->copTask_->solver().settings()->setCheckTermination(5); // default 25. 高速化
       this->copTask_->solver().settings()->setVerbosity(0);
     }
 

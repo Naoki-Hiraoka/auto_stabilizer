@@ -37,6 +37,7 @@
 #include "LegCoordsGenerator.h"
 #include "ImpedanceController.h"
 #include "Stabilizer.h"
+#include "ExternalForceHandler.h"
 
 class AutoStabilizer : public RTC::DataFlowComponentBase{
 public:
@@ -129,12 +130,12 @@ protected:
      */
     enum Mode_enum{ MODE_IDLE, MODE_SYNC_TO_ABC, MODE_ABC, MODE_SYNC_TO_ST, MODE_ST, MODE_SYNC_TO_STOPST, MODE_SYNC_TO_IDLE};
     enum Transition_enum{ START_ABC, STOP_ABC, START_ST, STOP_ST};
-    double abc_start_transition_time, abc_stop_transition_time, st_start_transition_time, st_stop_transition_time; // 一般に、現在の姿勢が関節角度上下限外といった状況でなければ、start_transition_timeはほぼゼロでよい
+    double abc_start_transition_time, abc_stop_transition_time, st_start_transition_time, st_stop_transition_time;
   private:
     Mode_enum current, previous, next;
     double remain_time;
   public:
-    ControlMode(){ reset(); abc_start_transition_time = 0.5; abc_stop_transition_time = 2.0; st_start_transition_time = 0.5; st_stop_transition_time = 2.0;}
+    ControlMode(){ reset(); abc_start_transition_time = 2.0; abc_stop_transition_time = 2.0; st_start_transition_time = 0.5; st_stop_transition_time = 2.0;}
     void reset(){ current = previous = next = MODE_IDLE; remain_time = 0;}
     bool setNextTransition(const Transition_enum request){
       switch(request){
@@ -221,6 +222,7 @@ protected:
 
   RefToGenFrameConverter refToGenFrameConverter_;
   ActToGenFrameConverter actToGenFrameConverter_;
+  ExternalForceHandler externalForceHandler_;
   ImpedanceController impedanceController_;
   FootStepGenerator footStepGenerator_;
   LegCoordsGenerator legCoordsGenerator_;
@@ -233,7 +235,7 @@ protected:
   static void moveCoords(cnoid::BodyPtr robot, const cnoid::Position& target, const cnoid::Position& at);
 
   static bool readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobotRaw, cnoid::BodyPtr actRobotRaw, GaitParam& gaitParam);
-  static bool execAutoStabilizer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobotRaw, cnoid::BodyPtr& refRobot, const cnoid::BodyPtr& actRobotRaw, cnoid::BodyPtr& actRobot, cnoid::BodyPtr& genRobot, cnoid::BodyPtr& actRobotTqc, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ActToGenFrameConverter& actToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer);
+  static bool execAutoStabilizer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobotRaw, cnoid::BodyPtr& refRobot, const cnoid::BodyPtr& actRobotRaw, cnoid::BodyPtr& actRobot, cnoid::BodyPtr& genRobot, cnoid::BodyPtr& actRobotTqc, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ActToGenFrameConverter& actToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer, const ExternalForceHandler& externalForceHandler);
   class FullbodyIKParam {
   public:
     cnoid::VectorX jlim_avoid_weight;

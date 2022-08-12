@@ -12,11 +12,9 @@ public:
 
 protected:
   cpp_filters::TwoPointInterpolator<double> handControlRatio = cpp_filters::TwoPointInterpolator<double>(0.0,0.0,0.0,cpp_filters::HOFFARBIB); // 0~1. startAutoBalancer直後の不連続性を減らすためのもの. 0 -> 1へ遷移
-  double handControlRatioTransitionTime = 1.0;
-
 public:
   // startAutoBalancer時に呼ばれる
-  void reset() {
+  void reset(double handControlRatioTransitionTime = 1.0) {
     handControlRatio.reset(0.0);
     handControlRatio.setGoal(1.0, handControlRatioTransitionTime);
     handFixMode.reset(handFixMode.getGoal());

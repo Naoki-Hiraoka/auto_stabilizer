@@ -249,13 +249,10 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
 }
 
 void LegCoordsGenerator::calcCOMCoords(const GaitParam& gaitParam, double dt, double mass, cnoid::Vector3& o_genNextCog, cnoid::Vector3& o_genNextCogVel) const{
-  double w = std::sqrt(gaitParam.g/gaitParam.refdz); // TODO refforceZ
-  cnoid::Vector3 l = cnoid::Vector3::Zero();
-  l[2] = gaitParam.refdz;
   cnoid::Vector3 genZmp;
   if(gaitParam.footstepNodesList[0].isSupportPhase[RLEG] || gaitParam.footstepNodesList[0].isSupportPhase[LLEG]){
-    cnoid::Vector3 genDCM = gaitParam.genCog + gaitParam.genCogVel / w;
-    genZmp = footguidedcontroller::calcFootGuidedControl(w,l,genDCM,gaitParam.refZmpTraj);
+    cnoid::Vector3 genDCM = gaitParam.genCog + gaitParam.genCogVel / gaitParam.omega;
+    genZmp = footguidedcontroller::calcFootGuidedControl(gaitParam.omega,gaitParam.l,genDCM,gaitParam.refZmpTraj);
     if(genZmp[2] >= gaitParam.genCog[2]) genZmp = gaitParam.genCog; // 下向きの力は受けられないので
     else{
       cnoid::Vector3 genZmpOrg = genZmp;
@@ -267,13 +264,13 @@ void LegCoordsGenerator::calcCOMCoords(const GaitParam& gaitParam, double dt, do
           vertices.push_back(gaitParam.genCoords[i].value()*gaitParam.legHull[i][j]);
         }
       }
-      genZmp = mathutil::calcInsidePointOfPolygon3D(genZmp,vertices,gaitParam.genCog);
+      genZmp = mathutil::calcInsidePointOfPolygon3D(genZmp,vertices,gaitParam.genCog - cnoid::Vector3(gaitParam.l[0],gaitParam.l[1], 0.0));
       //zmpがpolygon外に出たとしてもcogを進行方向に少しでもいいから動かす. そうしないとcogが無限遠に発散する恐れあり.
       for(int i=0;i<2;i++){
-        if((genZmpOrg[i]-gaitParam.genCog[i]) > 0.001){
-          if((genZmp[i]-gaitParam.genCog[i]) < 0.001) genZmp[i] = gaitParam.genCog[i] + 0.001;
-        }else if((genZmpOrg[i]-gaitParam.genCog[i]) < -0.001){
-          if((genZmp[i]-gaitParam.genCog[i]) > -0.001) genZmp[i] = gaitParam.genCog[i] - 0.001;
+        if((genZmpOrg[i]-gaitParam.genCog[i]+gaitParam.l[i]) > 0.001){
+          if((genZmp[i]-gaitParam.genCog[i]+gaitParam.l[i]) < 0.001) genZmp[i] = gaitParam.genCog[i] - gaitParam.l[i] + 0.001;
+        }else if((genZmpOrg[i]-gaitParam.genCog[i]+gaitParam.l[i]) < -0.001){
+          if((genZmp[i]-gaitParam.genCog[i]+gaitParam.l[i]) > -0.001) genZmp[i] = gaitParam.genCog[i] - gaitParam.l[i] - 0.001;
         }
       }
       // TODO 角運動量オフセット
@@ -282,7 +279,7 @@ void LegCoordsGenerator::calcCOMCoords(const GaitParam& gaitParam, double dt, do
     genZmp = gaitParam.genCog;
   }
   cnoid::Vector3 genNextCog,genNextCogVel,genNextForce;
-  footguidedcontroller::updateState(w,l,gaitParam.genCog,gaitParam.genCogVel,genZmp,mass,dt,
+  footguidedcontroller::updateState(gaitParam.omega,gaitParam.l,gaitParam.genCog,gaitParam.genCogVel,genZmp,mass,dt,
                                     genNextCog, genNextCogVel, genNextForce);
   o_genNextCog = genNextCog;
   o_genNextCogVel = genNextCogVel;

@@ -37,6 +37,7 @@ add_library(AutoStabilizer SHARED
   FootStepGenerator.cpp
   RefToGenFrameConverter.cpp
   ActToGenFrameConverter.cpp
+  ExternalForceHandler.cpp
   Stabilizer.cpp
   ImpedanceController.cpp
   MathUtil.cpp
