@@ -40,8 +40,8 @@ public:
                     cnoid::BodyPtr& genRobot, cpp_filters::TwoPointInterpolatorSE3& o_footMidCoords, cnoid::Vector3& o_genCog, cnoid::Vector3& o_genCogVel) const; // output
 
   // reference frameで表現されたrefRobotRawをgenerate frameに投影しrefRobotとし、各種referencec値をgenerate frameに変換する
-  bool convertFrame(const cnoid::BodyPtr& refRobotRaw, const GaitParam& gaitParam, // input
-                    cnoid::BodyPtr& refRobot, std::vector<cnoid::Position>& o_refEEPose, std::vector<cnoid::Vector6>& o_refEEWrench, double& o_refdz) const; // output
+  bool convertFrame(const cnoid::BodyPtr& refRobotRaw, const GaitParam& gaitParam, double dt,// input
+                    cnoid::BodyPtr& refRobot, std::vector<cnoid::Position>& o_refEEPose, std::vector<cnoid::Vector6>& o_refEEWrench, double& o_refdz, cpp_filters::TwoPointInterpolatorSE3& o_footMidCoords) const; // output
 protected:
   // refFootOriginWeightとdefaultTranslatePosとcopOffset に基づいて両足中間座標を求める
   cnoid::Position calcRefFootMidCoords(const cnoid::BodyPtr& robot, const GaitParam& gaitParam) const;

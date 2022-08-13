@@ -382,8 +382,8 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
   }
 
   // FootOrigin座標系を用いてrefRobotRawをgenerate frameに投影しrefRobotとする
-  refToGenFrameConverter.convertFrame(refRobotRaw, gaitParam,
-                                      refRobot, gaitParam.refEEPose, gaitParam.refEEWrench, gaitParam.refdz);
+  refToGenFrameConverter.convertFrame(refRobotRaw, gaitParam, dt,
+                                      refRobot, gaitParam.refEEPose, gaitParam.refEEWrench, gaitParam.refdz, gaitParam.footMidCoords);
 
   // FootOrigin座標系を用いてactRobotRawをgenerate frameに投影しactRobotとする
   actToGenFrameConverter.convertFrame(actRobotRaw, gaitParam, dt,
@@ -407,7 +407,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
   footStepGenerator.calcFootSteps(gaitParam, dt, mode.isSTRunning(),
                                   gaitParam.footstepNodesList);
   legCoordsGenerator.calcLegCoords(gaitParam, dt, mode.isSTRunning(),
-                                   gaitParam.refZmpTraj, gaitParam.genCoords, gaitParam.footMidCoords, gaitParam.footstepNodesList[0].swingState);
+                                   gaitParam.refZmpTraj, gaitParam.genCoords, gaitParam.footstepNodesList[0].swingState);
   legCoordsGenerator.calcCOMCoords(gaitParam, dt, genRobot->mass(),
                                    gaitParam.genCog, gaitParam.genCogVel);
   for(int i=0;i<gaitParam.eeName.size();i++){

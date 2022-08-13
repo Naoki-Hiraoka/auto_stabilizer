@@ -16,7 +16,7 @@ public:
                      std::vector<footguidedcontroller::LinearTrajectory<cnoid::Vector3> >& o_refZmpTraj, std::vector<cpp_filters::TwoPointInterpolatorSE3>& o_genCoords) const;
 
   void calcLegCoords(const GaitParam& gaitParam, double dt, bool useActStates,
-                     std::vector<footguidedcontroller::LinearTrajectory<cnoid::Vector3> >& o_refZmpTraj, std::vector<cpp_filters::TwoPointInterpolatorSE3>& o_genCoords, cpp_filters::TwoPointInterpolatorSE3& o_footMidCoords, std::vector<GaitParam::FootStepNodes::SwingState_enum>& o_swingState) const;
+                     std::vector<footguidedcontroller::LinearTrajectory<cnoid::Vector3> >& o_refZmpTraj, std::vector<cpp_filters::TwoPointInterpolatorSE3>& o_genCoords, std::vector<GaitParam::FootStepNodes::SwingState_enum>& o_swingState) const;
   // swingLegGainControl TODO
 
   void calcCOMCoords(const GaitParam& gaitParam, double dt, double mass,
