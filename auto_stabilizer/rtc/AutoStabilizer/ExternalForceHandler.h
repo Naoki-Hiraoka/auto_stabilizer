@@ -32,11 +32,12 @@ public:
     offsetPrev = cnoid::Vector3::Zero();
   }
 
-  bool initExternalForceHandlerOutput(const GaitParam& gaitParam,
-                                      double& o_omega, cnoid::Vector3& o_l, cnoid::Vector3& o_sbpOffset) const;
+  bool initExternalForceHandlerOutput(const GaitParam& gaitParam, const cnoid::BodyPtr& genRobot,
+                                      double& o_omega, cnoid::Vector3& o_l, cnoid::Vector3& o_sbpOffset, cnoid::Vector3& o_genCog) const;
 
   bool handleExternalForce(const GaitParam& gaitParam, double mass, const cnoid::BodyPtr& actRobot, bool useActState, double dt,
                            double& o_omega, cnoid::Vector3& o_l, cnoid::Vector3& o_sbpOffset, cnoid::Vector3& o_actCog) const;
+
 };
 
 #endif

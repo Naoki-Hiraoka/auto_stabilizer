@@ -3,7 +3,7 @@
 #include "MathUtil.h"
 
 bool RefToGenFrameConverter::initGenRobot(const cnoid::BodyPtr& refRobotRaw, const GaitParam& gaitParam, // input
-                                         cnoid::BodyPtr& genRobot, cpp_filters::TwoPointInterpolatorSE3& o_footMidCoords, cnoid::Vector3& o_genCog, cnoid::Vector3& o_genCogVel) const{ // output
+                                         cnoid::BodyPtr& genRobot, cpp_filters::TwoPointInterpolatorSE3& o_footMidCoords, cnoid::Vector3& o_genCogVel) const{ // output
   genRobot->rootLink()->T() = refRobotRaw->rootLink()->T();
   genRobot->rootLink()->v() = refRobotRaw->rootLink()->v();
   genRobot->rootLink()->w() = refRobotRaw->rootLink()->w();
@@ -19,11 +19,9 @@ bool RefToGenFrameConverter::initGenRobot(const cnoid::BodyPtr& refRobotRaw, con
   genRobot->calcForwardKinematics(true);
   genRobot->calcCenterOfMass();
 
-  cnoid::Vector3 genCog = genRobot->centerOfMass();
   cnoid::Vector3 genCogVel = cnoid::Vector3::Zero();
 
   o_footMidCoords.reset(footMidCoords);
-  o_genCog = genCog;
   o_genCogVel = genCogVel;
   return true;
 }
@@ -116,8 +114,8 @@ bool RefToGenFrameConverter::convertFrame(const cnoid::BodyPtr& refRobotRaw, con
   // refEEWrenchを計算
   std::vector<cnoid::Vector6> refEEWrench(gaitParam.eeName.size());
   for(int i=0;i<gaitParam.eeName.size();i++){
-    refEEWrench[i].head<3>() = gaitParam.footMidCoords.value().linear() * gaitParam.refEEWrenchOrigin[i].head<3>();
-    refEEWrench[i].tail<3>() = gaitParam.footMidCoords.value().linear() * gaitParam.refEEWrenchOrigin[i].tail<3>();
+    refEEWrench[i].head<3>() = footMidCoords.value().linear() * gaitParam.refEEWrenchOrigin[i].head<3>();
+    refEEWrench[i].tail<3>() = footMidCoords.value().linear() * gaitParam.refEEWrenchOrigin[i].tail<3>();
   }
 
   o_refEEPose = refEEPose;
@@ -132,13 +130,15 @@ cnoid::Position RefToGenFrameConverter::calcRefFootMidCoords(const cnoid::BodyPt
 
   cnoid::Position rleg = robot->link(gaitParam.eeParentLink[RLEG])->T()*gaitParam.eeLocalT[RLEG];
   rleg.translation() += rleg.linear() * gaitParam.copOffset[RLEG];
+  rleg.translation() -= rleg.linear() * gaitParam.defaultTranslatePos[RLEG];
   cnoid::Position lleg = robot->link(gaitParam.eeParentLink[LLEG])->T()*gaitParam.eeLocalT[LLEG];
   lleg.translation() += lleg.linear() * gaitParam.copOffset[LLEG];
+  lleg.translation() -= lleg.linear() * gaitParam.defaultTranslatePos[LLEG];
 
   cnoid::Position bothmidcoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{rleg, lleg},
                                                           std::vector<double>{1.0, 1.0});
-  cnoid::Position rlegmidcoords = rleg; rlegmidcoords.translation() -= rlegmidcoords.linear() * gaitParam.defaultTranslatePos[RLEG];
-  cnoid::Position llegmidcoords = lleg; llegmidcoords.translation() -= llegmidcoords.linear() * gaitParam.defaultTranslatePos[LLEG];
+  cnoid::Position rlegmidcoords = rleg;
+  cnoid::Position llegmidcoords = lleg;
 
   double bothweight = std::min(this->refFootOriginWeight[RLEG].value(), this->refFootOriginWeight[LLEG].value());
   double rlegweight = this->refFootOriginWeight[RLEG].value() - bothweight;

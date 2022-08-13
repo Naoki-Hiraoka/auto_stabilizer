@@ -1,19 +1,43 @@
 #include "ExternalForceHandler.h"
 #include "MathUtil.h"
 
-bool ExternalForceHandler::initExternalForceHandlerOutput(const GaitParam& gaitParam,
-                                                          double& o_omega, cnoid::Vector3& o_l, cnoid::Vector3& o_sbpOffset) const{
-  double dz = (gaitParam.footMidCoords.value().inverse() * gaitParam.genCog)[2];
-  if(dz <= 0.0){ // 倒立振子近似が成り立たないので破綻する
+bool ExternalForceHandler::initExternalForceHandlerOutput(const GaitParam& gaitParam, const cnoid::BodyPtr& genRobot,
+                                                          double& o_omega, cnoid::Vector3& o_l, cnoid::Vector3& o_sbpOffset, cnoid::Vector3& o_genCog) const{
+  double dz = genRobot->centerOfMass()[2] - gaitParam.footMidCoords.value().translation()[2];
+
+  /*
+    genCog - lの位置まわりのトルクのXY成分が、脚以外の目標反力とgenRobot->centerOfMass()に加わる重力の合計がゼロになるように、genCogを決める
+   */
+  cnoid::Vector6 feedForwardExternalWrench = cnoid::Vector6::Zero(); // generate frame. generate frame原点(Z座標はfootMidCoords)origin.
+  cnoid::Vector3 origin = cnoid::Vector3(0,0,gaitParam.footMidCoords.value().translation()[2]); // generate frame
+  feedForwardExternalWrench.head<3>() += - gaitParam.g * genRobot->mass() * cnoid::Vector3::UnitZ();
+  feedForwardExternalWrench.tail<3>() += (genRobot->centerOfMass() - origin).cross(- gaitParam.g * genRobot->mass() * cnoid::Vector3::UnitZ());
+  for(int i=NUM_LEGS; i<gaitParam.eeName.size();i++){ // 脚以外の目標反力を足す
+    cnoid::Position eePose = genRobot->link(gaitParam.eeParentLink[i])->T() * gaitParam.eeLocalT[i]; // generate frame
+    cnoid::Vector6 eeWrench; /*generate frame. endeffector origin*/
+    eeWrench.head<3>() = gaitParam.footMidCoords.value().linear() * gaitParam.refEEWrenchOrigin[i].head<3>();
+    eeWrench.tail<3>() = gaitParam.footMidCoords.value().linear() * gaitParam.refEEWrenchOrigin[i].tail<3>();
+    feedForwardExternalWrench.head<3>() += eeWrench.head<3>();
+    feedForwardExternalWrench.tail<3>() += eeWrench.tail<3>();
+    feedForwardExternalWrench.tail<3>() += (eePose.translation() - origin).cross(eeWrench.head<3>());
+  }
+
+  if(dz <= 0.0 || feedForwardExternalWrench[2] >= 0.0) { // 倒立振子近似が成り立たないので計算が破綻する.
     o_omega = 1.0;
     o_l = cnoid::Vector3(0.0,0.0,1.0);
     o_sbpOffset.setZero();
+    o_genCog = genRobot->centerOfMass();
     return false;
   }
 
-  o_omega = std::sqrt(gaitParam.g / dz);
+  cnoid::Vector3 genCog = genRobot->centerOfMass();
+  genCog[0] = (-feedForwardExternalWrench[4] / feedForwardExternalWrench[2]);
+  genCog[1] = (feedForwardExternalWrench[3] / feedForwardExternalWrench[2]);
+
+  o_omega = std::sqrt((-feedForwardExternalWrench[2]/genRobot->mass()) / dz);
   o_l = cnoid::Vector3(0.0,0.0,dz);
-  o_sbpOffset.setZero();
+  o_sbpOffset = genRobot->centerOfMass() - genCog;
+  o_genCog = genCog;
   return true;
 }
 
@@ -27,28 +51,26 @@ bool ExternalForceHandler::handleExternalForce(const GaitParam& gaitParam, doubl
     lやsbpOffsetは連続的に変化することが求められている. refEEPoseやrefEEWrenchが不連続に変化すると不連続に変化してしまうので注意. startAutoBalancer直後の初回は、refEEWrenchが非ゼロの場合に不連続に変化することは避けられない. startAutoBalancerのtransition_timeで補間してごまかす.
    */
 
-  cnoid::Vector6 sumRefExternalWrench = cnoid::Vector6::Zero(); // generate frame. generate frame原点origin.
+  cnoid::Vector6 feedForwardExternalWrench = cnoid::Vector6::Zero(); // generate frame. genCog - lの位置origin.
   for(int i=NUM_LEGS; i<gaitParam.eeName.size();i++){ // 脚以外の目標反力を足す
-    sumRefExternalWrench.head<3>() += gaitParam.refEEWrench[i].head<3>()/*generate frame. endeffector origin*/;
-    sumRefExternalWrench.tail<3>() += gaitParam.refEEWrench[i].tail<3>()/*generate frame. endeffector origin*/;
+    feedForwardExternalWrench.head<3>() += gaitParam.refEEWrench[i].head<3>()/*generate frame. endeffector origin*/;
+    feedForwardExternalWrench.tail<3>() += gaitParam.refEEWrench[i].tail<3>()/*generate frame. endeffector origin*/;
     cnoid::Vector3 trans = gaitParam.refEEPose[i].translation() - (gaitParam.genCog - gaitParam.l);
-    sumRefExternalWrench.tail<3>() += trans.cross(gaitParam.refEEWrench[i].head<3>()/*generate frame. endeffector origin*/);
+    feedForwardExternalWrench.tail<3>() += trans.cross(gaitParam.refEEWrench[i].head<3>()/*generate frame. endeffector origin*/);
   }
 
-  if(sumRefExternalWrench[2] >= mass * gaitParam.g) { // 倒立振子近似が成り立たないので計算が破綻する. 前回の値をそのまま使う
-    o_omega = gaitParam.omega;
-    o_l = gaitParam.l;
+  if(feedForwardExternalWrench[2] >= mass * gaitParam.g) { // 倒立振子近似が成り立たないので計算が破綻する. 前回の値をそのまま使う
     return false;
   }
 
-  double omega = std::sqrt((gaitParam.g-sumRefExternalWrench[2]/mass) / gaitParam.refdz);
+  double omega = std::sqrt((gaitParam.g-feedForwardExternalWrench[2]/mass) / gaitParam.refdz);
   cnoid::Vector3 l = cnoid::Vector3::Zero();
   cnoid::Vector3 sbpOffset = cnoid::Vector3::Zero();
   l[2] = gaitParam.refdz;
 
   // フィードフォワード外乱補償
-  sbpOffset[0] = (-sumRefExternalWrench[4] / (mass * gaitParam.g));
-  sbpOffset[1] = (sumRefExternalWrench[3] / (mass * gaitParam.g));
+  sbpOffset[0] = (-feedForwardExternalWrench[4] / (mass * gaitParam.g));
+  sbpOffset[1] = (feedForwardExternalWrench[3] / (mass * gaitParam.g));
 
   // 長期的外乱補償
   {
@@ -81,7 +103,7 @@ bool ExternalForceHandler::handleExternalForce(const GaitParam& gaitParam, doubl
       targetOffset -= sbpOffset; // フィードフォワード外乱補償では足りない分のみを扱う
     }
 
-    cnoid::Vector3 offset = offsetPrev;
+    cnoid::Vector3 offset = this->offsetPrev;
     for(int i=0;i<2;i++){
       double timeConst = this->dcTimeConst;
       if(std::abs(offset[i]) > std::abs(targetOffset[i])) timeConst *= 0.1;
@@ -89,7 +111,7 @@ bool ExternalForceHandler::handleExternalForce(const GaitParam& gaitParam, doubl
     }
     offset = mathutil::clampMatrix(offset, this->dcOffsetLimit);
     sbpOffset += offset; // フィードフォワード外乱補償に足す
-    offsetPrev = offset;
+    this->offsetPrev = offset;
   }
 
   o_omega = omega;

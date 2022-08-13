@@ -37,7 +37,7 @@ public:
   // startAutoBalancer直後の初回に呼ぶ必要がある.
   // generate frame中のfootMidCoordsの位置がreference frame中のrefRobotRawのfootMidCoordsの位置と同じで、generate frame中のfootMidCoordsの傾きが水平になるように、genRobotの初期位置を決め、その姿勢でgenRobotを初期化する
   bool initGenRobot(const cnoid::BodyPtr& refRobotRaw, const GaitParam& gaitParam, // input
-                    cnoid::BodyPtr& genRobot, cpp_filters::TwoPointInterpolatorSE3& o_footMidCoords, cnoid::Vector3& o_genCog, cnoid::Vector3& o_genCogVel) const; // output
+                    cnoid::BodyPtr& genRobot, cpp_filters::TwoPointInterpolatorSE3& o_footMidCoords, cnoid::Vector3& o_genCogVel) const; // output
 
   // reference frameで表現されたrefRobotRawをgenerate frameに投影しrefRobotとし、各種referencec値をgenerate frameに変換する
   bool convertFrame(const cnoid::BodyPtr& refRobotRaw, const GaitParam& gaitParam, double dt,// input

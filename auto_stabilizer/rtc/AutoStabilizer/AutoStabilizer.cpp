@@ -368,9 +368,9 @@ bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr
 bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobotRaw, cnoid::BodyPtr& refRobot, const cnoid::BodyPtr& actRobotRaw, cnoid::BodyPtr& actRobot, cnoid::BodyPtr& genRobot, cnoid::BodyPtr& actRobotTqc, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ActToGenFrameConverter& actToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer, const ExternalForceHandler& externalForceHandler) {
   if(mode.isSyncToABCInit()){ // startAutoBalancer直後の初回. gaitParamのリセット
     refToGenFrameConverter.initGenRobot(refRobotRaw, gaitParam,
-                                        genRobot, gaitParam.footMidCoords, gaitParam.genCog, gaitParam.genCogVel);
-    externalForceHandler.initExternalForceHandlerOutput(gaitParam,
-                                                        gaitParam.omega, gaitParam.l, gaitParam.sbpOffset);
+                                        genRobot, gaitParam.footMidCoords, gaitParam.genCogVel);
+    externalForceHandler.initExternalForceHandlerOutput(gaitParam, genRobot,
+                                                        gaitParam.omega, gaitParam.l, gaitParam.sbpOffset, gaitParam.genCog);
     impedanceController.initImpedanceOutput(gaitParam,
                                             gaitParam.icEEOffset);
     footStepGenerator.initFootStepNodesList(genRobot, gaitParam,
