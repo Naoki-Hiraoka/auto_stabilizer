@@ -4,7 +4,9 @@
 #include <cnoid/ForceSensor>
 
 bool ActToGenFrameConverter::convertFrame(const cnoid::BodyPtr& actRobotRaw, const GaitParam& gaitParam, double dt,// input
-                                          cnoid::BodyPtr& actRobot, std::vector<cnoid::Position>& o_actEEPose, std::vector<cnoid::Vector6>& o_actEEWrench, cnoid::Vector3& o_actCog, cpp_filters::FirstOrderLowPassFilter<cnoid::Vector3>& o_actCogVel) const {
+                                          cnoid::BodyPtr& actRobot, std::vector<cnoid::Position>& o_actEEPose, std::vector<cnoid::Vector6>& o_actEEWrench, cpp_filters::FirstOrderLowPassFilter<cnoid::Vector3>& o_actCogVel) const {
+
+  cnoid::Vector3 actCogPrev = actRobot->centerOfMass();
 
   {
     // FootOrigin座標系を用いてactRobotRawをgenerate frameに投影しactRobotとする
@@ -50,7 +52,6 @@ bool ActToGenFrameConverter::convertFrame(const cnoid::BodyPtr& actRobotRaw, con
     }
   }
 
-  cnoid::Vector3 actCog = actRobot->centerOfMass();
   cnoid::Vector3 actCogVel;
   {
     // actCogを計算
@@ -62,13 +63,12 @@ bool ActToGenFrameConverter::convertFrame(const cnoid::BodyPtr& actRobotRaw, con
       //座標系が飛んでいるので、gaitParam.actCogVel は前回の周期の値をそのままつかう
       actCogVel = gaitParam.actCogVel.value();
     }else{
-      actCogVel = (actCog - gaitParam.actCog) / dt;
+      actCogVel = (actRobot->centerOfMass() - actCogPrev) / dt;
     }
   }
 
   o_actEEPose = actEEPose;
   o_actEEWrench = actEEWrench;
-  o_actCog = actCog;
   if(this->isInitial){
     o_actCogVel.reset(cnoid::Vector3::Zero());
   } else {

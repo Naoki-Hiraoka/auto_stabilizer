@@ -4,17 +4,18 @@
 #include <cnoid/Jacobian>
 
 void Stabilizer::initStabilizerOutput(const GaitParam& gaitParam,
-                                      cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/) const{
+                                      cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/, cnoid::Vector3& o_stTargetZmp) const{
 
   for(int i=0;i<gaitParam.eeName.size();i++){
     o_stEEOffsetDampingControl[i].reset(cnoid::Vector6::Zero());
     o_stEEOffsetSwingEEModification[i].reset(cnoid::Vector6::Zero());
   }
   o_stOffsetRootRpy.reset(cnoid::Vector3::Zero());
+  o_stTargetZmp = gaitParam.refZmpTraj[0].getStart();
 }
 
 bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobot, const cnoid::BodyPtr actRobot, const cnoid::BodyPtr genRobot, const GaitParam& gaitParam, double dt, double mass,
-                                cnoid::BodyPtr& actRobotTqc, cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/) const{
+                                cnoid::BodyPtr& actRobotTqc, cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/, cnoid::Vector3& o_stTargetZmp) const{
   // - root attitude control
   // - 現在のactual重心位置から、目標ZMPを計算
   // - 目標ZMPを満たすように目標足裏反力を計算
@@ -26,14 +27,13 @@ bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobot, const cnoid::Body
                                         o_stOffsetRootRpy); // output
 
   // 現在のactual重心位置から、目標ZMPを計算
-  cnoid::Vector3 tgtZmp; // generate frame
   cnoid::Vector3 tgtForce; // generate frame
   this->calcZMP(gaitParam, dt, mass, // input
-                tgtZmp, tgtForce); // output
+                o_stTargetZmp, tgtForce); // output
 
   // 目標ZMPを満たすように目標EndEffector反力を計算
   std::vector<cnoid::Vector6> tgtEEWrench; // 要素数EndEffector数. generate frame. EndEffector origin
-  this->calcWrench(gaitParam, tgtZmp, tgtForce, // input
+  this->calcWrench(gaitParam, o_stTargetZmp, tgtForce, // input
                    tgtEEWrench); // output
 
   // 目標反力を満たすように重力補償+仮想仕事の原理

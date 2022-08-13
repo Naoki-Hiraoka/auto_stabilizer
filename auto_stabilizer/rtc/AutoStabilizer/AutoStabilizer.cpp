@@ -370,7 +370,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
     refToGenFrameConverter.initGenRobot(refRobotRaw, gaitParam,
                                         genRobot, gaitParam.footMidCoords, gaitParam.genCog, gaitParam.genCogVel);
     externalForceHandler.initExternalForceHandlerOutput(gaitParam,
-                                                        gaitParam.omega, gaitParam.l);
+                                                        gaitParam.omega, gaitParam.l, gaitParam.sbpOffset);
     impedanceController.initImpedanceOutput(gaitParam,
                                             gaitParam.icEEOffset);
     footStepGenerator.initFootStepNodesList(genRobot, gaitParam,
@@ -378,7 +378,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
     legCoordsGenerator.initLegCoords(gaitParam,
                                      gaitParam.refZmpTraj, gaitParam.genCoords);
     stabilizer.initStabilizerOutput(gaitParam,
-                                    gaitParam.stOffsetRootRpy, gaitParam.stEEOffsetDampingControl, gaitParam.stEEOffsetSwingEEModification);
+                                    gaitParam.stOffsetRootRpy, gaitParam.stEEOffsetDampingControl, gaitParam.stEEOffsetSwingEEModification, gaitParam.stTargetZmp);
   }
 
   // FootOrigin座標系を用いてrefRobotRawをgenerate frameに投影しrefRobotとする
@@ -387,11 +387,11 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
 
   // FootOrigin座標系を用いてactRobotRawをgenerate frameに投影しactRobotとする
   actToGenFrameConverter.convertFrame(actRobotRaw, gaitParam, dt,
-                                      actRobot, gaitParam.actEEPose, gaitParam.actEEWrench, gaitParam.actCog,gaitParam.actCogVel);
+                                      actRobot, gaitParam.actEEPose, gaitParam.actEEWrench, gaitParam.actCogVel);
 
   // 目標外力に応じてオフセットを計算する
-  externalForceHandler.handleExternalForce(gaitParam, genRobot->mass(),
-                                           gaitParam.omega, gaitParam.l);
+  externalForceHandler.handleExternalForce(gaitParam, genRobot->mass(), actRobot, mode.isSTRunning(), dt,
+                                           gaitParam.omega, gaitParam.l, gaitParam.sbpOffset, gaitParam.actCog);
 
   // Impedance Controller
   impedanceController.calcImpedanceControl(dt, gaitParam,
@@ -418,7 +418,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
   // Stabilizer
   if(mode.isSTRunning()){
     stabilizer.execStabilizer(refRobot, actRobot, genRobot, gaitParam, dt, genRobot->mass(),
-                              actRobotTqc, gaitParam.stOffsetRootRpy, gaitParam.stEEOffsetDampingControl, gaitParam.stEEOffsetSwingEEModification);
+                              actRobotTqc, gaitParam.stOffsetRootRpy, gaitParam.stEEOffsetDampingControl, gaitParam.stEEOffsetSwingEEModification, gaitParam.stTargetZmp);
   }else if(mode.isSyncToStopST()){ // stopST直後の初回
     gaitParam.stOffsetRootRpy.setGoal(cnoid::Vector3::Zero(),mode.remainTime());
     for(int i=0;i<gaitParam.eeName.size();i++){
@@ -478,7 +478,7 @@ bool AutoStabilizer::solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::Body
     fullbodyIKParam.comConstraint->A_robot() = genRobot;
     fullbodyIKParam.comConstraint->A_localp() = cnoid::Vector3::Zero();
     fullbodyIKParam.comConstraint->B_robot() = nullptr;
-    fullbodyIKParam.comConstraint->B_localp() = gaitParam.genCog;
+    fullbodyIKParam.comConstraint->B_localp() = gaitParam.genCog - gaitParam.sbpOffset;
     fullbodyIKParam.comConstraint->maxError() << 10.0*dt, 10.0*dt, 10.0*dt;
     fullbodyIKParam.comConstraint->precision() << 0.0, 0.0, 0.0; // 強制的にIKをmax loopまで回す
     fullbodyIKParam.comConstraint->weight() << 3.0, 3.0, 1.0;
@@ -664,6 +664,7 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
     if(this->mode_.isSyncToABCInit()){ // startAutoBalancer直後の初回. 内部パラメータのリセット
       this->refToGenFrameConverter_.reset(this->mode_.remainTime());
       this->actToGenFrameConverter_.reset();
+      this->externalForceHandler_.reset();
       this->footStepGenerator_.reset();
       this->impedanceController_.reset();
     }

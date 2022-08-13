@@ -1,21 +1,24 @@
 #include "ExternalForceHandler.h"
+#include "MathUtil.h"
 
 bool ExternalForceHandler::initExternalForceHandlerOutput(const GaitParam& gaitParam,
-                                                          double& o_omega, cnoid::Vector3& o_l) const{
+                                                          double& o_omega, cnoid::Vector3& o_l, cnoid::Vector3& o_sbpOffset) const{
   double dz = (gaitParam.footMidCoords.value().inverse() * gaitParam.genCog)[2];
   if(dz <= 0.0){ // 倒立振子近似が成り立たないので破綻する
     o_omega = 1.0;
     o_l = cnoid::Vector3(0.0,0.0,1.0);
+    o_sbpOffset.setZero();
     return false;
   }
 
   o_omega = std::sqrt(gaitParam.g / dz);
   o_l = cnoid::Vector3(0.0,0.0,dz);
+  o_sbpOffset.setZero();
   return true;
 }
 
-bool ExternalForceHandler::handleExternalForce(const GaitParam& gaitParam, double mass,
-                                               double& o_omega, cnoid::Vector3& o_l) const{
+bool ExternalForceHandler::handleExternalForce(const GaitParam& gaitParam, double mass, const cnoid::BodyPtr& actRobot, bool useActState, double dt,
+                                               double& o_omega, cnoid::Vector3& o_l, cnoid::Vector3& o_sbpOffset, cnoid::Vector3& o_actCog) const{
   /*
     COG - lの位置まわりのトルクのXY成分が、脚以外の目標反力と重心に加わる重力の合計がゼロになればよいとする(厳密な力の釣り合いを考えるなら、全く正確ではないが...)
     脚以外のエンドエフェクタは、RefToGenFrameConverterで、COG - lの位置からの相対位置が変化しないように動く.(HandFixModeは考えない).
@@ -39,12 +42,57 @@ bool ExternalForceHandler::handleExternalForce(const GaitParam& gaitParam, doubl
   }
 
   double omega = std::sqrt((gaitParam.g-sumRefExternalWrench[2]/mass) / gaitParam.refdz);
-  cnoid::Vector3 l;
+  cnoid::Vector3 l = cnoid::Vector3::Zero();
+  cnoid::Vector3 sbpOffset = cnoid::Vector3::Zero();
+  l[2] = gaitParam.refdz;
+
   l[0] = (-sumRefExternalWrench[4] / (mass * gaitParam.g));
   l[1] = (sumRefExternalWrench[3] / (mass * gaitParam.g));
-  l[2] = gaitParam.refdz;
+
+  cnoid::Vector3 actCP = actRobot->centerOfMass() + gaitParam.actCogVel.value() / omega; // generate frame. ここではsbpOffsetやlは考えない, 生の重心位置を用いる
+  cnoid::Vector3 actCPVel;
+  if(this->isInitial) actCPVel = cnoid::Vector3::Zero();
+  else actCPVel = (actCP - this->actCPPrev) / dt;
+  this->actCPPrev = actCP;
+  cnoid::Vector3 tmpOffset = cnoid::Vector3::Zero();
+  tmpOffset.head<2>() = (actCP - actCPVel / omega - gaitParam.stTargetZmp).head<2>();
+  this->disturbance = (this->disturbance * this->disturbanceTime + tmpOffset * dt) / (this->disturbanceTime + dt);
+  this->disturbanceTime += dt;
+  if(this->disturbanceTime > 0.0 &&
+     ((gaitParam.isStatic() && this->disturbanceTime >= this->disturbanceCompensationStaticTime) ||
+      (gaitParam.prevSupportPhase[RLEG] != gaitParam.footstepNodesList[0].isSupportPhase[RLEG] || gaitParam.prevSupportPhase[LLEG] != gaitParam.footstepNodesList[0].isSupportPhase[LLEG]))){
+    this->disturbanceQueue.emplace_back(this->disturbance, this->disturbanceTime);
+    this->disturbance = cnoid::Vector3::Zero();
+    this->disturbanceTime = 0.0;
+    while(this->disturbanceQueue.size() > this->disturbanceCompensationStepNum) this->disturbanceQueue.pop_front();
+  }
+
+  if(this->useDisturbanceCompensation){
+    cnoid::Vector3 average = cnoid::Vector3::Zero();
+    double tm = 0;
+    for(std::list<std::pair<cnoid::Vector3, double> >::iterator it = this->disturbanceQueue.begin(); it != this->disturbanceQueue.end(); it++){
+      average += it->first * it->second;
+      tm += it->second;
+    }
+    average /= tm;
+
+    cnoid::Vector3 offset = offsetPrev;
+    for(int i=0;i<2;i++){
+      double timeConst = this->dcTimeConst;
+      if(std::abs(offset[i]) > std::abs(average[i])) timeConst *= 0.1;
+      offset[i] += (average[i] - offset[i]) * dt / timeConst;
+    }
+
+    sbpOffset += offset;
+    offsetPrev = offset;
+
+    std::cerr << offset.transpose() << std::endl;
+  }
 
   o_omega = omega;
   o_l = l;
+  o_sbpOffset = sbpOffset;
+  o_actCog = actRobot->centerOfMass() - sbpOffset;
+  this->isInitial = false;
   return true;
 }

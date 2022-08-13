@@ -17,7 +17,7 @@ public:
   std::vector<std::string> eeParentLink; // constant. 要素数と順序はeeNameと同じ. 必ずrobot->link(parentLink)がnullptrではないことを約束する. そのため、毎回robot->link(parentLink)がnullptrかをチェックしなくても良い
   std::vector<cnoid::Position> eeLocalT; // constant. 要素数と順序はeeNameと同じ. Parent Link Frame
 
-  double g = 9.80665; // 重力加速度
+  const double g = 9.80665; // 重力加速度
 public:
   // AutoStabilizerの中で計算更新される.
 
@@ -26,15 +26,16 @@ public:
   std::vector<cnoid::Vector6> refEEWrench; // 要素数と順序はeeNameと同じ.generate frame. EndEffector origin. ロボットが受ける力
   double refdz = 1.0; // generate frame. 支持脚からのCogの目標高さ. 0より大きい
 
-  // ExternalForceHandler
-  double omega = std::sqrt(g / refdz); // DCMの計算に用いる. 0より大きい
-  cnoid::Vector3 l = cnoid::Vector3(0, 0, refdz); // generate frame. FootGuidedControlで外力を計算するときの、ZMP-重心の相対位置に対するオフセット. また、CMPの計算時にDCMに対するオフセット(CMP + l = DCM). 連続的に変化する.
-
   // actToGenFrameConverter
-  cnoid::Vector3 actCog; // generate frame.  現在のCOM
   cpp_filters::FirstOrderLowPassFilter<cnoid::Vector3> actCogVel = cpp_filters::FirstOrderLowPassFilter<cnoid::Vector3>(4.0, cnoid::Vector3::Zero());  // generate frame.  現在のCOM速度. cutoff=4.0Hzは今の歩行時間と比べて遅すぎる気もするが、実際のところ問題なさそう?
   std::vector<cnoid::Position> actEEPose; // 要素数と順序はeeNameと同じ.generate frame
   std::vector<cnoid::Vector6> actEEWrench; // 要素数と順序はeeNameと同じ.generate frame. EndEffector origin. ロボットが受ける力
+
+  // ExternalForceHandler
+  double omega = std::sqrt(g / refdz); // DCMの計算に用いる. 0より大きい
+  cnoid::Vector3 l = cnoid::Vector3(0, 0, refdz); // generate frame. FootGuidedControlで外力を計算するときの、ZMP-重心の相対位置に対するオフセット. また、CMPの計算時にDCMに対するオフセット(CMP + l = DCM). 連続的に変化する.
+  cnoid::Vector3 sbpOffset = cnoid::Vector3::Zero(); // generate frame. 外力考慮重心と重心のオフセット. genCog = genRobot->centerOfMass() - sbpOffset. actCog = actRobot->centerOfMass() - sbpOffset.
+  cnoid::Vector3 actCog; // generate frame. 現在のCOMにsbpOffsetを施したもの actCog = actRobot->centerOfMass() - sbpOffset
 
   // ImpedanceController
   std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> > icEEOffset; // 要素数と順序はeeNameと同じ.generate frame. endEffector origin. icで計算されるオフセット
@@ -82,6 +83,7 @@ public:
   std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> > stEEOffsetDampingControl; // 要素数と順序はeeNameと同じ.generate frame. endEffector origin. stで計算されるオフセット(Damping Control)
   std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> > stEEOffsetSwingEEModification; // 要素数と順序はeeNameと同じ.generate frame. endEffector origin. stで計算されるオフセット(SwingEEModification)
   std::vector<cnoid::Position> stEETargetPose; // 要素数と順序はeeNameと同じ.generate frame. stで計算された目標位置姿勢
+  cnoid::Vector3 stTargetZmp; // generate frame. stで計算された目標ZMP
 
   std::vector<std::shared_ptr<IK::PositionConstraint> > ikEEPositionConstraint; // 要素数と順序はeeNameと同じ.
 
@@ -99,7 +101,7 @@ public:
 
 public:
   bool isStatic() const{ // 現在static状態かどうか
-    this->footstepNodesList.size() == 1 && this->footstepNodesList[0].remainTime == 0.0;
+    return this->footstepNodesList.size() == 1 && this->footstepNodesList[0].remainTime == 0.0;
   }
 
 public:
