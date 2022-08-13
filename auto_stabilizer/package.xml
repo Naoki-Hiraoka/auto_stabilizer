@@ -20,4 +20,5 @@
   <depend>ik_constraint</depend>
   <depend>prioritized_qp</depend>
   <depend>fullbody_inverse_kinematics_solver</depend>
+  <depend>joint_limit_table</depend>
 </package>

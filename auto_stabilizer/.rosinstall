@@ -27,3 +27,6 @@
 - git:
     uri: https://github.com/Naoki-Hiraoka/prioritized_qp
     local-name: prioritized_qp
+- git:
+    uri: https://github.com/Naoki-Hiraoka/joint_limit_table
+    local-name: joint_limit_table

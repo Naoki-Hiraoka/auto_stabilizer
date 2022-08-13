@@ -25,6 +25,7 @@
 #include <ik_constraint/COMConstraint.h>
 #include <ik_constraint/JointAngleConstraint.h>
 #include <ik_constraint/AngularMomentumConstraint.h>
+#include <joint_limit_table/JointLimitTable.h>
 
 // #include <cpp_filters/IIRFilter.h>
 // #include <joint_limit_table/JointLimitTable.h>
@@ -212,6 +213,7 @@ protected:
     // constant
     std::string name = ""; // 関節名
     double maxTorque = 0.0; // モデルのclimit * gearRatio * torqueConstより計算
+    std::vector<std::shared_ptr<joint_limit_table::JointLimitTable> > jointLimitTables; // for genRobot
 
     // params
     bool controllable = true; // falseの場合、qやtauはrefの値をそのまま出力する. その関節は存在しないかのように扱う. このパラメータはMODE_IDLEのときにしか変更されないので、そこは安心してプログラムを書いて良い

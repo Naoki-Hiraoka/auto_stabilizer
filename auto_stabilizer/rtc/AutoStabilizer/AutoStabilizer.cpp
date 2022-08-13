@@ -249,23 +249,18 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
   this->loop_ = 0;
 
 
-  // TODO
-
-  // std::string jointLimitTableStr;
-  // if(this->getProperties().hasKey("joint_limit_table")) jointLimitTableStr = std::string(this->getProperties()["joint_limit_table"]);
-  // else jointLimitTableStr = std::string(this->m_pManager->getConfig()["joint_limit_table"]); // 引数 -o で与えたプロパティを捕捉
-  // std::vector<std::shared_ptr<joint_limit_table::JointLimitTable> > jointLimitTables = joint_limit_table::readJointLimitTablesFromProperty (this->robot_com_, jointLimitTableStr);
-  // std::cerr << "[" << this->m_profile.instance_name << "] joint_limit_table: " << jointLimitTableStr<<std::endl;
-  // for(size_t i=0;i<jointLimitTables.size();i++){
-  //   // apply margin
-  //   for(size_t j=0;j<jointLimitTables[i]->lLimitTable().size();j++){
-  //     if(jointLimitTables[i]->uLimitTable()[j] - jointLimitTables[i]->lLimitTable()[j] > 0.002){
-  //       jointLimitTables[i]->uLimitTable()[j] -= 0.001;
-  //       jointLimitTables[i]->lLimitTable()[j] += 0.001;
-  //     }
-  //   }
-  //   this->jointLimitTablesMap_[jointLimitTables[i]->getSelfJoint()].push_back(jointLimitTables[i]);
-  // }
+  std::string jointLimitTableStr; this->getProperty("joint_limit_table",jointLimitTableStr);
+  std::vector<std::shared_ptr<joint_limit_table::JointLimitTable> > jointLimitTables = joint_limit_table::readJointLimitTablesFromProperty (this->genRobot_, jointLimitTableStr);
+  for(size_t i=0;i<jointLimitTables.size();i++){
+    // apply margin
+    for(size_t j=0;j<jointLimitTables[i]->lLimitTable().size();j++){
+      if(jointLimitTables[i]->uLimitTable()[j] - jointLimitTables[i]->lLimitTable()[j] > 0.002){
+        jointLimitTables[i]->uLimitTable()[j] -= 0.001;
+        jointLimitTables[i]->lLimitTable()[j] += 0.001;
+      }
+    }
+    this->jointParams_[jointLimitTables[i]->getSelfJoint()->jointId()].jointLimitTables.push_back(jointLimitTables[i]);
+  }
 
   return RTC::RTC_OK;
 }
@@ -452,6 +447,20 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
 
 // static function
 bool AutoStabilizer::solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::BodyPtr& refRobot, AutoStabilizer::FullbodyIKParam& fullbodyIKParam, double dt, const std::vector<JointParam>& jointParams, const GaitParam& gaitParam) {
+
+  // update joint limit
+  for(int i=0;i<jointParams.size();i++){
+    cnoid::LinkPtr joint = genRobot->joint(i);
+    double u = refRobot->joint(i)->q_upper();
+    double l = refRobot->joint(i)->q_lower();
+    for(int j=0;j<jointParams[i].jointLimitTables.size();j++){
+      u = std::min(u,jointParams[i].jointLimitTables[j]->getUlimit());
+      l = std::max(l,jointParams[i].jointLimitTables[j]->getLlimit());
+    }
+    joint->q() = std::min(u, std::max(l, joint->q()));
+    joint->setJointRange(l, u);
+  }
+
   if(fullbodyIKParam.jlim_avoid_weight.size() != 6+genRobot->numJoints()) fullbodyIKParam.jlim_avoid_weight = cnoid::VectorX::Zero(6+genRobot->numJoints());
   cnoid::VectorX dq_weight_all = cnoid::VectorX::Zero(6+genRobot->numJoints());
   for(int i=0;i<6;i++) dq_weight_all[i] = 1.0;
