@@ -501,6 +501,10 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
 
 // 早づきしたらremainTimeをdtに減らしてすぐに次のnodeへ移る. この機能が無いと少しでもロボットが傾いて早づきするとジャンプするような挙動になる. 遅づきに備えるために、着地位置を下方にオフセットさせる
 void FootStepGenerator::checkEarlyTouchDown(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const GaitParam& gaitParam, double dt) const{
+  for(int i=0;i<NUM_LEGS;i++){
+    actLegWrenchFilter[i].passFilter(gaitParam.actEEWrench[i], dt);
+  }
+
   // 現在片足支持期で、次が両足支持期であるときのみ、行う
   if(!(footstepNodesList.size() > 1 &&
        (footstepNodesList[1].isSupportPhase[RLEG] && footstepNodesList[1].isSupportPhase[LLEG]) &&
@@ -513,7 +517,7 @@ void FootStepGenerator::checkEarlyTouchDown(std::vector<GaitParam::FootStepNodes
   // DOWN_PHASEのときのみ行う
   if(footstepNodesList[0].swingState[swingLeg] != GaitParam::FootStepNodes::DOWN_PHASE) return;
 
-  if(gaitParam.actEEWrench[swingLeg][2] > this->contactDecisionThreshold /*generate frame. ロボットが受ける力*/ ||
+  if(actLegWrenchFilter[swingLeg].value()[2] > this->contactDecisionThreshold /*generate frame. ロボットが受ける力*/ ||
      footstepNodesList[0].remainTime <= dt // 地面につかないままswingphase終了
      ){
     cnoid::Vector3 diff = gaitParam.genCoords[swingLeg].value().translation() - footstepNodesList[0].dstCoords[swingLeg].translation(); // generate frame
@@ -523,6 +527,7 @@ void FootStepGenerator::checkEarlyTouchDown(std::vector<GaitParam::FootStepNodes
     this->transformCurrentSupportSteps(supportLeg, footstepNodesList, trans); // 支持脚を今の位置姿勢で止める
     footstepNodesList[0].remainTime = dt;
     footstepNodesList[0].goalOffset[swingLeg] = 0.0;
+
   }else{
     footstepNodesList[0].goalOffset[swingLeg] = this->goalOffset;
   }

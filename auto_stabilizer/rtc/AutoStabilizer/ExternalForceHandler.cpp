@@ -49,32 +49,35 @@ bool ExternalForceHandler::handleExternalForce(const GaitParam& gaitParam, doubl
   l[0] = (-sumRefExternalWrench[4] / (mass * gaitParam.g));
   l[1] = (sumRefExternalWrench[3] / (mass * gaitParam.g));
 
-  cnoid::Vector3 actCP = actRobot->centerOfMass() + gaitParam.actCogVel.value() / omega; // generate frame. ここではsbpOffsetやlは考えない, 生の重心位置を用いる
-  cnoid::Vector3 actCPVel;
-  if(this->isInitial) actCPVel = cnoid::Vector3::Zero();
-  else actCPVel = (actCP - this->actCPPrev) / dt;
-  this->actCPPrev = actCP;
-  cnoid::Vector3 tmpOffset = cnoid::Vector3::Zero();
-  tmpOffset.head<2>() = (actCP - actCPVel / omega - gaitParam.stTargetZmp).head<2>();
-  this->disturbance = (this->disturbance * this->disturbanceTime + tmpOffset * dt) / (this->disturbanceTime + dt);
-  this->disturbanceTime += dt;
-  if(this->disturbanceTime > 0.0 &&
-     ((gaitParam.isStatic() && this->disturbanceTime >= this->disturbanceCompensationStaticTime) ||
-      (gaitParam.prevSupportPhase[RLEG] != gaitParam.footstepNodesList[0].isSupportPhase[RLEG] || gaitParam.prevSupportPhase[LLEG] != gaitParam.footstepNodesList[0].isSupportPhase[LLEG]))){
-    this->disturbanceQueue.emplace_back(this->disturbance, this->disturbanceTime);
-    this->disturbance = cnoid::Vector3::Zero();
-    this->disturbanceTime = 0.0;
-    while(this->disturbanceQueue.size() > this->disturbanceCompensationStepNum) this->disturbanceQueue.pop_front();
-  }
-
-  if(this->useDisturbanceCompensation){
-    cnoid::Vector3 average = cnoid::Vector3::Zero();
-    double tm = 0;
-    for(std::list<std::pair<cnoid::Vector3, double> >::iterator it = this->disturbanceQueue.begin(); it != this->disturbanceQueue.end(); it++){
-      average += it->first * it->second;
-      tm += it->second;
+  // 長期的外乱補償
+  {
+    cnoid::Vector3 actCP = actRobot->centerOfMass() + gaitParam.actCogVel.value() / omega; // generate frame. ここではsbpOffsetやlは考えない, 生の重心位置を用いる
+    cnoid::Vector3 actCPVel;
+    if(this->isInitial) actCPVel = cnoid::Vector3::Zero();
+    else actCPVel = (actCP - this->actCPPrev) / dt;
+    this->actCPPrev = actCP;
+    cnoid::Vector3 tmpOffset = cnoid::Vector3::Zero();
+    tmpOffset.head<2>() = (actCP - actCPVel / omega - gaitParam.stTargetZmp).head<2>();
+    this->disturbance = (this->disturbance * this->disturbanceTime + tmpOffset * dt) / (this->disturbanceTime + dt);
+    this->disturbanceTime += dt;
+    if(this->disturbanceTime > 0.0 &&
+       ((gaitParam.isStatic() && this->disturbanceTime >= this->disturbanceCompensationStaticTime) ||
+        (gaitParam.prevSupportPhase[RLEG] != gaitParam.footstepNodesList[0].isSupportPhase[RLEG] || gaitParam.prevSupportPhase[LLEG] != gaitParam.footstepNodesList[0].isSupportPhase[LLEG]))){
+      this->disturbanceQueue.emplace_back(this->disturbance, this->disturbanceTime);
+      this->disturbance = cnoid::Vector3::Zero();
+      this->disturbanceTime = 0.0;
+      while(this->disturbanceQueue.size() > this->disturbanceCompensationStepNum) this->disturbanceQueue.pop_front();
     }
-    average /= tm;
+
+    cnoid::Vector3 average = cnoid::Vector3::Zero();
+    if(this->useDisturbanceCompensation && useActState){
+      double tm = 0;
+      for(std::list<std::pair<cnoid::Vector3, double> >::iterator it = this->disturbanceQueue.begin(); it != this->disturbanceQueue.end(); it++){
+        average += it->first * it->second;
+        tm += it->second;
+      }
+      average /= tm;
+    }
 
     cnoid::Vector3 offset = offsetPrev;
     for(int i=0;i<2;i++){
@@ -85,8 +88,6 @@ bool ExternalForceHandler::handleExternalForce(const GaitParam& gaitParam, doubl
 
     sbpOffset += offset;
     offsetPrev = offset;
-
-    std::cerr << offset.transpose() << std::endl;
   }
 
   o_omega = omega;

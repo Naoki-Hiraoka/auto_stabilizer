@@ -419,11 +419,14 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
   if(mode.isSTRunning()){
     stabilizer.execStabilizer(refRobot, actRobot, genRobot, gaitParam, dt, genRobot->mass(),
                               actRobotTqc, gaitParam.stOffsetRootRpy, gaitParam.stEEOffsetDampingControl, gaitParam.stEEOffsetSwingEEModification, gaitParam.stTargetZmp);
-  }else if(mode.isSyncToStopST()){ // stopST直後の初回
-    gaitParam.stOffsetRootRpy.setGoal(cnoid::Vector3::Zero(),mode.remainTime());
-    for(int i=0;i<gaitParam.eeName.size();i++){
-      gaitParam.stEEOffsetDampingControl[i].setGoal(cnoid::Vector6::Zero(),mode.remainTime());
-      gaitParam.stEEOffsetSwingEEModification[i].setGoal(cnoid::Vector6::Zero(),mode.remainTime());
+  }else{
+    gaitParam.stTargetZmp = gaitParam.refZmpTraj[0].getStart();
+    if(mode.isSyncToStopSTInit()){ // stopST直後の初回
+      gaitParam.stOffsetRootRpy.setGoal(cnoid::Vector3::Zero(),mode.remainTime());
+      for(int i=0;i<gaitParam.eeName.size();i++){
+        gaitParam.stEEOffsetDampingControl[i].setGoal(cnoid::Vector6::Zero(),mode.remainTime());
+        gaitParam.stEEOffsetSwingEEModification[i].setGoal(cnoid::Vector6::Zero(),mode.remainTime());
+      }
     }
   }
   gaitParam.stOffsetRootRpy.interpolate(dt);
