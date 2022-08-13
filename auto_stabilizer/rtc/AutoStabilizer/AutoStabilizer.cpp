@@ -481,7 +481,7 @@ bool AutoStabilizer::solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::Body
     fullbodyIKParam.comConstraint->A_robot() = genRobot;
     fullbodyIKParam.comConstraint->A_localp() = cnoid::Vector3::Zero();
     fullbodyIKParam.comConstraint->B_robot() = nullptr;
-    fullbodyIKParam.comConstraint->B_localp() = gaitParam.genCog - gaitParam.sbpOffset;
+    fullbodyIKParam.comConstraint->B_localp() = gaitParam.genCog + gaitParam.sbpOffset;
     fullbodyIKParam.comConstraint->maxError() << 10.0*dt, 10.0*dt, 10.0*dt;
     fullbodyIKParam.comConstraint->precision() << 0.0, 0.0, 0.0; // 強制的にIKをmax loopまで回す
     fullbodyIKParam.comConstraint->weight() << 3.0, 3.0, 1.0;

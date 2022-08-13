@@ -121,8 +121,8 @@ protected:
   void transformFutureSteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, int index, const cnoid::Position& transformOrigin/*generate frame*/, const cnoid::Position& transform/*transformOrigin frame*/) const;
   // footstepNodesList[idx:] idxより先のstepの位置をgenerate frameでtransformだけ動かす
   void transformFutureSteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, int index, const cnoid::Vector3& transform/*generate frame*/) const;
-  // 現在のsupportLegが次にswingするまでの間の位置を、generate frameでtransformだけ動かす
-  void transformCurrentSupportSteps(int leg, std::vector<GaitParam::FootStepNodes>& footstepNodesList, const cnoid::Position& transform/*generate frame*/) const;
+  // indexのsupportLegが次にswingするまでの間の位置を、generate frameでtransformだけ動かす
+  void transformCurrentSupportSteps(int leg, std::vector<GaitParam::FootStepNodes>& footstepNodesList, const cnoid::Position& transform/*generate frame*/, int index) const;
   // footstepNodesの次の一歩を作る. RLEGとLLEGどちらをswingすべきかも決める
   void calcDefaultNextStep(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cnoid::Vector3>& defaultTranslatePos, const cnoid::Vector3& offset = cnoid::Vector3::Zero()) const;
   // footstepNodesの次の一歩を作る.

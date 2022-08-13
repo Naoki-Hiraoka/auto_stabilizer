@@ -211,10 +211,10 @@ void FootStepGenerator::transformFutureSteps(std::vector<GaitParam::FootStepNode
   }
 }
 
-// 現在のsupportLegが次にswingするまでの間の位置を、generate frameでtransformだけ動かす
-void FootStepGenerator::transformCurrentSupportSteps(int leg, std::vector<GaitParam::FootStepNodes>& footstepNodesList, const cnoid::Position& transform/*generate frame*/) const{
+// indexのsupportLegが次にswingするまでの間の位置を、generate frameでtransformだけ動かす
+void FootStepGenerator::transformCurrentSupportSteps(int leg, std::vector<GaitParam::FootStepNodes>& footstepNodesList, const cnoid::Position& transform/*generate frame*/, int index) const{
   assert(0<=leg && leg < NUM_LEGS);
-  for(int i=0;i<footstepNodesList.size();i++){
+  for(int i=index;i<footstepNodesList.size();i++){
     if(!footstepNodesList[i].isSupportPhase[leg]) return;
     footstepNodesList[i].dstCoords[leg] = transform * footstepNodesList[i].dstCoords[leg];
   }
@@ -520,11 +520,20 @@ void FootStepGenerator::checkEarlyTouchDown(std::vector<GaitParam::FootStepNodes
   if(actLegWrenchFilter[swingLeg].value()[2] > this->contactDecisionThreshold /*generate frame. ロボットが受ける力*/ ||
      footstepNodesList[0].remainTime <= dt // 地面につかないままswingphase終了
      ){
-    cnoid::Vector3 diff = gaitParam.genCoords[swingLeg].value().translation() - footstepNodesList[0].dstCoords[swingLeg].translation(); // generate frame
-    this->transformFutureSteps(footstepNodesList, 0, diff); // 遊脚を今の位置でとめる
-    footstepNodesList[0].dstCoords[swingLeg] = gaitParam.genCoords[swingLeg].value(); // 遊脚を今の傾きでとめる
-    cnoid::Position trans = gaitParam.genCoords[supportLeg].value() * footstepNodesList[0].dstCoords[supportLeg].inverse();
-    this->transformCurrentSupportSteps(supportLeg, footstepNodesList, trans); // 支持脚を今の位置姿勢で止める
+    {
+      cnoid::Position origin = mathutil::orientCoordToAxis(footstepNodesList[0].dstCoords[swingLeg], cnoid::Vector3::UnitZ()); // generate frame
+      cnoid::Position transform = origin.inverse() * mathutil::orientCoordToAxis(gaitParam.genCoords[swingLeg].value(), cnoid::Vector3::UnitZ()); // footstepNodesList[0].dstCoords[swingLeg] frame
+      this->transformFutureSteps(footstepNodesList, 0, origin, transform); // 遊脚を今の位置姿勢(Z軸は鉛直)でとめ、連動して将来の着地位置も変える
+    }
+    {
+      cnoid::Position diff = gaitParam.genCoords[swingLeg].value() * footstepNodesList[0].dstCoords[swingLeg].inverse();
+      footstepNodesList[0].dstCoords[swingLeg] = gaitParam.genCoords[swingLeg].value(); // 遊脚を今の傾きでとめる
+      this->transformCurrentSupportSteps(swingLeg, footstepNodesList, diff, 1); // 遊脚の次の支持脚期間を傾きを今の傾きにする
+    }
+    {
+      cnoid::Position diff = gaitParam.genCoords[supportLeg].value() * footstepNodesList[0].dstCoords[supportLeg].inverse();
+      this->transformCurrentSupportSteps(supportLeg, footstepNodesList, diff, 0); // 支持脚を今の位置姿勢で止める
+    }
     footstepNodesList[0].remainTime = dt;
     footstepNodesList[0].goalOffset[swingLeg] = 0.0;
 

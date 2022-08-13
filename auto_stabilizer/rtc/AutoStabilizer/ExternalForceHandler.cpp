@@ -20,11 +20,11 @@ bool ExternalForceHandler::initExternalForceHandlerOutput(const GaitParam& gaitP
 bool ExternalForceHandler::handleExternalForce(const GaitParam& gaitParam, double mass, const cnoid::BodyPtr& actRobot, bool useActState, double dt,
                                                double& o_omega, cnoid::Vector3& o_l, cnoid::Vector3& o_sbpOffset, cnoid::Vector3& o_actCog) const{
   /*
-    COG - lの位置まわりのトルクのXY成分が、脚以外の目標反力と重心に加わる重力の合計がゼロになればよいとする(厳密な力の釣り合いを考えるなら、全く正確ではないが...)
-    脚以外のエンドエフェクタは、RefToGenFrameConverterで、COG - lの位置からの相対位置が変化しないように動く.(HandFixModeは考えない).
-    よって、脚以外の目標反力による今のCOG - lの位置まわりのトルクを計算して、ゼロになっていないぶんだけ、COGを動かしてやれば良い.
+    genCog - lの位置まわりのトルクのXY成分が、脚以外の目標反力と重心に加わる重力の合計がゼロになればよいとする(厳密な力の釣り合いを考えるなら、全く正確ではないが...)
+    脚以外のエンドエフェクタは、RefToGenFrameConverterで、genCog - lの位置からの相対位置が変化しないように動く.(HandFixModeは考えない).
+    よって、脚以外の目標反力による今のgenCog - lの位置まわりのトルクを計算して、ゼロになっていないぶんだけ、COGのoffsetを動かしてやれば良い.
 
-    lは連続的に変化することが求められている(特にRefToGenFrameConverter). refEEPoseやrefEEWrenchが不連続に変化すると不連続に変化してしまうので注意. startAutoBalancer直後の初回は、refEEWrenchが非ゼロの場合に不連続に変化することは避けられない. startAutoBalancerのtransition_timeで補間してごまかす.
+    lやsbpOffsetは連続的に変化することが求められている. refEEPoseやrefEEWrenchが不連続に変化すると不連続に変化してしまうので注意. startAutoBalancer直後の初回は、refEEWrenchが非ゼロの場合に不連続に変化することは避けられない. startAutoBalancerのtransition_timeで補間してごまかす.
    */
 
   cnoid::Vector6 sumRefExternalWrench = cnoid::Vector6::Zero(); // generate frame. generate frame原点origin.
@@ -46,8 +46,9 @@ bool ExternalForceHandler::handleExternalForce(const GaitParam& gaitParam, doubl
   cnoid::Vector3 sbpOffset = cnoid::Vector3::Zero();
   l[2] = gaitParam.refdz;
 
-  l[0] = (-sumRefExternalWrench[4] / (mass * gaitParam.g));
-  l[1] = (sumRefExternalWrench[3] / (mass * gaitParam.g));
+  // フィードフォワード外乱補償
+  sbpOffset[0] = (-sumRefExternalWrench[4] / (mass * gaitParam.g));
+  sbpOffset[1] = (sumRefExternalWrench[3] / (mass * gaitParam.g));
 
   // 長期的外乱補償
   {
@@ -69,24 +70,25 @@ bool ExternalForceHandler::handleExternalForce(const GaitParam& gaitParam, doubl
       while(this->disturbanceQueue.size() > this->disturbanceCompensationStepNum) this->disturbanceQueue.pop_front();
     }
 
-    cnoid::Vector3 average = cnoid::Vector3::Zero();
+    cnoid::Vector3 targetOffset = cnoid::Vector3::Zero();
     if(this->useDisturbanceCompensation && useActState){
       double tm = 0;
       for(std::list<std::pair<cnoid::Vector3, double> >::iterator it = this->disturbanceQueue.begin(); it != this->disturbanceQueue.end(); it++){
-        average += it->first * it->second;
+        targetOffset += it->first * it->second;
         tm += it->second;
       }
-      average /= tm;
+      targetOffset /= tm;
+      targetOffset -= sbpOffset; // フィードフォワード外乱補償では足りない分のみを扱う
     }
 
     cnoid::Vector3 offset = offsetPrev;
     for(int i=0;i<2;i++){
       double timeConst = this->dcTimeConst;
-      if(std::abs(offset[i]) > std::abs(average[i])) timeConst *= 0.1;
-      offset[i] += (average[i] - offset[i]) * dt / timeConst;
+      if(std::abs(offset[i]) > std::abs(targetOffset[i])) timeConst *= 0.1;
+      offset[i] += (targetOffset[i] - offset[i]) * dt / timeConst;
     }
-
-    sbpOffset += offset;
+    offset = mathutil::clampMatrix(offset, this->dcOffsetLimit);
+    sbpOffset += offset; // フィードフォワード外乱補償に足す
     offsetPrev = offset;
   }
 
