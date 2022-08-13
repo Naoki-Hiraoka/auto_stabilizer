@@ -93,7 +93,7 @@ class JAXON_RED_HrpsysConfigurator(ChoreonoidHrpsysConfigurator):
         self.seq_svc.setJointAngles(self.jaxonResetPose()+[0.0, 0.0, 0.0, 0.0] , 1.0)
         #self.ic_svc.startImpedanceController("larm")
         #self.ic_svc.startImpedanceController("rarm")
-        self.ast_svc.startStabilizer()
+        #self.ast_svc.startStabilizer()
 
 if __name__ == '__main__':
     hcf = JAXON_RED_HrpsysConfigurator("JAXON_RED")

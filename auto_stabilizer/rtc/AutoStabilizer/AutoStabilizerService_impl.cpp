@@ -29,14 +29,14 @@ CORBA::Boolean AutoStabilizerService_impl::jumpTo( CORBA::Double x,  CORBA::Doub
   return this->comp_->jumpTo(x, y, z, ts, tf);
 };
 
-CORBA::Boolean AutoStabilizerService_impl::setFootSteps(const OpenHRP::AutoStabilizerService::FootstepsSequence& fss, CORBA::Long overwrite_fs_idx)
+CORBA::Boolean AutoStabilizerService_impl::setFootSteps(const OpenHRP::AutoStabilizerService::FootstepSequence& fs)
 {
-  return this->comp_->setFootSteps(fss, overwrite_fs_idx);
+  return this->comp_->setFootSteps(fs);
 }
 
-CORBA::Boolean AutoStabilizerService_impl::setFootStepsWithParam(const OpenHRP::AutoStabilizerService::FootstepsSequence& fss, const OpenHRP::AutoStabilizerService::StepParamsSequence& spss, CORBA::Long overwrite_fs_idx)
+CORBA::Boolean AutoStabilizerService_impl::setFootStepsWithParam(const OpenHRP::AutoStabilizerService::FootstepSequence& fs, const OpenHRP::AutoStabilizerService::StepParamSequence& spss)
 {
-  return this->comp_->setFootStepsWithParam(fss, spss, overwrite_fs_idx);
+  return this->comp_->setFootStepsWithParam(fs, spss);
 }
 
 void AutoStabilizerService_impl::waitFootSteps()

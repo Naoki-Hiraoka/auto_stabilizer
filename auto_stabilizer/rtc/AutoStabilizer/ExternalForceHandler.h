@@ -16,11 +16,11 @@ public:
 protected:
   // 内部で変更されるパラメータ. startAutoBalancer時にリセットされる
   mutable bool isInitial = true;
-  mutable cnoid::Vector3 actCPPrev = cnoid::Vector3::Zero();
-  mutable std::list<std::pair<cnoid::Vector3, double> > disturbanceQueue = {std::pair<cnoid::Vector3, double>{cnoid::Vector3::Zero(),1.0}};
-  mutable cnoid::Vector3 disturbance = cnoid::Vector3::Zero();
-  mutable double disturbanceTime = 0.0;
-  mutable cnoid::Vector3 offsetPrev = cnoid::Vector3::Zero();
+  mutable cnoid::Vector3 actCPPrev = cnoid::Vector3::Zero(); // generate frame.
+  mutable std::list<std::pair<cnoid::Vector3, double> > disturbanceQueue = {std::pair<cnoid::Vector3, double>{cnoid::Vector3::Zero(),1.0}}; // 過去のfootstepNodesListの各ステップごとの外乱と時間
+  mutable cnoid::Vector3 disturbance = cnoid::Vector3::Zero(); // generate frame. 現在のfootstepNodesListのステップの外乱
+  mutable double disturbanceTime = 0.0; // 現在のfootstepNodesListのステップの時間
+  mutable cnoid::Vector3 offsetPrev = cnoid::Vector3::Zero(); // generate frame. 前回の周期の長期的外乱補償の大きさ
 public:
   // startAutoBalancer時に呼ばれる
   void reset() {

@@ -31,24 +31,22 @@
    "Call jumpTo without wait."
    (send self :autostabilizerservice_jumpTo :x xx :y yy :z zz :ts ts :tf tf))
   (:set-foot-steps-no-wait
-   (foot-step-list &key (overwrite-footstep-index 0))
+   (foot-step-list)
    "Set foot step by default parameters and do not wait for step finish.
-    foot-step-list is list of footstep (only biped) or list of list of footstep.
-    overwrite-footstep-index is index to be overwritten. overwrite_fs_idx is used only in walking."
-   (unless (listp (car foot-step-list))
-     (setq foot-step-list (mapcar #'(lambda (fs) (list fs)) foot-step-list)))
+    foot-step-list is list of footstep."
    (send self :autostabilizerservice_setfootsteps
-         :fss
-         (mapcar #'(lambda (fs)
-                     (instance auto_stabilizer::openhrp_autostabilizerservice_footsteps :init
-                               :fs
-                               (mapcar #'(lambda (f)
-                                           (send self :eus-footstep->abc-footstep f))
-                                       fs)))
-                 foot-step-list)
-         :overwrite_fs_idx overwrite-footstep-index))
+         :fs
+         (mapcar #'(lambda (f)
+                     (send self :eus-footstep->abc-footstep f))
+                 foot-step-list)))
+  (:set-foot-steps
+   (foot-step-list)
+   "Set foot step by default parameters and wait for step finish.
+    foot-step-list is list of footstep."
+   (send self :set-foot-steps-no-wait foot-step-list)
+   (send self :wait-foot-steps))
   (:set-foot-steps-with-param-no-wait
-   (foot-step-list step-height-list step-time-list toe-angle-list heel-angle-list &key (overwrite-footstep-index 0))
+   (foot-step-list step-height-list step-time-list toe-angle-list heel-angle-list)
    "Set foot step with step parameter and do not wait for step finish.
     foot-step-list is list of footstep (only biped) or list of list of footstep.
     step-height-list is list of step height (only biped) or list of list of step height.
@@ -78,7 +76,6 @@
                                            (instance auto_stabilizer::openhrp_autostabilizerservice_stepparam :init :step_height (* sh 1e-3) :step_time st :toe_angle ta :heel_angle ha))
                                        shs sts tas has)))
                  step-height-list step-time-list toe-angle-list heel-angle-list)
-         :overwrite_fs_idx overwrite-footstep-index
          ))
   (:go-velocity
    (vx vy vth)

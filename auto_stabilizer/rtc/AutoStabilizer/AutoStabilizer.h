@@ -52,8 +52,8 @@ public:
   bool goVelocity(const double& vx, const double& vy, const double& vth);
   bool goStop();
   bool jumpTo(const double& x, const double& y, const double& z, const double& ts, const double& tf);
-  bool setFootSteps(const OpenHRP::AutoStabilizerService::FootstepsSequence& fss, CORBA::Long overwrite_fs_idx);
-  bool setFootStepsWithParam(const OpenHRP::AutoStabilizerService::FootstepsSequence& fss, const OpenHRP::AutoStabilizerService::StepParamsSequence& spss, CORBA::Long overwrite_fs_idx);
+  bool setFootSteps(const OpenHRP::AutoStabilizerService::FootstepSequence& fs);
+  bool setFootStepsWithParam(const OpenHRP::AutoStabilizerService::FootstepSequence& fs, const OpenHRP::AutoStabilizerService::StepParamSequence& sps);
   void waitFootSteps();
   bool startAutoBalancer();
   bool stopAutoBalancer();

@@ -6,7 +6,7 @@ bool ExternalForceHandler::initExternalForceHandlerOutput(const GaitParam& gaitP
   double dz = genRobot->centerOfMass()[2] - gaitParam.footMidCoords.value().translation()[2];
 
   /*
-    genCog - lの位置まわりのトルクのXY成分が、脚以外の目標反力とgenRobot->centerOfMass()に加わる重力の合計がゼロになるように、genCogを決める
+    genCog - lの位置まわりのトルクのXY成分が、脚以外の目標反力とgenRobot->centerOfMass()に加わる重力の合計がゼロになるように、genCogを決める. そうすると、genCogにsbpOffsetを足したものがgenRobot->centerOfMass()になるため、出力が連続的になる
    */
   cnoid::Vector6 feedForwardExternalWrench = cnoid::Vector6::Zero(); // generate frame. generate frame原点(Z座標はfootMidCoords)origin.
   cnoid::Vector3 origin = cnoid::Vector3(0,0,gaitParam.footMidCoords.value().translation()[2]); // generate frame
@@ -84,8 +84,8 @@ bool ExternalForceHandler::handleExternalForce(const GaitParam& gaitParam, doubl
     this->disturbance = (this->disturbance * this->disturbanceTime + tmpOffset * dt) / (this->disturbanceTime + dt);
     this->disturbanceTime += dt;
     if(this->disturbanceTime > 0.0 &&
-       ((gaitParam.isStatic() && this->disturbanceTime >= this->disturbanceCompensationStaticTime) ||
-        (gaitParam.prevSupportPhase[RLEG] != gaitParam.footstepNodesList[0].isSupportPhase[RLEG] || gaitParam.prevSupportPhase[LLEG] != gaitParam.footstepNodesList[0].isSupportPhase[LLEG]))){
+       ((gaitParam.isStatic() && this->disturbanceTime >= this->disturbanceCompensationStaticTime) || // 歩いていないときに、この時間で区切ってステップとする
+        (gaitParam.prevSupportPhase[RLEG] != gaitParam.footstepNodesList[0].isSupportPhase[RLEG] || gaitParam.prevSupportPhase[LLEG] != gaitParam.footstepNodesList[0].isSupportPhase[LLEG]))){ // footStepNodesListの変わり目
       this->disturbanceQueue.emplace_back(this->disturbance, this->disturbanceTime);
       this->disturbance = cnoid::Vector3::Zero();
       this->disturbanceTime = 0.0;

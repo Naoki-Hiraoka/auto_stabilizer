@@ -48,9 +48,9 @@ module OpenHRP
       double step_height;
       /// Step time [s]
       double step_time;
-      /// Maximum toe angle [deg] for toe-off motion
+      /// Maximum toe angle [deg] for toe-off motion (TODO)
       double toe_angle;
-      /// Maximum heel angle [deg] for heel-contact motion
+      /// Maximum heel angle [deg] for heel-contact motion (TODO)
       double heel_angle;
     };
 
@@ -653,18 +653,16 @@ module OpenHRP
     /**
      * @brief Set footsteps. Returns without waiting for whole steps to be executed.
      * @param fss is sequence of FootStep structure.
-              overwrite_fs_idx is index to be overwritten. overwrite_fs_idx is used only in walking.
      * @return true if set successfully, false otherwise
      */
-    boolean setFootSteps(in FootstepsSequence fss, in long overwrite_fs_idx);
+    boolean setFootSteps(in FootstepSequence fs);
 
     /**
      * @brief Set footsteps. Returns without waiting for whole steps to be executed.
      * @param fss is sequence of FootStepWithParam structure.
-              overwrite_fs_idx is index to be overwritten. overwrite_fs_idx is used only in walking.
      * @return true if set successfully, false otherwise
      */
-    boolean setFootStepsWithParam(in FootstepsSequence fss, in StepParamsSequence spss, in long overwrite_fs_idx);
+    boolean setFootStepsWithParam(in FootstepSequence fs, in StepParamSequence sps);
 
     /**
      * @brief Wait for whole footsteps are executed.
