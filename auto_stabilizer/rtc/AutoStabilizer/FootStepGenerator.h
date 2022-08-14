@@ -90,6 +90,8 @@ public:
    */
   bool setFootSteps(const GaitParam& gaitParam, const std::vector<StepNode>& footsteps,
                     std::vector<GaitParam::FootStepNodes>& o_footstepNodesList) const;
+  bool goPos(const GaitParam& gaitParam, double x, double y, double th,
+             std::vector<GaitParam::FootStepNodes>& o_footstepNodesList) const;
 
   // footstepNodesListの末尾に両脚が横に並ぶ位置に2歩歩くnodeが入る. 外部からgoVelocityModeをfalseにすること
   bool goStop(const GaitParam& gaitParam,

@@ -26,6 +26,11 @@
    (xx yy th)
    "Call goPos without wait."
    (send self :autostabilizerservice_goPos :x xx :y yy :th th))
+  (:go-pos
+   (xx yy th)
+   "Call goPos with wait."
+   (when (send (send self :go-pos-no-wait xx yy th) :operation_return)
+     (send self :wait-foot-steps))) ;; goVelocity中に呼ぶと無限にwaitするため
   (:jump-to-no-wait
    (xx yy zz ts tf)
    "Call jumpTo without wait."
@@ -43,8 +48,8 @@
    (foot-step-list)
    "Set foot step by default parameters and wait for step finish.
     foot-step-list is list of footstep."
-   (send self :set-foot-steps-no-wait foot-step-list)
-   (send self :wait-foot-steps))
+   (when (send (send self :set-foot-steps-no-wait foot-step-list) :operation_return)
+     (send self :wait-foot-steps))) ;; goVelocity中に呼ぶと無限にwaitするため
   (:set-foot-steps-with-param-no-wait
    (foot-step-list step-height-list step-time-list)
    "Set foot step with step parameter and do not wait for step finish.
@@ -65,8 +70,8 @@
    (foot-step-list step-height-list step-time-list)
    "Set foot step with step parameter and wait for step finish.
     For arguments, please see :set-foot-steps-with-param-no-wait documentation."
-   (send self :set-foot-steps-with-param-no-wait foot-step-list step-height-list step-time-list)
-   (send self :wait-foot-steps))
+   (when (send (send self :set-foot-steps-with-param-no-wait foot-step-list step-height-list step-time-list) :operation_return)
+     (send self :wait-foot-steps))) ;; goVelocity中に呼ぶと無限にwaitするため
   (:go-velocity
    (vx vy vth)
    "Call goVelocity. vx[m/s], vy[m/s], and vth[deg/s]"
@@ -74,7 +79,8 @@
   (:go-stop
    ()
    "Stop stepping."
-   (send self :autostabilizerservice_goStop))
+   (when (send (send self :autostabilizerservice_goStop) :operation_return)
+     (send self :wait-foot-steps)))
   (:wait-foot-steps
    ()
    "Wait for whole footsteps are executed."

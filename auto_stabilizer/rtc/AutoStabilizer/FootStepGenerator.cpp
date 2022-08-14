@@ -43,7 +43,7 @@ bool FootStepGenerator::setFootSteps(const GaitParam& gaitParam, const std::vect
   std::vector<GaitParam::FootStepNodes> footstepNodesList;
   footstepNodesList.push_back(gaitParam.footstepNodesList[0]);
 
-  if(footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG]){
+  if(footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG]){ // 両足支持期を延長
     footstepNodesList.back().remainTime = this->defaultDoubleSupportTime;
   }else if(!footstepNodesList.back().isSupportPhase[RLEG] && footsteps[1].l_r == LLEG){ // RLEGを下ろす必要がある
     this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos);
@@ -81,6 +81,62 @@ bool FootStepGenerator::setFootSteps(const GaitParam& gaitParam, const std::vect
     footstepNodesList.push_back(fs);
 
     footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back()));
+  }
+
+  o_footstepNodesList = footstepNodesList;
+  return true;
+}
+
+bool FootStepGenerator::goPos(const GaitParam& gaitParam, double x/*m*/, double y/*m*/, double th/*deg*/,
+                              std::vector<GaitParam::FootStepNodes>& o_footstepNodesList) const{
+  if(!gaitParam.isStatic()){ // 静止中でないと無効
+    o_footstepNodesList = gaitParam.footstepNodesList;
+    return false;
+  }
+
+  std::vector<GaitParam::FootStepNodes> footstepNodesList;
+  footstepNodesList.push_back(gaitParam.footstepNodesList[0]);
+
+  if(footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG]){ // 両足支持期を延長
+    footstepNodesList.back().remainTime = this->defaultDoubleSupportTime;
+  }
+
+  cnoid::Position currentPose;
+  {
+    cnoid::Position rleg = footstepNodesList.back().dstCoords[RLEG];
+    rleg.translation() -= rleg.linear() * gaitParam.defaultTranslatePos[RLEG];
+    cnoid::Position lleg = footstepNodesList.back().dstCoords[LLEG];
+    lleg.translation() -= lleg.linear() * gaitParam.defaultTranslatePos[LLEG];
+    currentPose = mathutil::calcMidCoords(std::vector<cnoid::Position>{rleg, lleg}, std::vector<double>{footstepNodesList.back().isSupportPhase[RLEG] ? 1.0 : 0.0, footstepNodesList.back().isSupportPhase[LLEG] ? 1.0 : 0.0});
+    currentPose = mathutil::orientCoordToAxis(currentPose, cnoid::Vector3::UnitZ());
+  }
+  cnoid::Position trans;
+  trans.translation() = cnoid::Vector3(x, y, 0.0);
+  trans.linear() = Eigen::AngleAxisd(th * M_PI / 180.0, cnoid::Vector3::UnitZ()).toRotationMatrix();
+  const cnoid::Position goalPose = currentPose * trans; // generate frame. Z軸は鉛直
+
+  int steps = 0;
+  while(true){
+    cnoid::Vector3 diff;
+    diff.head<2>() = goalPose.translation().head<2>() - currentPose.translation().head<2>(); //currentPose frame. [m]
+    diff[2] = cnoid::rpyFromRot(currentPose.linear().inverse() * goalPose.linear())[2]; // currentPose frame. [rad]
+    if(steps >= 1 && // 最低1歩は歩く. (そうしないと、両脚がdefaultTranslatePosとは違う開き方をしているときにgoPos(0,0,0)すると、defaultTranslatePosに戻れない)
+       (diff.head<2>().norm() < 1e-3 * 0.1) && (std::abs(diff[2]) < 0.5 * M_PI / 180.0)) break;
+    this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos, diff);
+    steps++;
+    {
+      cnoid::Position rleg = footstepNodesList.back().dstCoords[RLEG];
+      rleg.translation() -= rleg.linear() * gaitParam.defaultTranslatePos[RLEG];
+      cnoid::Position lleg = footstepNodesList.back().dstCoords[LLEG];
+      lleg.translation() -= lleg.linear() * gaitParam.defaultTranslatePos[LLEG];
+      currentPose = mathutil::calcMidCoords(std::vector<cnoid::Position>{rleg, lleg}, std::vector<double>{footstepNodesList[footstepNodesList.size()-2].isSupportPhase[LLEG] ? 1.0 : 0.0, footstepNodesList[footstepNodesList.size()-2].isSupportPhase[RLEG] ? 1.0 : 0.0}); // 前回swingした足の位置を見る
+      currentPose = mathutil::orientCoordToAxis(currentPose, cnoid::Vector3::UnitZ());
+    }
+  }
+
+  // 両脚が横に並ぶ位置に1歩歩く.
+  for(int i=0;i<1;i++){
+    this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos);
   }
 
   o_footstepNodesList = footstepNodesList;
@@ -226,13 +282,30 @@ void FootStepGenerator::calcDefaultNextStep(std::vector<GaitParam::FootStepNodes
     if(footstepNodesList.size() == 1 ||
        (footstepNodesList[footstepNodesList.size()-2].isSupportPhase[RLEG] && footstepNodesList[footstepNodesList.size()-2].isSupportPhase[LLEG]) ||
        (!footstepNodesList[footstepNodesList.size()-2].isSupportPhase[RLEG] && !footstepNodesList[footstepNodesList.size()-2].isSupportPhase[LLEG]) ){
+      // offsetを、両足の中間からの距離と解釈する(これ以外のケースでは支持脚からの距離と解釈する)
+      cnoid::Position rleg = footstepNodesList[0].dstCoords[RLEG];
+      rleg.translation() -= rleg.linear() * defaultTranslatePos[RLEG];
+      cnoid::Position lleg = footstepNodesList[0].dstCoords[LLEG];
+      lleg.translation() -= lleg.linear() * defaultTranslatePos[LLEG];
+      cnoid::Position midCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{rleg, lleg}, std::vector<double>{1.0, 1.0});
+      rleg = mathutil::orientCoordToAxis(rleg, cnoid::Vector3::UnitZ());
+      lleg = mathutil::orientCoordToAxis(lleg, cnoid::Vector3::UnitZ());
+      midCoords = mathutil::orientCoordToAxis(midCoords, cnoid::Vector3::UnitZ());
       // どっちをswingしてもいいので、進行方向に近いLegをswingする
       cnoid::Vector2 rlegTolleg = (defaultTranslatePos[LLEG] - defaultTranslatePos[RLEG]).head<2>();
       if(rlegTolleg.dot(offset.head<2>()) > 0) {
-        footstepNodesList.push_back(calcDefaultSwingStep(LLEG, footstepNodesList.back(), defaultTranslatePos, offset)); // LLEGをswingする
+        cnoid::Position rlegTomidCoords = rleg.inverse() * midCoords;
+        cnoid::Vector3 offset_rlegLocal;
+        offset_rlegLocal.head<2>() = rlegTomidCoords.translation().head<2>() + (rlegTomidCoords.linear() * cnoid::Vector3(offset[0],offset[1],0.0)).head<2>();
+        offset_rlegLocal[2] = cnoid::rpyFromRot(rlegTomidCoords.linear())[2] + offset[2];
+        footstepNodesList.push_back(calcDefaultSwingStep(LLEG, footstepNodesList.back(), defaultTranslatePos, offset_rlegLocal)); // LLEGをswingする
         footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back()));
       }else{
-        footstepNodesList.push_back(calcDefaultSwingStep(RLEG, footstepNodesList.back(), defaultTranslatePos, offset)); // RLEGをswingする
+        cnoid::Position llegTomidCoords = lleg.inverse() * midCoords;
+        cnoid::Vector3 offset_llegLocal;
+        offset_llegLocal.head<2>() = llegTomidCoords.translation().head<2>() + (llegTomidCoords.linear() * cnoid::Vector3(offset[0],offset[1],0.0)).head<2>();
+        offset_llegLocal[2] = cnoid::rpyFromRot(llegTomidCoords.linear())[2] + offset[2];
+        footstepNodesList.push_back(calcDefaultSwingStep(RLEG, footstepNodesList.back(), defaultTranslatePos, offset_llegLocal)); // RLEGをswingする
         footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back()));
       }
     }else if(footstepNodesList[footstepNodesList.size()-2].isSupportPhase[RLEG]){ // 前回LLEGをswingした
