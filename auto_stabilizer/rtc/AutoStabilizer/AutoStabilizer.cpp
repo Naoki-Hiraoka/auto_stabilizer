@@ -518,7 +518,7 @@ bool AutoStabilizer::solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::Body
     fullbodyIKParam.rootPositionConstraint->B_localpos() = gaitParam.stTargetRootPose;
     fullbodyIKParam.rootPositionConstraint->maxError() << 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt;
     fullbodyIKParam.rootPositionConstraint->precision() << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0; // 強制的にIKをmax loopまで回す
-    fullbodyIKParam.rootPositionConstraint->weight() << 0.0, 0.0, 0.0, 3, 3, 3; // 角運動量を利用するときは重みを小さく. 通常時、胴の質量・イナーシャやマスパラ誤差の大きさや、胴を大きく動かすための出力不足などによって、二足動歩行では胴の傾きの自由度を使わない方がよい
+    fullbodyIKParam.rootPositionConstraint->weight() << 0.0, 0.0, 0.0, 3.0, 3.0, 3.0; // 角運動量を利用するときは重みを小さく. 通常時、胴の質量・イナーシャやマスパラ誤差の大きさや、胴を大きく動かすための出力不足などによって、二足動歩行では胴の傾きの自由度を使わない方がよい
     //fullbodyIKParam.rootPositionConstraint->weight() << 0.0, 0.0, 0.0, 3e-1, 3e-1, 3e-1;
     fullbodyIKParam.rootPositionConstraint->eval_link() = nullptr;
     fullbodyIKParam.rootPositionConstraint->eval_localR() = cnoid::Matrix3::Identity();
@@ -542,15 +542,20 @@ bool AutoStabilizer::solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::Body
     }
   }
 
+  // 特異点近傍で振動するようなことは起こりにくいが、歩行動作中の一瞬だけIKがときにくい姿勢があってすぐに解ける姿勢に戻るといった場合に、その一瞬の間だけIKを解くために頑張って姿勢が大きく変化するので、危険.
+  //  この現象を防ぐには、未来の情報を含んだIKを作るか、歩行動作中にIKが解きづらい姿勢を経由しないように着地位置等をリミットするか. 後者を採用
+  //  歩行動作ではないゆっくりとした動作であれば、この現象が発生しても問題ない
+
   for(int i=0;i<ikConstraint.size();i++) ikConstraint[i]->debuglevel() = 0; //debuglevel
   fik::solveFullbodyIKLoopFast(genRobot,
                                ikConstraint,
                                fullbodyIKParam.jlim_avoid_weight,
                                dq_weight_all,
                                1,//loop
-                               1e-6,
+                               1e-6, // wn
                                0, //debug
-                               dt
+                               dt,
+                               1e2 // we. 1e0だとやや不安定. 1e3だと大きすぎる
                                );
   return true;
 }

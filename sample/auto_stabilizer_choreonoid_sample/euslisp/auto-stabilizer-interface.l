@@ -54,8 +54,8 @@
    (foot-step-list step-height-list step-time-list)
    "Set foot step with step parameter and do not wait for step finish.
     foot-step-list is list of footstep.
-    step-height-list is list of step height.
-    step-time-list is list of step time."
+    step-height-list is list of step height[mm].
+    step-time-list is list of step time[s]."
    (send self :autostabilizerservice_setfootstepswithparam
          :fs
          (mapcar #'(lambda (f)
