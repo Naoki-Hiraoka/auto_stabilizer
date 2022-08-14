@@ -949,6 +949,115 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
     }
   }
 
+  this->footStepGenerator_.defaultStepTime = std::max(i_param.default_step_time, 0.01);
+  this->footStepGenerator_.defaultStrideLimitationTheta = std::max(i_param.default_stride_limitation_theta, 0.0);
+  if(i_param.default_stride_limitation.length() == NUM_LEGS){
+    for(int i=0;i<NUM_LEGS;i++){
+      std::vector<cnoid::Vector3> vertices;
+      for(int j=0;j<i_param.default_stride_limitation[i].length();j++) vertices.emplace_back(i_param.default_stride_limitation[i][j][0],i_param.default_stride_limitation[i][j][1],0.0);
+      vertices = mathutil::calcConvexHull(vertices);
+      if(vertices.size() > 0) this->footStepGenerator_.defaultStrideLimitationHull[i] = vertices;
+    }
+  }
+  this->footStepGenerator_.defaultDoubleSupportRatio = std::min(std::max(i_param.default_double_support_ratio, 0.01), 0.99);
+  this->footStepGenerator_.defaultStepHeight = std::max(i_param.default_step_height, 0.0);
+  this->footStepGenerator_.goVelocityStepNum = std::max(i_param.go_velocity_step_num, 1);
+  this->footStepGenerator_.isModifyFootSteps = i_param.modify_footsteps;
+  this->footStepGenerator_.overwritableMinTime = std::max(i_param.overwritable_min_time, 0.0);
+  this->footStepGenerator_.overwritableMaxTime = std::max(i_param.overwritable_max_time, this->footStepGenerator_.overwritableMinTime);
+  this->footStepGenerator_.overwritableMaxSwingVelocity = std::max(i_param.overwritable_max_swing_velocity, 0.0);
+  if(i_param.safe_leg_hull.length() == NUM_LEGS){
+    for(int i=0;i<NUM_LEGS;i++){
+      std::vector<cnoid::Vector3> vertices;
+      for(int j=0;j<i_param.safe_leg_hull[i].length();j++) vertices.emplace_back(i_param.safe_leg_hull[i][j][0],i_param.safe_leg_hull[i][j][1],0.0);
+      vertices = mathutil::calcConvexHull(vertices);
+      if(vertices.size() > 0) this->footStepGenerator_.safeLegHull[i] = vertices;
+    }
+  }
+  if(!this->mode_.isABCRunning() || this->gaitParam_.isStatic()){
+    if(i_param.overwritable_stride_limitation.length() == NUM_LEGS){
+      for(int i=0;i<NUM_LEGS;i++){
+        std::vector<cnoid::Vector3> vertices;
+        for(int j=0;j<i_param.overwritable_stride_limitation[i].length();j++) vertices.emplace_back(i_param.overwritable_stride_limitation[i][j][0],i_param.overwritable_stride_limitation[i][j][1],0.0);
+        vertices = mathutil::calcConvexHull(vertices);
+        if(vertices.size() > 0) this->footStepGenerator_.overwritableStrideLimitationHull[i] = vertices;
+      }
+    }
+  }
+  this->footStepGenerator_.contactDetectionThreshold = i_param.contact_detection_threshould;
+  if(!this->mode_.isABCRunning() || this->gaitParam_.isStatic()) this->footStepGenerator_.goalOffset = std::min(i_param.goal_offset, 0.0);
+
+  this->legCoordsGenerator_.delayTimeOffset = std::max(i_param.swing_trajectory_delay_time_offset, 0.0);
+  this->legCoordsGenerator_.touchVel = std::max(i_param.swing_trajectory_touch_vel, 0.001);
+  this->legCoordsGenerator_.finalDistanceWeight = std::max(i_param.swing_trajectory_final_distance_weight, 0.01);
+
+  if(i_param.eefm_body_attitude_control_gain.length() == 2 &&
+     i_param.eefm_body_attitude_control_time_const.length() == 2 &&
+     i_param.eefm_body_attitude_control_compensation_limit.length() == 2){
+    for(int i=0;i<2;i++) {
+      this->stabilizer_.bodyAttitudeControlGain[i] = std::max(i_param.eefm_body_attitude_control_gain[i], 0.0);
+      this->stabilizer_.bodyAttitudeControlTimeConst[i] = std::max(i_param.eefm_body_attitude_control_time_const[i], 0.01);
+      if(!this->mode_.isSTRunning()) this->stabilizer_.bodyAttitudeControlCompensationLimit[i] = std::max(i_param.eefm_body_attitude_control_compensation_limit[i], 0.0);
+    }
+  }
+  if(i_param.eefm_rot_damping_gain.length() == NUM_LEGS &&
+     i_param.eefm_rot_time_const.length() == NUM_LEGS &&
+     i_param.eefm_pos_damping_gain.length() == NUM_LEGS &&
+     i_param.eefm_pos_time_const.length() == NUM_LEGS &&
+     i_param.eefm_pos_compensation_limit.length() == NUM_LEGS &&
+     i_param.eefm_rot_compensation_limit.length() == NUM_LEGS){
+    for(int i=0;i<NUM_LEGS;i++){
+      if(i_param.eefm_rot_damping_gain[i].length() == 3 &&
+         i_param.eefm_rot_time_const[i].length() == 3 &&
+         i_param.eefm_pos_damping_gain[i].length() == 3 &&
+         i_param.eefm_pos_time_const[i].length() == 3){
+        for(int j=0;j<3;j++){
+          this->stabilizer_.dampingGain[i][3+j] = std::max(i_param.eefm_rot_damping_gain[i][j], 0.01);
+          this->stabilizer_.dampingTimeConst[i][3+j] = std::max(i_param.eefm_rot_time_const[i][j], 0.01);
+          this->stabilizer_.dampingGain[i][j] = std::max(i_param.eefm_pos_damping_gain[i][j], 0.01);
+          this->stabilizer_.dampingTimeConst[i][j] = std::max(i_param.eefm_pos_time_const[i][j], 0.01);
+        }
+      }
+      if(!this->mode_.isSTRunning()){
+        for(int j=0;j<3;j++){
+          this->stabilizer_.dampingCompensationLimit[i][j] = std::max(i_param.eefm_pos_compensation_limit[i], 0.0);
+          this->stabilizer_.dampingCompensationLimit[i][3+j] = std::max(i_param.eefm_rot_compensation_limit[i], 0.0);
+        }
+      }
+    }
+  }
+
+  if(i_param.eefm_swing_rot_spring_gain.length() == NUM_LEGS &&
+     i_param.eefm_swing_rot_time_const.length() == NUM_LEGS &&
+     i_param.eefm_swing_pos_spring_gain.length() == NUM_LEGS &&
+     i_param.eefm_swing_pos_time_const.length() == NUM_LEGS &&
+     i_param.eefm_swing_pos_spring_velocity_limit.length() == NUM_LEGS &&
+     i_param.eefm_swing_rot_spring_velocity_limit.length() == NUM_LEGS &&
+     i_param.eefm_swing_pos_spring_compensation_limit.length() == NUM_LEGS &&
+     i_param.eefm_swing_rot_spring_compensation_limit.length() == NUM_LEGS){
+    for(int i=0;i<NUM_LEGS;i++){
+      if(i_param.eefm_swing_rot_spring_gain[i].length() == 3 &&
+         i_param.eefm_swing_rot_time_const[i].length() == 3 &&
+         i_param.eefm_swing_pos_spring_gain[i].length() == 3 &&
+         i_param.eefm_swing_pos_time_const[i].length() == 3){
+        for(int j=0;j<3;j++){
+          this->stabilizer_.springGain[i][3+j] = std::max(i_param.eefm_swing_rot_spring_gain[i][j], 0.01);
+          this->stabilizer_.springTimeConst[i][3+j] = std::max(i_param.eefm_swing_rot_time_const[i][j], 0.01);
+          this->stabilizer_.springGain[i][j] = std::max(i_param.eefm_swing_pos_spring_gain[i][j], 0.01);
+          this->stabilizer_.springTimeConst[i][j] = std::max(i_param.eefm_swing_pos_time_const[i][j], 0.01);
+        }
+      }
+      if(!this->mode_.isSTRunning()){
+        for(int j=0;j<3;j++){
+          this->stabilizer_.springCompensationVelocityLimit[i][j] = std::max(i_param.eefm_swing_pos_spring_velocity_limit[i], 0.0);
+          this->stabilizer_.springCompensationVelocityLimit[i][3+j] = std::max(i_param.eefm_swing_rot_spring_velocity_limit[i], 0.0);
+          this->stabilizer_.springCompensationLimit[i][j] = std::max(i_param.eefm_swing_pos_spring_compensation_limit[i], 0.0);
+          this->stabilizer_.springCompensationLimit[i][3+j] = std::max(i_param.eefm_swing_rot_spring_compensation_limit[i], 0.0);
+        }
+      }
+    }
+  }
+
   return true;
 }
 bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::AutoStabilizerParam& i_param){
@@ -1043,7 +1152,60 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
   i_param.contact_detection_threshould = this->footStepGenerator_.contactDetectionThreshold;
   i_param.goal_offset = this->footStepGenerator_.goalOffset;
 
-  // i_param.leg_names // refFootOriginWeightとautoControlRatioが必要
+  i_param.swing_trajectory_delay_time_offset = this->legCoordsGenerator_.delayTimeOffset;
+  i_param.swing_trajectory_touch_vel = this->legCoordsGenerator_.touchVel;
+  i_param.swing_trajectory_final_distance_weight = this->legCoordsGenerator_.finalDistanceWeight;
+
+  i_param.eefm_body_attitude_control_gain.length(2);
+  i_param.eefm_body_attitude_control_time_const.length(2);
+  i_param.eefm_body_attitude_control_compensation_limit.length(2);
+  for(int i=0;i<2;i++) {
+    i_param.eefm_body_attitude_control_gain[i] = this->stabilizer_.bodyAttitudeControlGain[i];
+    i_param.eefm_body_attitude_control_time_const[i] = this->stabilizer_.bodyAttitudeControlTimeConst[i];
+    i_param.eefm_body_attitude_control_compensation_limit[i] = this->stabilizer_.bodyAttitudeControlCompensationLimit[i];
+  }
+  i_param.eefm_rot_damping_gain.length(NUM_LEGS);
+  i_param.eefm_rot_time_const.length(NUM_LEGS);
+  i_param.eefm_pos_damping_gain.length(NUM_LEGS);
+  i_param.eefm_pos_time_const.length(NUM_LEGS);
+  i_param.eefm_pos_compensation_limit.length(NUM_LEGS);
+  i_param.eefm_rot_compensation_limit.length(NUM_LEGS);
+  i_param.eefm_swing_rot_spring_gain.length(NUM_LEGS);
+  i_param.eefm_swing_rot_time_const.length(NUM_LEGS);
+  i_param.eefm_swing_pos_spring_gain.length(NUM_LEGS);
+  i_param.eefm_swing_pos_time_const.length(NUM_LEGS);
+  i_param.eefm_swing_pos_spring_velocity_limit.length(NUM_LEGS);
+  i_param.eefm_swing_rot_spring_velocity_limit.length(NUM_LEGS);
+  i_param.eefm_swing_pos_spring_compensation_limit.length(NUM_LEGS);
+  i_param.eefm_swing_rot_spring_compensation_limit.length(NUM_LEGS);
+  for(int i=0;i<NUM_LEGS;i++){
+    i_param.eefm_rot_damping_gain[i].length(3);
+    i_param.eefm_rot_time_const[i].length(3);
+    i_param.eefm_pos_damping_gain[i].length(3);
+    i_param.eefm_pos_time_const[i].length(3);
+    i_param.eefm_swing_rot_spring_gain[i].length(3);
+    i_param.eefm_swing_rot_time_const[i].length(3);
+    i_param.eefm_swing_pos_spring_gain[i].length(3);
+    i_param.eefm_swing_pos_time_const[i].length(3);
+    for(int j=0;j<3;j++){
+      i_param.eefm_rot_damping_gain[i][j] = this->stabilizer_.dampingGain[i][3+j];
+      i_param.eefm_rot_time_const[i][j] = this->stabilizer_.dampingTimeConst[i][3+j];
+      i_param.eefm_pos_damping_gain[i][j] = this->stabilizer_.dampingGain[i][j];
+      i_param.eefm_pos_time_const[i][j] = this->stabilizer_.dampingTimeConst[i][j];
+      i_param.eefm_swing_rot_spring_gain[i][j] = this->stabilizer_.springGain[i][3+j];
+      i_param.eefm_swing_rot_time_const[i][j] = this->stabilizer_.springTimeConst[i][3+j];
+      i_param.eefm_swing_pos_spring_gain[i][j] = this->stabilizer_.springGain[i][j];
+      i_param.eefm_swing_pos_time_const[i][j] = this->stabilizer_.springTimeConst[i][j];
+    }
+    i_param.eefm_pos_compensation_limit[i] = this->stabilizer_.dampingCompensationLimit[i][0];
+    i_param.eefm_rot_compensation_limit[i] = this->stabilizer_.dampingCompensationLimit[i][3];
+    i_param.eefm_swing_pos_spring_velocity_limit[i] = this->stabilizer_.springCompensationVelocityLimit[i][0];
+    i_param.eefm_swing_rot_spring_velocity_limit[i] = this->stabilizer_.springCompensationVelocityLimit[i][3];
+    i_param.eefm_swing_pos_spring_compensation_limit[i] = this->stabilizer_.springCompensationLimit[i][0];
+    i_param.eefm_swing_rot_spring_compensation_limit[i] = this->stabilizer_.springCompensationLimit[i][3];
+  }
+
+  // i_param.leg_names // refFootOriginWeightとautoControlRatioが必要 TODO
   return true;
 }
 

@@ -61,7 +61,7 @@ bool Stabilizer::moveBasePosRotForBodyRPYControl(const cnoid::BodyPtr refRobot, 
 
   for (size_t i = 0; i < 2; i++) {
     stOffsetRootRpy[i] += (this->bodyAttitudeControlGain[i] * rootRpyError[i] - 1.0/this->bodyAttitudeControlTimeConst[i] * stOffsetRootRpy[i]) * dt;
-    stOffsetRootRpy[i] = mathutil::clamp(stOffsetRootRpy[i], this->rootRotCompensationLimit[i]);
+    stOffsetRootRpy[i] = mathutil::clamp(stOffsetRootRpy[i], this->bodyAttitudeControlCompensationLimit[i]);
   }
   stOffsetRootRpy[2] = 0.0;
 
