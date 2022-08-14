@@ -50,7 +50,8 @@ public:
 
       footstepNodesList[0]のisSupportPhaseは、変更されない
       footstepNodesList[0]のdstCoordsを変更する場合には、footstepNodesList[0]のremainTimeが小さい場合は延長した方が安全
-      footstepNodesList[0]のremainTimeを変更する場合には、小さい値に変更することは避けたほうが安全
+      footstepNodesList[0]のremainTimeを変更する場合には、小さい値に変更することは避けたほうが安全.
+      footstepNodesList[0]のremainTimeは、footstepNodesList[0]が片足支持期でfootstepNodesList[1]が両足支持期の場合に、突然0になる場合がある(footStepGeneratorのearlyTouchDown)
       footstepNodesList[1]のisSupportPhaseを変更する場合には、footstepNodesList[0]のremainTimeが小さい場合はを延長した方が安全
     */
     std::vector<cnoid::Position> dstCoords = std::vector<cnoid::Position>(NUM_LEGS,cnoid::Position::Identity()); // 要素数2. rleg: 0. lleg: 1. generate frame.

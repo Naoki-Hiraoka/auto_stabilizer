@@ -46,37 +46,27 @@
    (send self :set-foot-steps-no-wait foot-step-list)
    (send self :wait-foot-steps))
   (:set-foot-steps-with-param-no-wait
-   (foot-step-list step-height-list step-time-list toe-angle-list heel-angle-list)
+   (foot-step-list step-height-list step-time-list)
    "Set foot step with step parameter and do not wait for step finish.
-    foot-step-list is list of footstep (only biped) or list of list of footstep.
-    step-height-list is list of step height (only biped) or list of list of step height.
-    step-time-list is list of step time (only biped) or list of list of step time.
-    toe-angle-list is list of toe angle (only biped) or list of list of toe angle.
-    heel-angle-list is list of heel angle (only biped) or list of list of heel angle."
-   (unless (listp (car foot-step-list))
-     (setq foot-step-list (mapcar #'(lambda (fs) (list fs)) foot-step-list)
-           step-height-list (mapcar #'(lambda (sh) (list sh)) step-height-list)
-           step-time-list (mapcar #'(lambda (st) (list st)) step-time-list)
-           toe-angle-list (mapcar #'(lambda (ta) (list ta)) toe-angle-list)
-           heel-angle-list (mapcar #'(lambda (ha) (list ha)) heel-angle-list)))
+    foot-step-list is list of footstep.
+    step-height-list is list of step height.
+    step-time-list is list of step time."
    (send self :autostabilizerservice_setfootstepswithparam
-         :fss
-         (mapcar #'(lambda (fs)
-                     (instance auto_stabilizer::openhrp_autostabilizerservice_footsteps :init
-                               :fs
-                               (mapcar #'(lambda (f)
-                                           (send self :eus-footstep->abc-footstep f))
-                                       fs)))
+         :fs
+         (mapcar #'(lambda (f)
+                     (send self :eus-footstep->abc-footstep f))
                  foot-step-list)
-         :spss
-         (mapcar #'(lambda (shs sts tas has)
-                     (instance auto_stabilizer::openhrp_autostabilizerservice_stepparams :init
-                               :sps
-                               (mapcar #'(lambda (sh st ta ha)
-                                           (instance auto_stabilizer::openhrp_autostabilizerservice_stepparam :init :step_height (* sh 1e-3) :step_time st :toe_angle ta :heel_angle ha))
-                                       shs sts tas has)))
-                 step-height-list step-time-list toe-angle-list heel-angle-list)
+         :sps
+         (mapcar #'(lambda (sh st)
+                     (instance auto_stabilizer::openhrp_autostabilizerservice_stepparam :init :step_height (* sh 1e-3) :step_time st))
+                 step-height-list step-time-list)
          ))
+  (:set-foot-steps-with-param
+   (foot-step-list step-height-list step-time-list)
+   "Set foot step with step parameter and wait for step finish.
+    For arguments, please see :set-foot-steps-with-param-no-wait documentation."
+   (send self :set-foot-steps-with-param-no-wait foot-step-list step-height-list step-time-list)
+   (send self :wait-foot-steps))
   (:go-velocity
    (vx vy vth)
    "Call goVelocity. vx[m/s], vy[m/s], and vth[deg/s]"

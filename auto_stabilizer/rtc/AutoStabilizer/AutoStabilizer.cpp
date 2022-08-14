@@ -758,6 +758,27 @@ bool AutoStabilizer::setFootSteps(const OpenHRP::AutoStabilizerService::Footstep
 }
 bool AutoStabilizer::setFootStepsWithParam(const OpenHRP::AutoStabilizerService::FootstepSequence& fs, const OpenHRP::AutoStabilizerService::StepParamSequence& sps){
   std::lock_guard<std::mutex> guard(this->mutex_);
+  std::vector<FootStepGenerator::StepNode> footsteps;
+  if(fs.length() != sps.length()){
+    std::cerr << "\x1b[31m[" << this->m_profile.instance_name << "] fs.length() != sps.length()" << "\x1b[39m" << std::endl;
+    return false;
+  }
+  for(int i=0;i<fs.length();i++){
+    FootStepGenerator::StepNode stepNode;
+    if(std::string(fs[i].leg) == "rleg") stepNode.l_r = RLEG;
+    else if(std::string(fs[i].leg) == "lleg") stepNode.l_r = LLEG;
+    else {
+      std::cerr << "\x1b[31m[" << this->m_profile.instance_name << "] leg name [" << fs[i].leg << "] is invalid" << "\x1b[39m" << std::endl;
+      return false;
+    }
+    stepNode.coords.translation() = cnoid::Vector3(fs[i].pos[0],fs[i].pos[1],fs[i].pos[2]);
+    stepNode.coords.linear() = Eigen::Quaterniond(fs[i].rot[0],fs[i].rot[1],fs[i].rot[2],fs[i].rot[3]).toRotationMatrix();
+    stepNode.stepHeight = sps[i].step_height;
+    stepNode.stepTime = sps[i].step_time;
+    footsteps.push_back(stepNode);
+  }
+  this->footStepGenerator_.setFootSteps(this->gaitParam_,footsteps, // input
+                                        this->gaitParam_.footstepNodesList); // output
   return true;
 }
 void AutoStabilizer::waitFootSteps(){

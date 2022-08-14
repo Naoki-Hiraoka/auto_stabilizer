@@ -66,7 +66,7 @@ public:
   public:
     int l_r; // 0: RLEG. 1: LLEG
     cnoid::Position coords;
-    double stepHeight, stepTime;
+    double stepHeight, stepTime; // stepHeightは0以上でなければならない. stepTimeは0より大きくなければならない
   public:
     StepNode () : l_r(RLEG), coords(cnoid::Position::Identity()), stepHeight(), stepTime(){};
     StepNode (const int _l_r, const cnoid::Position& _coords, const double _stepHeight, const double _stepTime)
