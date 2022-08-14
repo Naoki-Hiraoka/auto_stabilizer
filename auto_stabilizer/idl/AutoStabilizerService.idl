@@ -117,7 +117,7 @@ module OpenHRP
     struct AutoStabilizerParam
     {
       // AutoStabilizer
-      // AutoStablizerが変更する関節の名前. MODE_IDLEのとき以外変更不可.
+      /// AutoStablizerが変更する関節の名前. MODE_IDLEのとき以外変更不可.
       sequence<string> controllable_joints;
       /// Transition time [s] for start AutoBalancer. 下限0.01[s]
       double abc_start_transition_time;
@@ -127,6 +127,14 @@ module OpenHRP
       double st_start_transition_time;
       /// Transition time [s] for stop Stabilizer. 下限0.01[s]
       double st_stop_transition_time;
+
+      // GaitParam
+      /// ZMP offset vectors[m] for rleg and lleg (<-please set by this order)
+      sequence<sequence<double, 2>, 2> default_zmp_offsets;
+      /// convex hull.
+      sequence<sequence<sequence<double, 2> >, 2> leg_hull;
+      /// Foot position offset[m] (rleg and lleg)
+      sequence<sequence<double, 2>, 2> leg_default_translate_pos;
 
       // RefToGenFrameConverter
       /// Flag for fix hand while walking.
@@ -204,33 +212,33 @@ module OpenHRP
       /// Limit of compensation for difference between ref-act root rot [rad]. stabilierが動いているときは変更不可. 下限0.0
       sequence<double, 2> eefm_body_attitude_control_compensation_limit;
       /// Sequence of all end-effector rotation damping gain [Nm/(rad/s)] (r,p,y). 下限0.01
-      sequence<sequence<double, 3> > eefm_rot_damping_gain;
+      sequence<sequence<double, 3>, 2 > eefm_rot_damping_gain;
       /// Sequence of all end-effector rotation damping time constant [s] (r,p,y). 下限0.01
-      sequence<sequence<double, 3> > eefm_rot_time_const;
+      sequence<sequence<double, 3>, 2 > eefm_rot_time_const;
       /// Sequence of all end-effector position damping gain [N/(m/s)] (x,y,z). 下限0.01
-      sequence<sequence<double, 3> > eefm_pos_damping_gain;
+      sequence<sequence<double, 3>, 2 > eefm_pos_damping_gain;
       /// Sequence of all end-effector position damping time constant for double support phase [s] (x,y,z). 下限0.01
-      sequence<sequence<double, 3> > eefm_pos_time_const;
+      sequence<sequence<double, 3>, 2 > eefm_pos_time_const;
       /// Sequence of all end-effector position compensation limit [m]. stabilierが動いているときは変更不可. 下限0.0
-      sequence<double> eefm_pos_compensation_limit;
+      sequence<double, 2> eefm_pos_compensation_limit;
       /// Sequence of all end-effector rot compensation limit [rad]. stabilierが動いているときは変更不可. 下限0.0
-      sequence<double> eefm_rot_compensation_limit;
+      sequence<double, 2> eefm_rot_compensation_limit;
       /// Sequence of all swing leg end-effector rotation spring gain (r,p,y). 下限0.01
-      sequence<sequence<double, 3> > eefm_swing_rot_spring_gain;
+      sequence<sequence<double, 3>, 2> eefm_swing_rot_spring_gain;
       /// Sequence of all swing leg end-effector rotation spring time constant [s] (r,p,y). 下限0.01
-      sequence<sequence<double, 3> > eefm_swing_rot_time_const;
+      sequence<sequence<double, 3>, 2 > eefm_swing_rot_time_const;
       /// Sequence of all swing leg end-effector position spring gain (x,y,z). 下限0.01
-      sequence<sequence<double, 3> > eefm_swing_pos_spring_gain;
+      sequence<sequence<double, 3>, 2 > eefm_swing_pos_spring_gain;
       /// Sequence of all swing leg end-effector position spring time constant [s] (x,y,z). 下限0.01
-      sequence<sequence<double, 3> > eefm_swing_pos_time_const;
+      sequence<sequence<double, 3>, 2 > eefm_swing_pos_time_const;
       /// Sequence of all end-effector position compensation limit [m]. stabilierが動いているときは変更不可. 下限0.0
-      sequence<double> eefm_swing_pos_spring_compensation_limit;
+      sequence<double, 2> eefm_swing_pos_spring_compensation_limit;
       /// Sequence of all end-effector rot compensation limit [rad]. stabilierが動いているときは変更不可. 下限0.0
-      sequence<double> eefm_swing_rot_spring_compensation_limit;
+      sequence<double, 2> eefm_swing_rot_spring_compensation_limit;
       /// Sequence of all end-effector position compensation limit [m/s]. 下限0.0
-      sequence<double> eefm_swing_pos_spring_velocity_limit;
+      sequence<double, 2> eefm_swing_pos_spring_velocity_limit;
       /// Sequence of all end-effector rot compensation limit [rad/s]. 下限0.0
-      sequence<double> eefm_swing_rot_spring_velocity_limit;
+      sequence<double, 2> eefm_swing_rot_spring_velocity_limit;
     };
 
     /**

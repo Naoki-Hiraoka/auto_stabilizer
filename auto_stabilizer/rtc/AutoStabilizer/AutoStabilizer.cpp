@@ -896,11 +896,33 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
       if(joint) this->jointParams_[joint->jointId()].controllable = true;
     }
   }
-
   this->mode_.abc_start_transition_time = std::max(i_param.abc_start_transition_time, 0.01);
   this->mode_.abc_stop_transition_time = std::max(i_param.abc_stop_transition_time, 0.01);
   this->mode_.st_start_transition_time = std::max(i_param.st_start_transition_time, 0.01);
   this->mode_.st_stop_transition_time = std::max(i_param.st_stop_transition_time, 0.01);
+
+  if(i_param.default_zmp_offsets.length() == NUM_LEGS){
+    for(int i=0;i<NUM_LEGS; i++) {
+      if(i_param.default_zmp_offsets[i].length() == 2){
+        for(int j=0;j<2;j++) this->gaitParam_.copOffset[i][j] = i_param.default_zmp_offsets[i][j];
+      }
+    }
+  }
+  if(i_param.leg_hull.length() == NUM_LEGS){
+    for(int i=0;i<NUM_LEGS;i++){
+      std::vector<cnoid::Vector3> vertices;
+      for(int j=0;j<i_param.leg_hull[i].length();j++) vertices.emplace_back(i_param.leg_hull[i][j][0],i_param.leg_hull[i][j][1],0.0);
+      vertices = mathutil::calcConvexHull(vertices);
+      if(vertices.size() > 0) this->gaitParam_.legHull[i] = vertices;
+    }
+  }
+  if(i_param.leg_default_translate_pos.length() == NUM_LEGS){
+    for(int i=0;i<NUM_LEGS; i++) {
+      if(i_param.leg_default_translate_pos[i].length() == 2){
+        for(int j=0;j<2;j++) this->gaitParam_.defaultTranslatePos[i][j] = i_param.leg_default_translate_pos[i][j];
+      }
+    }
+  }
 
   if((this->refToGenFrameConverter_.handFixMode.getGoal() == 1.0) != i_param.is_hand_fix_mode) this->refToGenFrameConverter_.handFixMode.setGoal(i_param.is_hand_fix_mode ? 1.0 : 0.0, 1.0); // 1.0[s]で補間
 
@@ -1067,11 +1089,29 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
   for(int i=0;i<this->jointParams_.size();i++) if(this->jointParams_[i].controllable) controllable_joints.push_back(this->jointParams_[i].name);
   i_param.controllable_joints.length(controllable_joints.size());
   for(int i=0;i<controllable_joints.size();i++) i_param.controllable_joints[i] = controllable_joints[i].c_str();
-
   i_param.abc_start_transition_time = this->mode_.abc_start_transition_time;
   i_param.abc_stop_transition_time = this->mode_.abc_stop_transition_time;
   i_param.st_start_transition_time = this->mode_.st_start_transition_time;
   i_param.st_stop_transition_time = this->mode_.st_stop_transition_time;
+
+  i_param.default_zmp_offsets.length(NUM_LEGS);
+  for(int i=0;i<NUM_LEGS; i++) {
+    i_param.default_zmp_offsets[i].length(2);
+    for(int j=0;j<2;j++) i_param.default_zmp_offsets[i][j] = this->gaitParam_.copOffset[i][j];
+  }
+  i_param.leg_hull.length(NUM_LEGS);
+  for(int i=0;i<NUM_LEGS;i++){
+    i_param.leg_hull[i].length(this->gaitParam_.legHull[i].size());
+    for(int j=0;j<this->gaitParam_.legHull[i].size(); j++) {
+      i_param.leg_hull[i][j].length(2);
+      for(int k=0;k<2;k++) i_param.leg_hull[i][j][k] = this->gaitParam_.legHull[i][j][k];
+    }
+  }
+  i_param.leg_default_translate_pos.length(NUM_LEGS);
+  for(int i=0;i<NUM_LEGS; i++) {
+    i_param.leg_default_translate_pos[i].length(2);
+    for(int j=0;j<2;j++) i_param.leg_default_translate_pos[i][j] = this->gaitParam_.defaultTranslatePos[i][j];
+  }
 
   i_param.is_hand_fix_mode = (this->refToGenFrameConverter_.handFixMode.getGoal() == 1.0);
 
@@ -1135,18 +1175,18 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
   i_param.overwritable_max_swing_velocity = this->footStepGenerator_.overwritableMaxSwingVelocity;
   i_param.safe_leg_hull.length(NUM_LEGS);
   for(int i=0;i<NUM_LEGS;i++){
-    i_param.default_stride_limitation[i].length(this->footStepGenerator_.safeLegHull[i].size());
+    i_param.safe_leg_hull[i].length(this->footStepGenerator_.safeLegHull[i].size());
     for(int j=0;j<this->footStepGenerator_.safeLegHull[i].size(); j++) {
-      i_param.default_stride_limitation[i][j].length(2);
-      for(int k=0;k<2;k++) i_param.default_stride_limitation[i][j][k] = this->footStepGenerator_.safeLegHull[i][j][k];
+      i_param.safe_leg_hull[i][j].length(2);
+      for(int k=0;k<2;k++) i_param.safe_leg_hull[i][j][k] = this->footStepGenerator_.safeLegHull[i][j][k];
     }
   }
   i_param.overwritable_stride_limitation.length(NUM_LEGS);
   for(int i=0;i<NUM_LEGS;i++){
-    i_param.default_stride_limitation[i].length(this->footStepGenerator_.overwritableStrideLimitationHull[i].size());
+    i_param.overwritable_stride_limitation[i].length(this->footStepGenerator_.overwritableStrideLimitationHull[i].size());
     for(int j=0;j<this->footStepGenerator_.overwritableStrideLimitationHull[i].size(); j++) {
-      i_param.default_stride_limitation[i][j].length(2);
-      for(int k=0;k<2;k++) i_param.default_stride_limitation[i][j][k] = this->footStepGenerator_.overwritableStrideLimitationHull[i][j][k];
+      i_param.overwritable_stride_limitation[i][j].length(2);
+      for(int k=0;k<2;k++) i_param.overwritable_stride_limitation[i][j][k] = this->footStepGenerator_.overwritableStrideLimitationHull[i][j][k];
     }
   }
   i_param.contact_detection_threshould = this->footStepGenerator_.contactDetectionThreshold;
