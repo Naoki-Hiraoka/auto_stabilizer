@@ -64,41 +64,16 @@ CORBA::Boolean AutoStabilizerService_impl::stopStabilizer(void)
   return this->comp_->stopStabilizer();
 }
 
-CORBA::Boolean AutoStabilizerService_impl::setGaitGeneratorParam(const OpenHRP::AutoStabilizerService::GaitGeneratorParam& i_param)
+CORBA::Boolean AutoStabilizerService_impl::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService::AutoStabilizerParam& i_param)
 {
-  return this->comp_->setGaitGeneratorParam(i_param);
+  return this->comp_->setAutoStabilizerParam(i_param);
 };
 
-CORBA::Boolean AutoStabilizerService_impl::getGaitGeneratorParam(OpenHRP::AutoStabilizerService::GaitGeneratorParam_out i_param)
+CORBA::Boolean AutoStabilizerService_impl::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::AutoStabilizerParam_out i_param)
 {
-  i_param = new OpenHRP::AutoStabilizerService::GaitGeneratorParam();
-  i_param->stride_parameter.length(6);
-  i_param->toe_heel_phase_ratio.length(7);
-  i_param->zmp_weight_map.length(4);
-  return this->comp_->getGaitGeneratorParam(*i_param);
+  i_param = new OpenHRP::AutoStabilizerService::AutoStabilizerParam();
+  return this->comp_->getAutoStabilizerParam(*i_param);
 };
-
-CORBA::Boolean AutoStabilizerService_impl::setAutoBalancerParam(const OpenHRP::AutoStabilizerService::AutoBalancerParam& i_param)
-{
-  return this->comp_->setAutoBalancerParam(i_param);
-};
-
-CORBA::Boolean AutoStabilizerService_impl::getAutoBalancerParam(OpenHRP::AutoStabilizerService::AutoBalancerParam_out i_param)
-{
-  i_param = new OpenHRP::AutoStabilizerService::AutoBalancerParam();
-  return this->comp_->getAutoBalancerParam(*i_param);
-};
-
-void AutoStabilizerService_impl::setStabilizerParam(const OpenHRP::AutoStabilizerService::StabilizerParam& i_param)
-{
-  this->comp_->setStabilizerParam(i_param);
-}
-
-void AutoStabilizerService_impl::getStabilizerParam(OpenHRP::AutoStabilizerService::StabilizerParam_out i_param)
-{
-  i_param = new OpenHRP::AutoStabilizerService::StabilizerParam();
-  return this->comp_->getStabilizerParam(*i_param);
-}
 
 CORBA::Boolean AutoStabilizerService_impl::releaseEmergencyStop()
 {

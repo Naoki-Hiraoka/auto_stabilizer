@@ -6,11 +6,11 @@
 class ImpedanceController {
 public:
   // Impedance Controllerでしか使わないパラメータ
-  std::vector<cnoid::Vector6> compensationLimit; // 要素数EndEffectors. generate frame. endEffector origin. この値はisImpedanceModeがtrueのときに不連続に変えてはならない
-  std::vector<cnoid::Vector6> M; // 要素数EndEffectors. EndEffector frame(icTargetPose). endEffector origin
-  std::vector<cnoid::Vector6> D; // 要素数EndEffectors. EndEffector frame(icTargetPose). endEffector origin
-  std::vector<cnoid::Vector6> K; // 要素数EndEffectors. EndEffector frame(icTargetPose). endEffector origin
-  std::vector<cnoid::Vector6> wrenchGain; // 要素数EndEffectors. EndEffector frame(icTargetPose). endEffector origin
+  std::vector<cnoid::Vector6> compensationLimit; // 要素数EndEffectors. generate frame. endEffector origin. この値はisImpedanceModeがtrueのときに不連続に変えてはならない. 0以上
+  std::vector<cnoid::Vector6> M; // 要素数EndEffectors. EndEffector frame(icTargetPose). endEffector origin. 0以上
+  std::vector<cnoid::Vector6> D; // 要素数EndEffectors. EndEffector frame(icTargetPose). endEffector origin. 0以上
+  std::vector<cnoid::Vector6> K; // 要素数EndEffectors. EndEffector frame(icTargetPose). endEffector origin. 0以上
+  std::vector<cnoid::Vector6> wrenchGain; // 要素数EndEffectors. EndEffector frame(icTargetPose). endEffector origin. 0以上
 
   // reset()時にresetされる
   std::vector<bool> isImpedanceMode; // 要素数EndEffectors. Impedance Controlをするかどうか

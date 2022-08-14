@@ -24,12 +24,8 @@ public:
   CORBA::Boolean stopAutoBalancer();
   CORBA::Boolean startStabilizer(void);
   CORBA::Boolean stopStabilizer(void);
-  CORBA::Boolean setGaitGeneratorParam(const OpenHRP::AutoStabilizerService::GaitGeneratorParam& i_param);
-  CORBA::Boolean getGaitGeneratorParam(OpenHRP::AutoStabilizerService::GaitGeneratorParam_out i_param);
-  CORBA::Boolean setAutoBalancerParam(const OpenHRP::AutoStabilizerService::AutoBalancerParam& i_param);
-  CORBA::Boolean getAutoBalancerParam(OpenHRP::AutoStabilizerService::AutoBalancerParam_out i_param);
-  void setStabilizerParam(const OpenHRP::AutoStabilizerService::StabilizerParam& i_param);
-  void getStabilizerParam(OpenHRP::AutoStabilizerService::StabilizerParam_out i_param);
+  CORBA::Boolean setAutoStabilizerParam(const OpenHRP::AutoStabilizerService::AutoStabilizerParam& i_param);
+  CORBA::Boolean getAutoStabilizerParam(OpenHRP::AutoStabilizerService::AutoStabilizerParam_out i_param);
   CORBA::Boolean releaseEmergencyStop();
   CORBA::Boolean startImpedanceController(const char *i_name_);
   CORBA::Boolean stopImpedanceController(const char *i_name_);

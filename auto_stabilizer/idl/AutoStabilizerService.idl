@@ -30,15 +30,6 @@ module OpenHRP
     };
 
     /**
-     * @struct Footsteps
-     * @brief Foot step for multi legs.
-     */
-    struct Footsteps
-    {
-      sequence<Footstep> fs;
-    };
-
-    /**
      * @struct StepParam
      * @brief Step parameter for one step
      */
@@ -55,63 +46,11 @@ module OpenHRP
     };
 
     /**
-     * @struct StepParams
-     * @brief Step parameters for multi step
-     */
-    struct StepParams
-    {
-      sequence<StepParam> sps;
-    };
-
-    /**
      * @struct FootstepSequence
      * @brief Sequence of foot step.
      */
     typedef sequence<Footstep> FootstepSequence;
     typedef sequence<StepParam> StepParamSequence;
-
-    /**
-     * @struct FootstepsSequence
-     * @brief Sequence of foot steps.
-     */
-    typedef sequence<Footsteps> FootstepsSequence;
-    typedef sequence<StepParams> StepParamsSequence;
-
-    /**
-     * @enum SupportLegState
-     * @brief State of support leg.
-     */
-    enum SupportLegState {
-      RLEG,
-      LLEG,
-      BOTH
-    };
-
-    /**
-     * @enum OrbitType
-     * @brief Orbit type of swing foot.
-     */
-    enum OrbitType {
-      SHUFFLING,
-      CYCLOID,
-      RECTANGLE,
-      STAIR,
-      CYCLOIDDELAY,
-      CYCLOIDDELAYKICK,
-      CROSS
-    };
-
-    /**
-     * @enum GaitType
-     * @brief Gait type
-     */
-    enum GaitType {
-      BIPED,
-      TROT,
-      PACE,
-      CRAWL,
-      GALLOP
-    };
 
     /**
      * @enum ControllerMode
@@ -145,15 +84,6 @@ module OpenHRP
     };
 
     /**
-     * @enum StrideLimitationType
-     * @brief Type of stride limitation
-     */
-    enum StrideLimitationType {
-      SQUARE,
-      CIRCLE
-    };
-
-    /**
      * @struct FootstepParam
      * @brief Foot step parameters.
      */
@@ -169,25 +99,9 @@ module OpenHRP
       Footstep swing_leg_dst_coords;
       /// Destination foot midcoords
       Footstep dst_foot_midcoords;
-      /// RLEG or LLEG
-      SupportLegState support_leg;
-      /// RLEG, LLEG, or BOTH
-      SupportLegState support_leg_with_both;
     };
 
     typedef sequence<string> StrSequence;
-
-    /**
-     * @enum STAlgorithm
-     * @brief Algorithm of Stabilizer
-     */
-    enum STAlgorithm {
-      TPCC,
-      EEFM,
-      EEFMQP,
-      EEFMQPCOP,
-      EEFMQPCOP2
-    };
 
     /**
      * @enum EmergencyCheckMode
@@ -200,20 +114,80 @@ module OpenHRP
       TILT
     };
 
-    /**
-     * @enum TwoDimensionVertex
-     * @brief 2D vertex of a support polygon [m]
-     */
-    struct TwoDimensionVertex {
-        DblArray2 pos;
-    };
+    struct AutoStabilizerParam
+    {
+      // AutoStabilizer
+      // AutoStablizerが変更する関節の名前. MODE_IDLEのとき以外変更不可.
+      sequence<string> controllable_joints;
+      /// Transition time [s] for start AutoBalancer. 下限0.01[s]
+      double abc_start_transition_time;
+      /// Transition time [s] for stop AutoBalancer. 下限0.01[s]
+      double abc_stop_transition_time;
+      /// Transition time [s] for start Stabilizer. 下限0.01[s]
+      double st_start_transition_time;
+      /// Transition time [s] for stop Stabilizer. 下限0.01[s]
+      double st_stop_transition_time;
 
-    /**
-     * @enum SupportPolygonVertices
-     * @brief Vertices of a support polygon at the end effector
-     */
-    struct SupportPolygonVertices {
-        sequence<TwoDimensionVertex> vertices;
+      // RefToGenFrameConverter
+      /// Flag for fix hand while walking.
+      boolean is_hand_fix_mode;
+
+      // ExternalForceHandler
+      /// Whether use disturbance compensation or not.
+      boolean use_disturbance_compensation;
+      /// Time Const for disturbance compensation [s]. 下限0.01[s]
+      double disturbance_compensation_time_const;
+      /// 下限1
+      long disturbance_compensation_step_num;
+      /// 下限0.01[s]
+      double disturbance_compensation_static_time;
+      /// 下限0[m]
+      double disturbance_compensation_limit;
+
+      // ImpedanceController
+      sequence<sequence<double, 3> > impedance_M_p;
+      sequence<sequence<double, 3> > impedance_D_p;
+      sequence<sequence<double, 3> > impedance_K_p;
+      sequence<sequence<double, 3> > impedance_M_r;
+      sequence<sequence<double, 3> > impedance_D_r;
+      sequence<sequence<double, 3> > impedance_K_r;
+      sequence<sequence<double, 3> > impedance_force_gain;
+      sequence<sequence<double, 3> > impedance_moment_gain;
+      /// StopImpedanceControllerのとき以外変更不可
+      sequence<sequence<double, 3> > impedance_pos_compensation_limit;
+      /// StopImpedanceControllerのとき以外変更不可
+      sequence<sequence<double, 3> > impedance_rot_compensation_limit;
+
+      // FootStepGenerator
+      /// Step time [s]. 下限0.01[s]
+      double default_step_time;
+      /// 下限0[rad]
+      double default_stride_limitation_theta;
+      /// convex hull. [m]
+      sequence<sequence<sequence<double, 2> >, 2> default_stride_limitation;
+      /// Ratio of double support period. 下限0.01. 上限0.99
+      double default_double_support_ratio;
+      /// Step height [m]. 0以上
+      double default_step_height;
+      /// 下限1
+      long go_velocity_step_num;
+      /// Whether modify footsteps based on Capture Point
+      boolean modify_footsteps;
+      /// overwritable min time[s]. 下限0.01[s]
+      double overwritable_min_time;
+      /// overwritable max time[s]. 下限overwritable_min_time[s].
+      double overwritable_max_time;
+      /// 下限0.01[m/s].
+      double overwritable_max_swing_velocity;
+      /// convex hull. [s]
+      sequence<sequence<sequence<double, 2> >, 2> safe_leg_hull;
+      /// convex hull. [m]
+      sequence<sequence<sequence<double, 2> >, 2> overwritable_stride_limitation;
+      /// [N]
+      double contact_detection_threshould;
+      /// [N]. 上限0.0
+      double goal_offset;
+      
     };
 
     /**
@@ -246,8 +220,6 @@ module OpenHRP
       sequence<double, 6> stride_parameter;
       /// Stride limitation when generating footsteps with stride limitation type CIRCLE (forward, outside, theta, backward, inside) [m]
       DblArray5 stride_limitation_for_circle_type;
-      /// Default OrbitType
-      OrbitType default_orbit_type;
       /// Time offset [s] for swing trajectory by delay_hoffarbib_trajectory_generator.
       double swing_trajectory_delay_time_offset;
       /// Weight parameter for distance of final path of delay_hoffarbib_trajectory_generator (1.0 by default).
@@ -300,8 +272,6 @@ module OpenHRP
       DblArray5 overwritable_stride_limitation;
       /// Use stride limitation or not
       boolean use_stride_limitation;
-      /// Stride limitation type
-      StrideLimitationType stride_limitation_type;
       /// Leg margin between foot end effector position and foot edge (front, rear, outside, inside) [m]
       DblArray4 leg_margin;
       /// Safe leg margin between foot end effector position and foot edge (front, rear, outside, inside) [m]
@@ -425,8 +395,6 @@ module OpenHRP
       /// Flag for fix hand while walking.
       boolean is_hand_fix_mode;
       sequence<Footstep> end_effector_list;
-      /// Default GaitType
-      GaitType default_gait_type;
       /// Sequence for all end-effectors' ik limb parameters
       sequence<IKLimbParameters> ik_limb_parameters;
       /// Whether change root link height for avoiding limb stretch
@@ -548,8 +516,6 @@ module OpenHRP
       double eefm_ee_rot_error_p_gain;
       /// Pos rot error cutoff freq [Hz]
       double eefm_ee_error_cutoff_freq;
-      /// Sequence of vertices for all end effectors assuming that the order is (rleg, lleg, rarm, larm)
-      sequence< SupportPolygonVertices > eefm_support_polygon_vertices_sequence;
       /// Use force difference control or each limb force control. True by default.
       boolean eefm_use_force_difference_control;
       /// Use damping control for swing leg.
@@ -565,8 +531,6 @@ module OpenHRP
       /// Sequence of all end-effector force/moment distribution weight
       sequence<sequence<double, 6> > eefm_ee_forcemoment_distribution_weight;
       // common
-      /// Current Stabilizer algorithm
-      STAlgorithm st_algorithm;
       /// Current ControllerMode
       ControllerMode controller_mode;
       /// Transition time [s] for start and stop Stabilizer
@@ -686,53 +650,11 @@ module OpenHRP
     boolean stopAutoBalancer();
 
     /**
-     * @brief Set GaitGenerator parameters
-     * @param i_param is input parameter
-     * @return true if set successfully, false otherwise
-     */
-    boolean setGaitGeneratorParam(in GaitGeneratorParam i_param);
-
-    /**
-     * @brief Get GaitGenerator parameters.
-     * @param i_param is output parameters
-     * @return true if set successfully, false otherwise
-     */
-    boolean getGaitGeneratorParam(out GaitGeneratorParam i_param);
-
-    /**
-     * @brief Set AutoBalancer parameters
-     * @param i_param is input parameter
-     * @return true if set successfully, false otherwise
-     */
-    boolean setAutoBalancerParam(in AutoBalancerParam i_param);
-
-    /**
-     * @brief Get AutoBalancer parameters.
-     * @param i_param is output parameters
-     * @return true if set successfully, false otherwise
-     */
-    boolean getAutoBalancerParam(out AutoBalancerParam i_param);
-
-    /**
      * @brief Release emergency stop mode.
      * @param
      * @return true if set successfully, false otherwise
      */
     boolean releaseEmergencyStop();
-
-    /**
-     * @brief Get Stabilizer parameters.
-     * @param i_param is output parameters
-     * @return true if set successfully, false otherwise
-     */
-    void getStabilizerParam(out StabilizerParam i_param);
-
-    /**
-     * @brief Set Stabilizer parameters.
-     * @param i_param is input parameters
-     * @return true if set successfully, false otherwise
-     */
-    void setStabilizerParam(in StabilizerParam i_param);
 
     /**
      * @brief Start Stabilizer mode.
@@ -761,6 +683,20 @@ module OpenHRP
      * @return true if set successfully, false otherwise
      */
     boolean stopImpedanceController(in string name);
+
+    /**
+     * @brief Set AutoStabilizer parameters
+     * @param i_param is input parameter
+     * @return true if set successfully, false otherwise
+     */
+    boolean setAutoStabilizerParam(in AutoStabilizerParam i_param);
+
+    /**
+     * @brief Get AutoStabilizer parameters.
+     * @param i_param is output parameters
+     * @return true if set successfully, false otherwise
+     */
+    boolean getAutoStabilizerParam(out AutoStabilizerParam i_param);
 
   };
 };

@@ -105,11 +105,12 @@ bool ExternalForceHandler::handleExternalForce(const GaitParam& gaitParam, doubl
 
     cnoid::Vector3 offset = this->offsetPrev;
     for(int i=0;i<2;i++){
-      double timeConst = this->dcTimeConst;
+      double timeConst = this->disturbanceCompensationTimeConst;
       if(std::abs(offset[i]) > std::abs(targetOffset[i])) timeConst *= 0.1;
       offset[i] += (targetOffset[i] - offset[i]) * dt / timeConst;
+      offset[i] = mathutil::clamp(offset[i], this->disturbanceCompensationLimit);
     }
-    offset = mathutil::clampMatrix(offset, this->dcOffsetLimit);
+    offset[2] = 0.0;
     sbpOffset += offset; // フィードフォワード外乱補償に足す
     this->offsetPrev = offset;
   }

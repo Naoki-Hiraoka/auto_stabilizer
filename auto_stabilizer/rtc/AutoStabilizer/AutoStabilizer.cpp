@@ -886,30 +886,165 @@ bool AutoStabilizer::stopImpedanceController(const std::string& i_name){
   }
 }
 
-bool AutoStabilizer::setGaitGeneratorParam(const OpenHRP::AutoStabilizerService::GaitGeneratorParam& i_param){
+bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService::AutoStabilizerParam& i_param){
   std::lock_guard<std::mutex> guard(this->mutex_);
+
+  if(this->mode_.now() == ControlMode::MODE_IDLE){
+    for(int i=0;i<this->jointParams_.size();i++) this->jointParams_[i].controllable = false;
+    for(int i=0;i<i_param.controllable_joints.length();i++){
+      cnoid::LinkPtr joint = this->genRobot_->link(std::string(i_param.controllable_joints[i]));
+      if(joint) this->jointParams_[joint->jointId()].controllable = true;
+    }
+  }
+
+  this->mode_.abc_start_transition_time = std::max(i_param.abc_start_transition_time, 0.01);
+  this->mode_.abc_stop_transition_time = std::max(i_param.abc_stop_transition_time, 0.01);
+  this->mode_.st_start_transition_time = std::max(i_param.st_start_transition_time, 0.01);
+  this->mode_.st_stop_transition_time = std::max(i_param.st_stop_transition_time, 0.01);
+
+  if((this->refToGenFrameConverter_.handFixMode.getGoal() == 1.0) != i_param.is_hand_fix_mode) this->refToGenFrameConverter_.handFixMode.setGoal(i_param.is_hand_fix_mode ? 1.0 : 0.0, 1.0); // 1.0[s]で補間
+
+  this->externalForceHandler_.useDisturbanceCompensation = i_param.use_disturbance_compensation;
+  this->externalForceHandler_.disturbanceCompensationTimeConst = std::max(i_param.disturbance_compensation_time_const, 0.01);
+  this->externalForceHandler_.disturbanceCompensationStepNum = std::max(i_param.disturbance_compensation_step_num, 1);
+  this->externalForceHandler_.disturbanceCompensationStaticTime = std::max(i_param.disturbance_compensation_static_time, 0.01);
+  this->externalForceHandler_.disturbanceCompensationLimit = std::max(i_param.disturbance_compensation_limit, 0.0);
+
+  if(i_param.impedance_M_p.length() == this->gaitParam_.eeName.size() &&
+     i_param.impedance_D_p.length() == this->gaitParam_.eeName.size() &&
+     i_param.impedance_K_p.length() == this->gaitParam_.eeName.size() &&
+     i_param.impedance_M_r.length() == this->gaitParam_.eeName.size() &&
+     i_param.impedance_D_r.length() == this->gaitParam_.eeName.size() &&
+     i_param.impedance_K_r.length() == this->gaitParam_.eeName.size() &&
+     i_param.impedance_force_gain.length() == this->gaitParam_.eeName.size() &&
+     i_param.impedance_moment_gain.length() == this->gaitParam_.eeName.size() &&
+     i_param.impedance_pos_compensation_limit.length() == this->gaitParam_.eeName.size() &&
+     i_param.impedance_rot_compensation_limit.length() == this->gaitParam_.eeName.size()){
+    for(int i=0;i<this->gaitParam_.eeName.size();i++){
+      if(i_param.impedance_M_p[i].length() == 3 &&
+         i_param.impedance_D_p[i].length() == 3 &&
+         i_param.impedance_K_p[i].length() == 3 &&
+         i_param.impedance_M_r[i].length() == 3 &&
+         i_param.impedance_D_r[i].length() == 3 &&
+         i_param.impedance_K_r[i].length() == 3 &&
+         i_param.impedance_force_gain[i].length() == 3 &&
+         i_param.impedance_moment_gain[i].length() == 3 &&
+         i_param.impedance_pos_compensation_limit[i].length() == 3 &&
+         i_param.impedance_rot_compensation_limit[i].length() == 3){
+        for(int j=0;j<3;j++){
+          this->impedanceController_.M[i][j] = std::max(i_param.impedance_M_p[i][j], 0.0);
+          this->impedanceController_.D[i][j] = std::max(i_param.impedance_D_p[i][j], 0.0);
+          this->impedanceController_.K[i][j] = std::max(i_param.impedance_K_p[i][j], 0.0);
+          this->impedanceController_.M[i][3+j] = std::max(i_param.impedance_M_r[i][j], 0.0);
+          this->impedanceController_.D[i][3+j] = std::max(i_param.impedance_D_r[i][j], 0.0);
+          this->impedanceController_.K[i][3+j] = std::max(i_param.impedance_K_r[i][j], 0.0);
+          this->impedanceController_.wrenchGain[i][j] = std::max(i_param.impedance_force_gain[i][j], 0.0);
+          this->impedanceController_.wrenchGain[i][3+j] = std::max(i_param.impedance_moment_gain[i][j], 0.0);
+          if(!this->impedanceController_.isImpedanceMode[i]){
+            this->impedanceController_.compensationLimit[i][j] = std::max(i_param.impedance_pos_compensation_limit[i][j], 0.0);
+            this->impedanceController_.compensationLimit[i][3+j] = std::max(i_param.impedance_rot_compensation_limit[i][j], 0.0);
+          }
+        }
+      }
+    }
+  }
+
   return true;
 }
-bool AutoStabilizer::getGaitGeneratorParam(OpenHRP::AutoStabilizerService::GaitGeneratorParam& i_param){
+bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::AutoStabilizerParam& i_param){
   std::lock_guard<std::mutex> guard(this->mutex_);
-  return true;
-}
-bool AutoStabilizer::setAutoBalancerParam(const OpenHRP::AutoStabilizerService::AutoBalancerParam& i_param){
-  std::lock_guard<std::mutex> guard(this->mutex_);
-  return true;
-}
-bool AutoStabilizer::getAutoBalancerParam(OpenHRP::AutoStabilizerService::AutoBalancerParam& i_param){
-  std::lock_guard<std::mutex> guard(this->mutex_);
+
+  std::vector<std::string> controllable_joints;
+  for(int i=0;i<this->jointParams_.size();i++) if(this->jointParams_[i].controllable) controllable_joints.push_back(this->jointParams_[i].name);
+  i_param.controllable_joints.length(controllable_joints.size());
+  for(int i=0;i<controllable_joints.size();i++) i_param.controllable_joints[i] = controllable_joints[i].c_str();
+
+  i_param.abc_start_transition_time = this->mode_.abc_start_transition_time;
+  i_param.abc_stop_transition_time = this->mode_.abc_stop_transition_time;
+  i_param.st_start_transition_time = this->mode_.st_start_transition_time;
+  i_param.st_stop_transition_time = this->mode_.st_stop_transition_time;
+
+  i_param.is_hand_fix_mode = (this->refToGenFrameConverter_.handFixMode.getGoal() == 1.0);
+
+  i_param.use_disturbance_compensation = this->externalForceHandler_.useDisturbanceCompensation;
+  i_param.disturbance_compensation_time_const = this->externalForceHandler_.disturbanceCompensationTimeConst;
+  i_param.disturbance_compensation_step_num = this->externalForceHandler_.disturbanceCompensationStepNum;
+  i_param.disturbance_compensation_static_time = this->externalForceHandler_.disturbanceCompensationStaticTime;
+  i_param.disturbance_compensation_limit = this->externalForceHandler_.disturbanceCompensationLimit;
+
+  i_param.impedance_M_p.length(this->gaitParam_.eeName.size());
+  i_param.impedance_D_p.length(this->gaitParam_.eeName.size());
+  i_param.impedance_K_p.length(this->gaitParam_.eeName.size());
+  i_param.impedance_M_r.length(this->gaitParam_.eeName.size());
+  i_param.impedance_D_r.length(this->gaitParam_.eeName.size());
+  i_param.impedance_K_r.length(this->gaitParam_.eeName.size());
+  i_param.impedance_force_gain.length(this->gaitParam_.eeName.size());
+  i_param.impedance_moment_gain.length(this->gaitParam_.eeName.size());
+  i_param.impedance_pos_compensation_limit.length(this->gaitParam_.eeName.size());
+  i_param.impedance_rot_compensation_limit.length(this->gaitParam_.eeName.size());
+  for(int i=0;i<this->gaitParam_.eeName.size();i++){
+    i_param.impedance_M_p[i].length(3);
+    i_param.impedance_D_p[i].length(3);
+    i_param.impedance_K_p[i].length(3);
+    i_param.impedance_M_r[i].length(3);
+    i_param.impedance_D_r[i].length(3);
+    i_param.impedance_K_r[i].length(3);
+    i_param.impedance_force_gain[i].length(3);
+    i_param.impedance_moment_gain[i].length(3);
+    i_param.impedance_pos_compensation_limit[i].length(3);
+    i_param.impedance_rot_compensation_limit[i].length(3);
+    for(int j=0;j<3;j++){
+      i_param.impedance_M_p[i][j] = this->impedanceController_.M[i][j];
+      i_param.impedance_D_p[i][j] = this->impedanceController_.D[i][j];
+      i_param.impedance_K_p[i][j] = this->impedanceController_.K[i][j];
+      i_param.impedance_M_r[i][j] = this->impedanceController_.M[i][3+j];
+      i_param.impedance_D_r[i][j] = this->impedanceController_.D[i][3+j];
+      i_param.impedance_K_r[i][j] = this->impedanceController_.K[i][3+j];
+      i_param.impedance_force_gain[i][j] = this->impedanceController_.wrenchGain[i][j];
+      i_param.impedance_moment_gain[i][j] = this->impedanceController_.wrenchGain[i][3+j];
+      i_param.impedance_pos_compensation_limit[i][j] = this->impedanceController_.compensationLimit[i][j];
+      i_param.impedance_rot_compensation_limit[i][j] = this->impedanceController_.compensationLimit[i][3+j];
+    }
+  }
+
+  i_param.default_step_time = this->footStepGenerator_.defaultStepTime;
+  i_param.default_stride_limitation_theta = this->footStepGenerator_.defaultStrideLimitationTheta;
+  i_param.default_stride_limitation.length(NUM_LEGS);
+  for(int i=0;i<NUM_LEGS;i++){
+    i_param.default_stride_limitation[i].length(this->footStepGenerator_.defaultStrideLimitationHull[i].size());
+    for(int j=0;j<this->footStepGenerator_.defaultStrideLimitationHull[i].size(); j++) {
+      i_param.default_stride_limitation[i][j].length(2);
+      for(int k=0;k<2;k++) i_param.default_stride_limitation[i][j][k] = this->footStepGenerator_.defaultStrideLimitationHull[i][j][k];
+    }
+  }
+  i_param.default_double_support_ratio = this->footStepGenerator_.defaultDoubleSupportRatio;
+  i_param.default_step_height = this->footStepGenerator_.defaultStepHeight;
+  i_param.go_velocity_step_num = this->footStepGenerator_.goVelocityStepNum;
+  i_param.modify_footsteps = this->footStepGenerator_.isModifyFootSteps;
+  i_param.overwritable_min_time = this->footStepGenerator_.overwritableMinTime;
+  i_param.overwritable_max_time = this->footStepGenerator_.overwritableMaxTime;
+  i_param.overwritable_max_swing_velocity = this->footStepGenerator_.overwritableMaxSwingVelocity;
+  i_param.safe_leg_hull.length(NUM_LEGS);
+  for(int i=0;i<NUM_LEGS;i++){
+    i_param.default_stride_limitation[i].length(this->footStepGenerator_.safeLegHull[i].size());
+    for(int j=0;j<this->footStepGenerator_.safeLegHull[i].size(); j++) {
+      i_param.default_stride_limitation[i][j].length(2);
+      for(int k=0;k<2;k++) i_param.default_stride_limitation[i][j][k] = this->footStepGenerator_.safeLegHull[i][j][k];
+    }
+  }
+  i_param.overwritable_stride_limitation.length(NUM_LEGS);
+  for(int i=0;i<NUM_LEGS;i++){
+    i_param.default_stride_limitation[i].length(this->footStepGenerator_.overwritableStrideLimitationHull[i].size());
+    for(int j=0;j<this->footStepGenerator_.overwritableStrideLimitationHull[i].size(); j++) {
+      i_param.default_stride_limitation[i][j].length(2);
+      for(int k=0;k<2;k++) i_param.default_stride_limitation[i][j][k] = this->footStepGenerator_.overwritableStrideLimitationHull[i][j][k];
+    }
+  }
+  i_param.contact_detection_threshould = this->footStepGenerator_.contactDetectionThreshold;
+  i_param.goal_offset = this->footStepGenerator_.goalOffset;
+
   // i_param.leg_names // refFootOriginWeightとautoControlRatioが必要
   return true;
-}
-void AutoStabilizer::setStabilizerParam(const OpenHRP::AutoStabilizerService::StabilizerParam& i_param){
-  std::lock_guard<std::mutex> guard(this->mutex_);
-  return;
-}
-void AutoStabilizer::getStabilizerParam(OpenHRP::AutoStabilizerService::StabilizerParam& i_param){
-  std::lock_guard<std::mutex> guard(this->mutex_);
-  return;
 }
 
 bool AutoStabilizer::getProperty(const std::string& key, std::string& ret) {

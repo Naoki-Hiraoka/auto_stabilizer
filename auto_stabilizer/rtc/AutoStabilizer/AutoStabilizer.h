@@ -58,13 +58,9 @@ public:
   void waitFootSteps();
   bool startAutoBalancer();
   bool stopAutoBalancer();
-  bool setGaitGeneratorParam(const OpenHRP::AutoStabilizerService::GaitGeneratorParam& i_param);
-  bool getGaitGeneratorParam(OpenHRP::AutoStabilizerService::GaitGeneratorParam& i_param);
-  bool setAutoBalancerParam(const OpenHRP::AutoStabilizerService::AutoBalancerParam& i_param);
-  bool getAutoBalancerParam(OpenHRP::AutoStabilizerService::AutoBalancerParam& i_param);
+  bool setAutoStabilizerParam(const OpenHRP::AutoStabilizerService::AutoStabilizerParam& i_param);
+  bool getAutoStabilizerParam(OpenHRP::AutoStabilizerService::AutoStabilizerParam& i_param);
   bool releaseEmergencyStop();
-  void getStabilizerParam(OpenHRP::AutoStabilizerService::StabilizerParam& i_param);
-  void setStabilizerParam(const OpenHRP::AutoStabilizerService::StabilizerParam& i_param);
   bool startStabilizer(void);
   bool stopStabilizer(void);
   bool startImpedanceController(const std::string& i_name);
@@ -125,7 +121,7 @@ protected:
   public:
     /*
       MODE_IDLE -> startAutoBalancer() -> MODE_SYNC_TO_ABC -> MODE_ABC -> startStabilizer() -> MODE_SYNC_TO_ST -> MODE_ST -> stopStabilizer() -> MODE_SYNC_TO_STOPST -> MODE_ABC -> stopAutoBalancer() -> MODE_SYNC_TO_IDLE -> MODE_IDLE
-      MODE_SYNC_TO*の時間はstartの方はすぐに遷移し、stopの方はtransition_timeの時間をかけて遷移するが、少なくとも1周期はMODE_SYNC_TO*を経由する.
+      MODE_SYNC_TO*の時間はtransition_timeの時間をかけて遷移するが、少なくとも1周期はMODE_SYNC_TO*を経由する.
       MODE_SYNC_TO*では、基本的に次のMODEと同じ処理が行われるが、出力時に前回のMODEの出力から補間するような軌道に加工されることで出力の連続性を確保する
       補間している途中で別のmodeに切り替わることは無いので、そこは安心してプログラムを書いてよい(例外はonActivated). 同様に、remainTimeが突然減ったり増えたりすることもない
      */
