@@ -4,17 +4,9 @@
 #include "hrpsys_ros_bridge/idl/RobotHardwareService.idl"
 module OpenHRP
 {
-  
+
   interface AutoStabilizerService
   {
-    typedef sequence<double, 3> DblSequence3;
-    //typedef sequence<double, 4> DblSequence4;
-    typedef double DblArray2[2];
-    typedef double DblArray3[3];
-    typedef double DblArray4[4];
-    typedef double DblArray5[5];
-    typedef sequence<boolean> BoolSequence;
-
     /**
      * @struct Footstep
      * @brief Foot step for one leg.
@@ -22,9 +14,9 @@ module OpenHRP
     struct Footstep
     {
       /// Foot position [m]
-      DblArray3 pos;
+      sequence<double, 3> pos;
       /// Foot orientation by quaternion (w,x,y,z)
-      DblArray4 rot;
+      sequence<double, 4> rot;
       /// Leg name (rleg or lleg)
       string leg;
     };
@@ -101,8 +93,6 @@ module OpenHRP
       Footstep dst_foot_midcoords;
     };
 
-    typedef sequence<string> StrSequence;
-
     /**
      * @enum EmergencyCheckMode
      * @brief Mode of emergency checking
@@ -112,6 +102,19 @@ module OpenHRP
       COP,
       CP,
       TILT
+    };
+
+    /**
+     * @struct JointServoControlParameter
+     * @brief Joint PD Servo Control Parameters
+     */
+    struct JointServoControlParameter {
+      sequence<double> support_pgain;
+      sequence<double> support_dgain;
+      sequence<double> landing_pgain;
+      sequence<double> landing_dgain;
+      sequence<double> swing_pgain;
+      sequence<double> swing_dgain;
     };
 
     struct AutoStabilizerParam
@@ -239,407 +242,6 @@ module OpenHRP
       sequence<double, 2> eefm_swing_pos_spring_velocity_limit;
       /// Sequence of all end-effector rot compensation limit [rad/s]. 下限0.0
       sequence<double, 2> eefm_swing_rot_spring_velocity_limit;
-    };
-
-    /**
-     * @struct GaitGeneratorParam
-     * @brief Parameters for GaitGenerator.
-     */
-    struct GaitGeneratorParam
-    {
-      /// Step time [s]
-      double default_step_time;
-      /// Step height [m]
-      double default_step_height;
-      /// Ratio of double support period. Ratio is included in (0, 1). Double support period time is default_double_support_ratio*default_step_time.
-      double default_double_support_ratio;
-      /// Ratio of first double support period. Ratio is included in (0, 1). First double support period time is default_double_support_ratio_before*default_step_time.
-      double default_double_support_ratio_before;
-      /// Ratio of last double support period. Ratio is included in (0, 1). Last double support period time is default_double_support_ratio_after*default_step_time.
-      double default_double_support_ratio_after;
-      /// Ratio of double support static period in which reference ZMP does not move. Ratio is included in (0, 1). default_double_support_ratio >= default_double_support_static_ratio..
-      double default_double_support_static_ratio;
-      /// Ratio of first double support static period in which reference ZMP does not move. Ratio is included in (0, 1). default_double_support_ratio_before >= default_double_support_static_ratio_before..
-      double default_double_support_static_ratio_before;
-      /// Ratio of last double support static period in which reference ZMP does not move. Ratio is included in (0, 1). default_double_support_ratio_after >= default_double_support_static_ratio_after..
-      double default_double_support_static_ratio_after;
-      /// Ratio of double support period before swing. Ratio is included in (0, 1).
-      double default_double_support_ratio_swing_before;
-      /// Ratio of double support period after swing. Ratio is included in (0, 1).
-      double default_double_support_ratio_swing_after;
-      /// Stride limitation of forward x[m], outside y[m], outside theta[deg], backward x[m], inside y[m], inside theta[deg] for goPos and goVelocity
-      sequence<double, 6> stride_parameter;
-      /// Stride limitation when generating footsteps with stride limitation type CIRCLE (forward, outside, theta, backward, inside) [m]
-      DblArray5 stride_limitation_for_circle_type;
-      /// Time offset [s] for swing trajectory by delay_hoffarbib_trajectory_generator.
-      double swing_trajectory_delay_time_offset;
-      /// Weight parameter for distance of final path of delay_hoffarbib_trajectory_generator (1.0 by default).
-      double swing_trajectory_final_distance_weight;
-      /// Way point offset 3D vector [m] for stair_delay_hoffarbib_trajectory_generator.
-      DblArray3 stair_trajectory_way_point_offset;
-      /// Way point offset 3D vector [m] for rectangle_delay_hoffarbib_trajectory_generator.
-      DblArray3 rectangle_trajectory_way_point_offset;
-      /// Goal offset 3D vector [m] for rectangle_delay_hoffarbib_trajectory_generator.
-      DblArray3 rectangle_goal_off;
-      /// Kick point offset 3D vector [m] for cycloid_delay_kick_hoffarbib_trajectory_generator.
-      DblArray3 cycloid_delay_kick_point_offset;
-      /// Time offset between Z convergence to antecedent path and XY convergence. [swing time]=[Z convergence time]=[XY convergence time]-[swing_trajectory_xy_time_offset]. 0 by default, this means Z convergence time and XY convergence time are same.
-      double swing_trajectory_time_offset_xy2z;
-      /// Gravitational acceleration [m/s^2]
-      double gravitational_acceleration;
-      /// Toe position offset [m] in end-effector frame x axis
-      double toe_pos_offset_x;
-      /// Heel position offset [m] in end-effector frame x axis
-      double heel_pos_offset_x;
-      /// Toe ZMP offset [m] in end-effector frame x axis
-      double toe_zmp_offset_x;
-      /// Heel ZMP offset [m] in end-effector frame x axis
-      double heel_zmp_offset_x;
-      /// Maximum toe angle [deg] for toe-off motion
-      double toe_angle;
-      /// Maximum heel angle [deg] for heel-contact motion
-      double heel_angle;
-      /// Threshould [m] (>=0) whether toe is used or not. This is used only if use_toe_heel_auto_set == true.
-      double toe_check_thre;
-      /// Threshould [m] (>=0) whether heel is used or not. This is used only if use_toe_heel_auto_set == true.
-      double heel_check_thre;
-      /// Sequence of phase ratio of toe-off and heel-contact. Sum of toe_heel_phase_ratio should be 1.0.
-      sequence<double> toe_heel_phase_ratio;
-      /// Use toe joint or not in toe-off heel-contact motion.
-      boolean use_toe_joint;
-      /// Use toe heel zmp transition. If true, zmp moves among default position, toe position (described by toe_zmp_offset_x), and heel position (described by heel_zmp_offset_x).
-      boolean use_toe_heel_transition;
-      /// Use toe heel auto setting. If true, gait generator autonomously determine whether toe and heel are used.
-      boolean use_toe_heel_auto_set;
-      /// ZMP weight of RLEG, LLEG, RARM and LARM
-      sequence<double, 4> zmp_weight_map;
-      /// Foot position offset[m] (rleg and lleg)
-      sequence<DblSequence3> leg_default_translate_pos;
-      /// Number of optional finalize footsteps in goPos
-      long optional_go_pos_finalize_footstep_num;
-      /// Offset for overwritable footstep index. Offset from current footstep index. Used in emergency_stop and velocity_mode.
-      long overwritable_footstep_index_offset;
-      /// Stride limitation when overwriting footsteps (forward, outside, theta, backward, inside) [m]
-      DblArray5 overwritable_stride_limitation;
-      /// Use stride limitation or not
-      boolean use_stride_limitation;
-      /// Leg margin between foot end effector position and foot edge (front, rear, outside, inside) [m]
-      DblArray4 leg_margin;
-      /// Safe leg margin between foot end effector position and foot edge (front, rear, outside, inside) [m]
-      DblArray4 safe_leg_margin;
-      /// Feedback gain when modifying footsteps based on Capture Point
-      double footstep_modification_gain;
-      /// Whether modify footsteps based on Capture Point
-      boolean modify_footsteps;
-      /// CP check margin when modifying footsteps (x, y) [m]
-      DblArray2 cp_check_margin;
-      /// Margin time ratio for footstep modification before landing [s]
-      double margin_time_ratio;
-      /// How much act_vel is used for walking pattern generation (0.0 ~ 1.0)
-      double act_vel_ratio;
-      /// overwritable min time until landing for fg[s]
-      double min_time_mgn;
-      /// overwritable min step time for fg[s]
-      double min_time;
-      /// Whether use disturbance compensation or not
-      boolean use_disturbance_compensation;
-      /// Gain for disturbance compensation
-      double dc_gain;
-      /// Offset of y component of ref_dcm
-      double dcm_offset;
-      /// Step time when emergency stepping [s]
-      DblArray3 emergency_step_time;
-      /// Whether use act states
-      boolean use_act_states;
-      /// zmp delay time [s]
-      double zmp_delay_time_const;
-      double overwritable_max_time;
-      double fg_zmp_cutoff_freq;
-      double fg_cp_cutoff_freq;
-      DblArray3 sum_d_footstep_thre;
-      DblArray3 footstep_check_delta;
-      boolean is_interpolate_zmp_in_double;
-      /// whether gostop after becoming stable
-      boolean is_stable_go_stop_mode;
-      boolean use_flywheel_balance;
-      boolean debug_set_landing_height;
-      double debug_landing_height;
-      DblArray2 debug_landing_height_xrange;
-      // (x, y) [m]
-      DblArray2 front_edge_offset_of_steppable_region;
-      boolean is_slow_stair_mode;
-      double stair_step_time;
-      long num_preview_step;
-      double rectangle_time_smooth_offset;
-    };
-
-    /**
-     * @enum IKLimbParameters
-     * @brief IKLimbParameters
-     */
-    struct IKLimbParameters {
-        /// Joint weight for Inverse Kinematics calculation.
-        sequence<double> ik_optional_weight_vector;
-        /// SR-inverse gain for inverse kinematics.
-        double sr_gain;
-        /// Avoid joint limit gain for inverse kinematics.
-        double avoid_gain;
-        /// Reference joint angles tracking gain for inverse kinematics.
-        double reference_gain;
-        /// Manipulability limit for inverse kinematics.
-        double manipulability_limit;
-        /// IK loop count
-        unsigned short ik_loop_count;
-    };
-
-    /**
-     * @struct JointServoControlParameter
-     * @brief Joint PD Servo Control Parameters
-     */
-    struct JointServoControlParameter {
-      sequence<double> support_pgain;
-      sequence<double> support_dgain;
-      sequence<double> landing_pgain;
-      sequence<double> landing_dgain;
-      sequence<double> swing_pgain;
-      sequence<double> swing_dgain;
-    };
-
-    /**
-     * @enum IKMode
-     * @brief Inverse Kinematics mode
-     */
-    enum IKMode {
-      SIMPLE,
-      FULLBODY
-    };
-    
-    /**
-     * @struct AutoBalancerParam
-     * @brief Parameters for AutoBalancer
-     */
-    struct AutoBalancerParam
-    {
-      /// ZMP offset vectors[m] for rleg and lleg (<-please set by this order)
-      sequence<DblSequence3> default_zmp_offsets;
-      double move_base_gain;
-      ControllerMode controller_mode;
-      UseForceMode use_force_mode;
-      boolean graspless_manip_mode;
-      string graspless_manip_arm;
-      DblArray3 graspless_manip_p_gain;
-      DblArray3 graspless_manip_reference_trans_pos;
-      DblArray4 graspless_manip_reference_trans_rot;
-      /// Transition time [s] for start and stop AutoBalancer
-      double transition_time;
-      /// Transition time [s] for default_zmp_offsets
-      double zmp_transition_time;
-      /// Transition time [s] for adjust foot step
-      double adjust_footstep_transition_time;
-      StrSequence leg_names;
-      /// Flag for inverse kinematics (IK). If true, IK has failed before.
-      boolean has_ik_failed;
-      /// IK position threshold [m]
-      double pos_ik_thre;
-      /// IK rotation threshold [rad]
-      double rot_ik_thre;
-      /// Flag for fix hand while walking.
-      boolean is_hand_fix_mode;
-      sequence<Footstep> end_effector_list;
-      /// Sequence for all end-effectors' ik limb parameters
-      sequence<IKLimbParameters> ik_limb_parameters;
-      /// Whether change root link height for avoiding limb stretch
-      boolean use_limb_stretch_avoidance;
-      /// Limb stretch avoidance time constant [s]
-      double limb_stretch_avoidance_time_const;
-      /// Root link height change limitation for avoiding limb stretch [m/s] (lower, upper)
-      DblArray2 limb_stretch_avoidance_vlimit;
-      /// Sequence of limb length margin from max limb length [m]
-      sequence<double> limb_length_margin;
-      /// Name of additional force applied link for MODE_REF_FORCE_WITH_FOOT for MODE_REF_FORCE_RFU_EXT_MOMENT. Additional force is applied to the point without force sensors, such as torso.
-      string additional_force_applied_link_name;
-      /// Link local offset[m] of force applied point for MODE_REF_FORCE_WITH_FOOT. This is local value in the link frame specified by "additional_force_applied_link_name". Zero by default.
-      DblArray3 additional_force_applied_point_offset;
-      /// switch SimpleFullbodyIK to FullbodyIK
-      IKMode ik_mode;
-      /// whether step when emergency
-      boolean is_emergency_step_mode;
-      /// whether touch wall when emergency
-      boolean is_emergency_touch_wall_mode;
-      /// whether use collision avoidance
-      boolean  use_collision_avoidance;
-      /// cog height constraint in fullbody IK
-      double cog_z_constraint;
-      /// Sync time for retrieve touch wall motion [s]
-      double touch_wall_retrieve_time;
-      boolean is_natural_walk;
-      boolean is_stop_early_foot;
-      double arm_swing_deg;
-      boolean debug_read_steppable_region;
-      long ik_max_loop;
-    };
-
-    /**
-     * @struct StabilizerParam
-     * @brief Stabilizer Parameters.
-     */
-    struct StabilizerParam {
-      // for TPCC
-      /// Feedback gain for ZMP tracking error (x,y)
-      DblArray2 k_tpcc_p;
-      /// Feedback gain for COG position tracking error (x,y)
-      DblArray2 k_tpcc_x;
-      /// Body posture control gain [rad/s] (roll, pitch).
-      DblArray2 k_brot_p;
-      /// Time constant for body posture control [s] (roll, pitch).
-      DblArray2 k_brot_tc;
-      // // for RUNST
-      // DblArray2 k_run_b;
-      // DblArray2 d_run_b;
-      // DblArray2 tdfke;
-      // DblArray2 tdftc;
-      // double k_run_x;
-      // double k_run_y;
-      // double d_run_x;
-      // double d_run_y;
-      // for EEFM ST
-      /// Feedback gain for COG position tracking error (x,y)
-      DblArray2 eefm_k1;
-      /// Feedback gain for COG velocity tracking error (x,y)
-      DblArray2 eefm_k2;
-      /// Feedback gain for ZMP tracking error (x,y)
-      DblArray2 eefm_k3;
-      /// Time constant for stabilizer ZMP delay [s] (x,y)
-      DblArray2 eefm_zmp_delay_time_const;
-      /// Auxiliary input for ZMP position [m] (x,y). This is used for delay model identification
-      DblArray2 eefm_ref_zmp_aux;
-      /// Sequence of all end-effector rotation damping gain [Nm/(rad/s)] (r,p,y).
-      sequence<sequence<double, 3> > eefm_rot_damping_gain;
-      /// Sequence of all end-effector rotation damping time constant [s] (r,p,y).
-      sequence<sequence<double, 3> > eefm_rot_time_const;
-      /// Sequence of all end-effector position damping gain [N/(m/s)] (x,y,z).
-      sequence<sequence<double, 3> > eefm_pos_damping_gain;
-      /// Sequence of all end-effector position damping time constant for double support phase [s] (x,y,z).
-      sequence<sequence<double, 3> > eefm_pos_time_const_support;
-      /// Sequence of all swing leg end-effector rotation spring gain (r,p,y).
-      sequence<sequence<double, 3> > eefm_swing_rot_spring_gain;
-      /// Sequence of all swing leg end-effector rotation spring time constant [s] (r,p,y).
-      sequence<sequence<double, 3> > eefm_swing_rot_time_const;
-      /// Sequence of all swing leg end-effector position spring gain (x,y,z).
-      sequence<sequence<double, 3> > eefm_swing_pos_spring_gain;
-      /// Sequence of all swing leg end-effector position spring time constant [s] (x,y,z).
-      sequence<sequence<double, 3> > eefm_swing_pos_time_const;
-      /// Sequence of all end-effector end-effector-frame moment limit [Nm]
-      sequence<sequence<double, 3> > eefm_ee_moment_limit;
-      /// Sequence of all end-effector position compensation limit [m]
-      sequence<double> eefm_pos_compensation_limit;
-      /// Sequence of all end-effector rot compensation limit [rad]
-      sequence<double> eefm_rot_compensation_limit;
-      /// End-effector position damping time constant for single support phase [s].
-      double eefm_pos_time_const_swing;
-      /// Transition time for single=>double support phase gain interpolation [s].
-      double eefm_pos_transition_time;
-      /// Margin for transition time for single=>double support phase gain interpolation [s].
-      double eefm_pos_margin_time;
-      /// Inside foot margine [m]. Distance between foot end effector position and foot inside edge.
-      double eefm_leg_inside_margin;
-      /// Outside foot margine [m]. Distance between foot end effector position and foot outside edge.
-      double eefm_leg_outside_margin;
-      /// Front foot margine [m]. Distance between foot end effector position and foot front edge.
-      double eefm_leg_front_margin;
-      /// Rear foot margine [m]. Distance between foot end effector position and foot rear edge.
-      double eefm_leg_rear_margin;
-      /// Body attitude control gain [rad/s] (roll, pitch) for EEFM.
-      DblArray2 eefm_body_attitude_control_gain;
-      /// Time constant for body attitude control [s] (roll, pitch) for EEFM.
-      DblArray2 eefm_body_attitude_control_time_const;
-      /// Cutoff frequency of LPF in calculation of COG velocity [Hz]
-      double eefm_cogvel_cutoff_freq;
-      /// Blending parameter [0, 1] for wrench distribution
-      double eefm_wrench_alpha_blending;
-      /// Cutoff frequency of LPF in calculation of force moment distribution alpha ratio parameter [Hz]
-      double eefm_alpha_cutoff_freq;
-      /// Gravitational acceleration [m/s^2] used in ST calculation
-      double eefm_gravitational_acceleration;
-      /// Pos error gain
-      double eefm_ee_pos_error_p_gain;
-      /// Rot error gain
-      double eefm_ee_rot_error_p_gain;
-      /// Pos rot error cutoff freq [Hz]
-      double eefm_ee_error_cutoff_freq;
-      /// Use force difference control or each limb force control. True by default.
-      boolean eefm_use_force_difference_control;
-      /// Use damping control for swing leg.
-      boolean eefm_use_swing_damping;
-      /// Swing damping control force threshold [N]
-      DblArray3 eefm_swing_damping_force_thre;
-      /// Swing damping control moment threshold [Nm]
-      DblArray3 eefm_swing_damping_moment_thre;
-      /// Rotation damping gain for swing leg [Nm/(rad/s)] (r,p,y)
-      DblArray3 eefm_swing_rot_damping_gain;
-      /// Position damping gain for swing leg [N/(m/s)] (x,y,z)
-      DblArray3 eefm_swing_pos_damping_gain;
-      /// Sequence of all end-effector force/moment distribution weight
-      sequence<sequence<double, 6> > eefm_ee_forcemoment_distribution_weight;
-      // common
-      /// Current ControllerMode
-      ControllerMode controller_mode;
-      /// Transition time [s] for start and stop Stabilizer
-      double transition_time;
-      /// Bool sequence for all end effectors whether the end effector is used for limb IK.
-      BoolSequence is_ik_enable;
-      /// Bool sequence for all end effectors whether the end effector is used for feedback control (currently damping control).
-      BoolSequence is_feedback_control_enable;
-      /// Bool sequence for all end effectors whether the end effector is used for zmp calculation.
-      BoolSequence is_zmp_calc_enable;
-      /// COP margin [m] from edges for COP checking
-      double cop_check_margin;
-      /// CP margin [m] (front, rear, inside, outside)
-      DblArray4 cp_check_margin;
-      /// tilt margin [rad] (single support phase, double support phase) from reference floor
-      DblArray2 tilt_margin;
-      /// ref_CP [m] (x,y) (foot_origin relative coordinate)
-      DblArray2 ref_capture_point;
-      /// act_CP [m] (x,y) (foot_origin relative coordinate)
-      DblArray2 act_capture_point;
-      /// CP_offset [m] (x,y) (foot_origin relative coordinate)
-      DblArray2 cp_offset;
-      /// contact decision threshold [N]
-      double contact_decision_threshold;
-      /// Foot origin position offset
-      sequence< sequence<double, 3> > foot_origin_offset;
-      /// Emergency signal checking mode
-      EmergencyCheckMode emergency_check_mode;
-      sequence<AutoStabilizerService::Footstep> end_effector_list;
-      /// whether an emergency stop is used while walking
-      boolean is_estop_while_walking;
-      /// Sequence for all end-effectors' ik limb parameters
-      sequence<IKLimbParameters> ik_limb_parameters;
-      /// Whether change root link height for avoiding limb stretch
-      boolean use_limb_stretch_avoidance;
-      /// Limb stretch avoidance time constant [s]
-      double limb_stretch_avoidance_time_const;
-      /// Root link height change limitation for avoiding limb stretch [m/s] (lower, upper)
-      DblArray2 limb_stretch_avoidance_vlimit;
-      /// Sequence of limb length margin from max limb length [m]
-      sequence<double> limb_length_margin;
-      /// Detection time whether is in air [s]
-      double detection_time_to_air;
-      /// Limit of compensation for difference between ref-act root rot [rad].
-      DblArray2 root_rot_compensation_limit;
-      /// Whether truncate zmp according to foot support polygon or not
-      boolean use_zmp_truncation;
-      boolean use_force_sensor;
-      boolean use_footguided_stabilizer;
-      double footguided_balance_time_const;
-      // For joint servo control parameter
-      RobotHardwareService::JointControlMode joint_control_mode;
-      double swing2landing_transition_time;
-      double landing_phase_time;
-      double landing2support_transition_time;
-      double support_phase_min_time;
-      double support2swing_transition_time;
-      sequence<JointServoControlParameter> joint_servo_control_parameters;
     };
 
     /**
