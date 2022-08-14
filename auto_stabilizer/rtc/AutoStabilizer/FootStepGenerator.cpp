@@ -112,10 +112,11 @@ bool FootStepGenerator::goPos(const GaitParam& gaitParam, double x/*m*/, double 
   const cnoid::Position goalPose = currentPose * trans; // generate frame. Z軸は鉛直
 
   int steps = 0;
-  while(true){
+  while(steps < 100){
     cnoid::Vector3 diff;
-    diff.head<2>() = goalPose.translation().head<2>() - currentPose.translation().head<2>(); //currentPose frame. [m]
-    diff[2] = cnoid::rpyFromRot(currentPose.linear().inverse() * goalPose.linear())[2]; // currentPose frame. [rad]
+    cnoid::Position trans = currentPose.inverse() * goalPose; // currentPose frame
+    diff.head<2>() = trans.translation().head<2>(); //currentPose frame. [m]
+    diff[2] = cnoid::rpyFromRot(trans.linear())[2]; // currentPose frame. [rad]
     if(steps >= 1 && // 最低1歩は歩く. (そうしないと、両脚がdefaultTranslatePosとは違う開き方をしているときにgoPos(0,0,0)すると、defaultTranslatePosに戻れない)
        (diff.head<2>().norm() < 1e-3 * 0.1) && (std::abs(diff[2]) < 0.5 * M_PI / 180.0)) break;
     this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos, diff);
@@ -128,6 +129,11 @@ bool FootStepGenerator::goPos(const GaitParam& gaitParam, double x/*m*/, double 
       currentPose = mathutil::calcMidCoords(std::vector<cnoid::Position>{rleg, lleg}, std::vector<double>{footstepNodesList[footstepNodesList.size()-2].isSupportPhase[LLEG] ? 1.0 : 0.0, footstepNodesList[footstepNodesList.size()-2].isSupportPhase[RLEG] ? 1.0 : 0.0}); // 前回swingした足の位置を見る
       currentPose = mathutil::orientCoordToAxis(currentPose, cnoid::Vector3::UnitZ());
     }
+  }
+
+  if(steps >= 100) { // goalに到達しない
+    o_footstepNodesList = gaitParam.footstepNodesList;
+    return false;
   }
 
   // 両脚が横に並ぶ位置に1歩歩く.
