@@ -2,6 +2,7 @@
 #include "MathUtil.h"
 #include <cnoid/JointPath>
 #include <cnoid/Jacobian>
+#include <cnoid/EigenUtil>
 
 void Stabilizer::initStabilizerOutput(const GaitParam& gaitParam,
                                       cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/, cnoid::Vector3& o_stTargetZmp) const{

@@ -20,12 +20,6 @@
 #include <cnoid/Body>
 
 #include <cpp_filters/TwoPointInterpolator.h>
-#include <fullbody_inverse_kinematics_solver/FullbodyInverseKinematicsSolverFast.h>
-#include <ik_constraint/PositionConstraint.h>
-#include <ik_constraint/COMConstraint.h>
-#include <ik_constraint/JointAngleConstraint.h>
-#include <ik_constraint/AngularMomentumConstraint.h>
-#include <joint_limit_table/JointLimitTable.h>
 
 // #include <cpp_filters/IIRFilter.h>
 // #include <joint_limit_table/JointLimitTable.h>
@@ -39,6 +33,7 @@
 #include "ImpedanceController.h"
 #include "Stabilizer.h"
 #include "ExternalForceHandler.h"
+#include "FullbodyIKSolver.h"
 
 class AutoStabilizer : public RTC::DataFlowComponentBase{
 public:
@@ -204,18 +199,6 @@ protected:
   cnoid::BodyPtr genRobot_; // output. 関節位置制御用
   cnoid::BodyPtr actRobotTqc_; // output. 関節トルク制御用
 
-  class JointParam {
-  public:
-    // constant
-    std::string name = ""; // 関節名
-    double maxTorque = 0.0; // モデルのclimit * gearRatio * torqueConstより計算
-    std::vector<std::shared_ptr<joint_limit_table::JointLimitTable> > jointLimitTables; // for genRobot
-
-    // params
-    bool controllable = true; // falseの場合、qやtauはrefの値をそのまま出力する. その関節は存在しないかのように扱う. このパラメータはMODE_IDLEのときにしか変更されないので、そこは安心してプログラムを書いて良い
-  };
-  std::vector<JointParam> jointParams_; // 要素数robot->numJoints(). jointIdの順.
-
   GaitParam gaitParam_;
 
   RefToGenFrameConverter refToGenFrameConverter_;
@@ -225,6 +208,7 @@ protected:
   FootStepGenerator footStepGenerator_;
   LegCoordsGenerator legCoordsGenerator_;
   Stabilizer stabilizer_;
+  FullbodyIKSolver fullbodyIKSolver_;
 
 protected:
   // utility functions
@@ -233,17 +217,7 @@ protected:
   static void moveCoords(cnoid::BodyPtr robot, const cnoid::Position& target, const cnoid::Position& at);
 
   static bool readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobotRaw, cnoid::BodyPtr actRobotRaw, GaitParam& gaitParam);
-  static bool execAutoStabilizer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobotRaw, cnoid::BodyPtr& refRobot, const cnoid::BodyPtr& actRobotRaw, cnoid::BodyPtr& actRobot, cnoid::BodyPtr& genRobot, cnoid::BodyPtr& actRobotTqc, GaitParam& gaitParam, double dt, const std::vector<JointParam>& jointParams, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ActToGenFrameConverter& actToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer, const ExternalForceHandler& externalForceHandler);
-  class FullbodyIKParam {
-  public:
-    cnoid::VectorX jlim_avoid_weight;
-    std::vector<std::shared_ptr<IK::JointAngleConstraint> > refJointAngleConstraint;
-    std::shared_ptr<IK::PositionConstraint> rootPositionConstraint = std::make_shared<IK::PositionConstraint>();
-    std::shared_ptr<IK::COMConstraint> comConstraint = std::make_shared<IK::COMConstraint>();
-    std::shared_ptr<IK::AngularMomentumConstraint> angularMomentumConstraint = std::make_shared<IK::AngularMomentumConstraint>();
-  };
-  FullbodyIKParam fullbodyIKParam_;
-  static bool solveFullbodyIK(cnoid::BodyPtr& genRobot, const cnoid::BodyPtr& refRobot, AutoStabilizer::FullbodyIKParam& fullbodyIKParam, double dt, const std::vector<JointParam>& jointParams, const GaitParam& gaitParam);
+  static bool execAutoStabilizer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobotRaw, cnoid::BodyPtr& refRobot, const cnoid::BodyPtr& actRobotRaw, cnoid::BodyPtr& actRobot, cnoid::BodyPtr& genRobot, cnoid::BodyPtr& actRobotTqc, GaitParam& gaitParam, double dt, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ActToGenFrameConverter& actToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer, const ExternalForceHandler& externalForceHandler, const FullbodyIKSolver& fullbodyIKSolver);
   class OutputOffsetInterpolators {
   public:
     cpp_filters::TwoPointInterpolatorSE3 genBasePoseInterpolator = cpp_filters::TwoPointInterpolatorSE3(cnoid::Position::Identity(),cnoid::Vector6::Zero(),cnoid::Vector6::Zero(),cpp_filters::HOFFARBIB);

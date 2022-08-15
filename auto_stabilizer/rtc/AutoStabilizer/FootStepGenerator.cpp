@@ -1,5 +1,6 @@
 #include "FootStepGenerator.h"
 #include "MathUtil.h"
+#include <cnoid/EigenUtil>
 
 bool FootStepGenerator::initFootStepNodesList(const cnoid::BodyPtr& genRobot, const GaitParam& gaitParam,
                                               std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<cnoid::Position>& o_dstCoordsOrg, std::vector<bool>& o_prevSupportPhase) const{
