@@ -23,32 +23,45 @@ bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobot, const cnoid::Body
   // - 目標反力を満たすように重力補償+仮想仕事の原理
   // - 目標足裏反力を満たすようにDamping Control.
 
+  gaitParam.resetTime();
+
   // root attitude control
   this->moveBasePosRotForBodyRPYControl(refRobot, actRobot, dt, gaitParam, // input
                                         o_stOffsetRootRpy); // output
+
+  gaitParam.printTime();
 
   // 現在のactual重心位置から、目標ZMPを計算
   cnoid::Vector3 tgtForce; // generate frame
   this->calcZMP(gaitParam, dt, mass, // input
                 o_stTargetZmp, tgtForce); // output
 
+  gaitParam.printTime();
+
   // 目標ZMPを満たすように目標EndEffector反力を計算
   std::vector<cnoid::Vector6> tgtEEWrench; // 要素数EndEffector数. generate frame. EndEffector origin
   this->calcWrench(gaitParam, o_stTargetZmp, tgtForce, // input
                    tgtEEWrench); // output
 
+  gaitParam.printTime();
+
   // 目標反力を満たすように重力補償+仮想仕事の原理
   this->calcTorque(actRobot, dt, gaitParam, tgtEEWrench, // input
                    actRobotTqc); // output
+
+  gaitParam.printTime();
 
   // 目標足裏反力を満たすようにDamping Control
   this->calcDampingControl(dt, gaitParam, tgtEEWrench, // input
                            o_stEEOffsetDampingControl); // output
 
+  gaitParam.printTime();
+
   // 目標遊脚位置を満たすように、SwingEEModification
   this->calcSwingEEModification(dt, gaitParam, //input
                                 o_stEEOffsetSwingEEModification); //output
 
+  gaitParam.printTime();
   return true;
 }
 

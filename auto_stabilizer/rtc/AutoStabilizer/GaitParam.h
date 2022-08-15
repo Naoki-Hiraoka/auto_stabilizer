@@ -1,6 +1,7 @@
 #ifndef GAITPARAM_H
 #define GAITPARAM_H
 
+#include <sys/time.h>
 #include <cnoid/EigenTypes>
 #include <vector>
 #include <cpp_filters/TwoPointInterpolator.h>
@@ -140,6 +141,16 @@ public:
     stEEOffsetDampingControl.push_back(cpp_filters::TwoPointInterpolator<cnoid::Vector6>(cnoid::Vector6::Zero(),cnoid::Vector6::Zero(),cnoid::Vector6::Zero(), cpp_filters::HOFFARBIB));
     stEEOffsetSwingEEModification.push_back(cpp_filters::TwoPointInterpolator<cnoid::Vector6>(cnoid::Vector6::Zero(),cnoid::Vector6::Zero(),cnoid::Vector6::Zero(), cpp_filters::HOFFARBIB));
     stEETargetPose.push_back(cnoid::Position::Identity());
+  }
+
+public:
+  // for debug
+  mutable struct timeval prevTime;
+  void resetTime() const { gettimeofday(&prevTime, NULL);}
+  void printTime() const {
+    struct timeval currentTime;
+    gettimeofday(&currentTime, NULL);
+    std::cerr << (currentTime.tv_sec - prevTime.tv_sec) + (currentTime.tv_usec - prevTime.tv_usec) * 1e-6 << std::endl;
   }
 };
 
