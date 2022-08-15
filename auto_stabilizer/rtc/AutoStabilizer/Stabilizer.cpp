@@ -105,8 +105,6 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
                             std::vector<cnoid::Vector6>& o_tgtEEWrench) const{
   std::vector<cnoid::Vector6> tgtEEWrench(gaitParam.eeName.size(), cnoid::Vector6::Zero()); /* 要素数EndEffector数. generate frame. EndEffector origin*/
 
-  gaitParam.resetTime();
-
   // leg以外はref値をそのまま
   for(int i = NUM_LEGS;i<gaitParam.eeName.size();i++){
     tgtEEWrench[i] = gaitParam.refEEWrench[i];
@@ -165,7 +163,7 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
 
       this->constraintTask_->w() = cnoid::VectorX::Ones(dim) * 1e-6;
       this->constraintTask_->toSolve() = false;
-      //this->constraintTask_->solver().settings()->setVerbosity(0);
+      this->constraintTask_->solver().settings()->setVerbosity(0);
     }
     {
       // 2. ZMPがtgtZmp
@@ -183,7 +181,6 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
         }
       }
       this->tgtZmpTask_->A() = A_ColMajor;
-      gaitParam.printTime();
       this->tgtZmpTask_->b() = Eigen::VectorXd::Zero(3);
       this->tgtZmpTask_->wa() = cnoid::VectorX::Ones(3);
 
@@ -194,9 +191,8 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
 
       this->tgtZmpTask_->w() = cnoid::VectorX::Ones(dim) * 1e-6;
       this->tgtZmpTask_->toSolve() = false; // 常にtgtZmpが支持領域内にあるなら解く必要がないので高速化のためfalseにする. ない場合があるならtrueにする. calcWrenchでtgtZmpをtruncateしているのでfalseでよい
-      //this->tgtZmpTask_->solver().settings()->setVerbosity(0);
+      this->tgtZmpTask_->solver().settings()->setVerbosity(0);
     }
-    gaitParam.printTime();
     {
       // 3. 各脚の各頂点のノルムの重心がCOPOffsetと一致 (fzの値でスケールされてしまうので、alphaを用いて左右をそろえる)
 
@@ -237,15 +233,14 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
 
       this->copTask_->w() = cnoid::VectorX::Ones(dim) * 1e-6;
       this->copTask_->toSolve() = true;
-      this->copTask_->options().setToReliable();
-      this->copTask_->options().printLevel = qpOASES::PL_NONE; // PL_HIGH or PL_NONE
-      //this->copTask_->solver().settings()->setCheckTermination(5); // default 25. 高速化
-      //this->copTask_->solver().settings()->setVerbosity(0);
+      // this->copTask_->options().setToReliable();
+      // this->copTask_->options().printLevel = qpOASES::PL_NONE; // PL_HIGH or PL_NONE
+      this->copTask_->solver().settings()->setCheckTermination(5); // default 25. 高速化
+      this->copTask_->solver().settings()->setVerbosity(0);
     }
 
     std::vector<std::shared_ptr<prioritized_qp_base::Task> > tasks{this->constraintTask_,this->tgtZmpTask_,this->copTask_};
     cnoid::VectorX result;
-    gaitParam.printTime();
     if(!prioritized_qp_base::solve(tasks,
                                    result,
                                    0 // debuglevel
@@ -263,7 +258,6 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
         }
       }
     }
-    gaitParam.printTime();
   }
 
   o_tgtEEWrench = tgtEEWrench;
@@ -373,8 +367,8 @@ bool Stabilizer::calcSwingEEModification(double dt, const GaitParam& gaitParam,
       dp = mathutil::clampMatrix(dp, this->springCompensationVelocityLimit[i]);
       offset += dp * dt;
       offset = mathutil::clampMatrix(offset, this->springCompensationLimit[i]);
-      o_stEEOffsetSwingEEModification[i].reset(offset, dp);
     }
+    o_stEEOffsetSwingEEModification[i].reset(offset);
   }
   return true;
 }

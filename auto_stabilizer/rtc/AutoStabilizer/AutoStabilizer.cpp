@@ -449,6 +449,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
   fullbodyIKSolver.solveFullbodyIK(refRobot, dt, gaitParam,// input
                                    genRobot); // output
 
+
   // advence dt
   footStepGenerator.advanceFootStepNodesList(gaitParam, dt, // input
                                              gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.dstCoordsOrg, gaitParam.prevSupportPhase); //output

@@ -77,46 +77,32 @@
    ()
    "Wait for whole footsteps are executed."
    (send self :autostabilizerservice_waitFootSteps))
-  (:set-auto-balancer-param
+  (:set-auto-stabilizer-param
    (&rest args
-    &key leg-names
-         default-zmp-offsets ;; [mm]
-         graspless-manip-arm
-         graspless-manip-reference-trans-pos ;; [mm]
-         graspless-manip-reference-trans-rot ;; rotation-matrix
-         use-force-mode
+    &key eefm-rot-damping-gain eefm-pos-damping-gain eefm-pos-time-const eefm-rot-time-const
     &allow-other-keys)
-   "Set AutoBalancer param.
-    For arguments, please see (send *ri* :get-auto-balancer-param-arguments)."
-   (send* self :raw-set-auto-balancer-param
-          (append
-           (if (and (memq :leg-names args) leg-names)
-               (list :leg-names (mapcar #'(lambda (x) (format nil "~A" (string-downcase x))) leg-names)))
-           (if (and (memq :default-zmp-offsets args) default-zmp-offsets)
-               (let ((dzo (copy-object (send (send self :get-auto-balancer-param) :default_zmp_offsets)))
-                     (lnum (length (remove-if-not #'(lambda (x) (send robot x)) '(:rarm :larm :rleg :lleg)))))
-                 (setq (dzo . ros::_data)
-                       (apply #'concatenate float-vector (mapcar #'(lambda (x) (scale 1e-3 x))
-                                                                 (append default-zmp-offsets
-                                                                         (make-list (- lnum (length default-zmp-offsets))
-                                                                                    :initial-element (float-vector 0 0 0))))))
-                 (list :default-zmp-offsets dzo)))
-           (if (and (memq :graspless-manip-arm args) graspless-manip-arm)
-               (list :graspless-manip-arm (string-downcase graspless-manip-arm)))
-           (if (and (memq :graspless-manip-reference-trans-pos args) graspless-manip-reference-trans-pos)
-               (list :graspless-manip-reference-trans-pos (scale 1e-3 graspless-manip-reference-trans-pos)))
-           (if (and (memq :graspless-manip-reference-trans-rot args) graspless-manip-reference-trans-rot)
-               (list :graspless-manip-reference-trans-rot (matrix2quaternion graspless-manip-reference-trans-rot)))
-           (if (memq :use-force-mode args)
-               (list :use-force-mode
-                     (if (or (null use-force-mode) (integerp use-force-mode))
-                         use-force-mode
-                       (let ((ot (read-from-string (format nil "AUTO_STABILIZER::OPENHRP_AUTOSTABILIZERSERVICE_USEFORCEMODE::*~A*" (substitute (elt "_" 0) (elt "-" 0) (string-downcase use-force-mode))))))
-                         (if (boundp ot)
-                             (eval ot)
-                           (error ";; no such :use-force-mode ~A in :set-auto-balancer-param~%" use-force-mode))
-                         ))))
-           args)))
+   "Set AutoStabilizer param.
+    For arguments, please see (send *ri* :get-auto-stabilizer-param-arguments)."
+   (let ((prm (send self :get-auto-stabilizer-param)))
+     (send* self :raw-set-auto-stabilizer-param
+            (append
+             (if (and (memq :eefm-pos-damping-gain args) eefm-pos-damping-gain)
+                 (let ((tmp (send prm :eefm_pos_damping_gain)))
+                   (setq (tmp . ros::_data) (apply #'concatenate float-vector eefm-pos-damping-gain))
+                   (list :eefm-pos-damping-gain tmp)))
+             (if (and (memq :eefm-rot-damping-gain args) eefm-rot-damping-gain)
+                 (let ((tmp (send prm :eefm_rot_damping_gain)))
+                   (setq (tmp . ros::_data) (apply #'concatenate float-vector eefm-rot-damping-gain))
+                   (list :eefm-rot-damping-gain tmp)))
+             (if (and (memq :eefm-pos-time-const args) eefm-pos-time-const)
+                 (let ((tmp (send prm :eefm_pos_damping_gain)))
+                   (setq (tmp . ros::_data) (apply #'concatenate float-vector eefm-pos-time-const))
+                   (list :eefm-pos-time-const tmp)))
+             (if (and (memq :eefm-rot-time-const args) eefm-rot-time-const)
+                 (let ((tmp (send prm :eefm_rot_damping_gain)))
+                   (setq (tmp . ros::_data) (apply #'concatenate float-vector eefm-rot-time-const))
+                   (list :eefm-rot-time-const tmp)))
+             args))))
   (:eus-footstep->abc-footstep
    (f)
    (instance auto_stabilizer::openhrp_autostabilizerservice_footstep :init

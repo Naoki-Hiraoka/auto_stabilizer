@@ -2,7 +2,7 @@
 #define Stabilizer_H
 
 #include "GaitParam.h"
-#include <prioritized_qp_qpoases/PrioritizedQPSolverqpOASES.h>
+#include <prioritized_qp/PrioritizedQPSolver.h>
 
 class Stabilizer{
 public:
@@ -23,7 +23,7 @@ public:
   Stabilizer(){
     for(int i=0;i<NUM_LEGS;i++){
       dampingCompensationLimit[i] << 0.08, 0.08, 0.08, 0.523599, 0.523599, 0.523599; // 0.523599rad = 30deg
-      dampingGain[i] << 33600, 33600, 7839, 60, 60, 1e5;
+      dampingGain[i] << 33600, 33600, 9000, 60, 60, 1e5;
       dampingTimeConst[i] << 3.0/1.1, 3.0/1.1, 1.5/1.1, 1.5/1.1, 1.5/1.1, 1.5/1.1;
 
       springCompensationLimit[i] << 0.05, 0.05, 0.05, 0.523599, 0.523599, 0.523599; // 0.523599rad = 30deg
@@ -34,9 +34,9 @@ public:
   }
 protected:
   // 計算高速化のためのキャッシュ. クリアしなくても別に副作用はない.
-  mutable std::shared_ptr<prioritized_qp_qpoases::Task> constraintTask_ = std::make_shared<prioritized_qp_qpoases::Task>();
-  mutable std::shared_ptr<prioritized_qp_qpoases::Task> tgtZmpTask_ = std::make_shared<prioritized_qp_qpoases::Task>();;
-  mutable std::shared_ptr<prioritized_qp_qpoases::Task> copTask_ = std::make_shared<prioritized_qp_qpoases::Task>();;
+  mutable std::shared_ptr<prioritized_qp::Task> constraintTask_ = std::make_shared<prioritized_qp::Task>();
+  mutable std::shared_ptr<prioritized_qp::Task> tgtZmpTask_ = std::make_shared<prioritized_qp::Task>();;
+  mutable std::shared_ptr<prioritized_qp::Task> copTask_ = std::make_shared<prioritized_qp::Task>();;
 public:
   void initStabilizerOutput(const GaitParam& gaitParam,
                             cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/, cnoid::Vector3& o_stTargetZmp) const;
