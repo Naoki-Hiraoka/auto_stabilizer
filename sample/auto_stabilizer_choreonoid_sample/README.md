@@ -22,6 +22,11 @@ roseus
               (make-coords :pos (float-vector 0 190 0) :name :lleg))
         (list 70 70)
         (list 1.0 1.0))
+(send *ri* :set-foot-steps
+        (list (make-coords :pos (float-vector 0 -100 0) :name :rleg)
+              (make-coords :pos (float-vector 0 100 0) :name :lleg)
+              (make-coords :pos (float-vector 0 100 0) :name :lleg)
+              (make-coords :pos (float-vector 0 100 0) :name :lleg)))
 
 (send *ri* :start-impedance :arms)
 (send *ri* :stop-impedance :arms)
@@ -33,22 +38,35 @@ roseus
 (send *robot* :legs :move-end-pos #F(0 0 150))
 (send *ri* :angle-vector (send *robot* :angle-vector) 3000)
 (send *ri* :wait-interpolation)
+(send *ri* :set-auto-stabilizer-param
+      :goal-offset 0.0
+      :default-double-support-ratio 0.2
+      :overwritable-min-time 1.4
+      )
 (send *ri* :set-foot-steps-with-param
-        (list (make-coords :pos (float-vector 0 -90 0) :name :rleg)
-              (make-coords :pos (float-vector 0 90 0) :name :lleg)
-              (make-coords :pos (float-vector 300 -90 200) :name :rleg)
-              (make-coords :pos (float-vector 300 90 200) :name :lleg)
-              (make-coords :pos (float-vector 600 -90 400) :name :rleg)
-              (make-coords :pos (float-vector 600 90 400) :name :lleg)
-              (make-coords :pos (float-vector 900 -90 600) :name :rleg))
+        (list (make-coords :pos (float-vector 0 100 0) :name :lleg)
+              (make-coords :pos (float-vector 300 -100 200) :name :rleg)
+              (make-coords :pos (float-vector 300 100 200) :name :lleg)
+              (make-coords :pos (float-vector 600 -100 400) :name :rleg)
+              (make-coords :pos (float-vector 600 100 400) :name :lleg)
+              (make-coords :pos (float-vector 900 -100 600) :name :rleg)
+              (make-coords :pos (float-vector 900 100 600) :name :lleg)
+              )
         (list 70 70 70 70 70 70 70)
         (list 1.4 1.4 1.4 1.4 1.4 1.4 1.4))
+(send *ri* :set-auto-stabilizer-param
+      :goal-offset 0.0
+      :default-double-support-ratio 0.2
+      :overwritable-min-time 2.0
+      )
 (send *ri* :set-foot-steps-with-param
-        (list (make-coords :pos (float-vector 0 -90 0) :name :rleg)
-              (make-coords :pos (float-vector 300 90 200) :name :lleg)
-              (make-coords :pos (float-vector 600 -90 400) :name :rleg)
-              (make-coords :pos (float-vector 900 90 600) :name :lleg)
-              (make-coords :pos (float-vector 1200 -90 800) :name :rleg))
-        (list 50 50 50 50 50)
-        (list 2.0 2.0 2.0 2.0 2.0))
+        (list (make-coords :pos (float-vector 0 -100 0) :name :rleg)
+              (make-coords :pos (float-vector 300 100 200) :name :lleg)
+              (make-coords :pos (float-vector 600 -100 400) :name :rleg)
+              (make-coords :pos (float-vector 900 100 600) :name :lleg)
+              (make-coords :pos (float-vector 1200 -100 800) :name :rleg)
+              (make-coords :pos (float-vector 1200 100 800) :name :lleg)
+              )
+        (list 50 50 50 50 50 50)
+        (list 2.0 2.0 2.0 2.0 2.0 2.0))
 ```
