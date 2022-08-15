@@ -169,8 +169,9 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
                                                             std::vector<double>{1,1});
     for(int i=0; i<NUM_LEGS; i++){
       cnoid::Position defaultPose = this->refRobot_->link(this->gaitParam_.eeParentLink[i])->T()*this->gaitParam_.eeLocalT[i];
-      this->gaitParam_.defaultTranslatePos[i] = defautFootMidCoords.inverse() * defaultPose.translation();
-      this->gaitParam_.defaultTranslatePos[i][2] = 0.0;
+      cnoid::Vector3 defaultTranslatePos = defautFootMidCoords.inverse() * defaultPose.translation();
+      defaultTranslatePos[2] = 0.0;
+      this->gaitParam_.defaultTranslatePos[i].reset(defaultTranslatePos);
     }
   }
 
@@ -673,12 +674,14 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
   if(!AutoStabilizer::readInPortData(this->ports_, this->refRobotRaw_, this->actRobotRaw_, this->gaitParam_)) return RTC::RTC_OK;  // qRef が届かなければ何もしない
 
   this->mode_.update(this->dt_);
+  this->gaitParam_.update(this->dt_);
   this->refToGenFrameConverter_.update(this->dt_);
 
   if(!this->mode_.isABCRunning()) {
     cnoidbodyutil::copyRobotState(this->refRobotRaw_, this->genRobot_);
   }else{
     if(this->mode_.isSyncToABCInit()){ // startAutoBalancer直後の初回. 内部パラメータのリセット
+      this->gaitParam_.reset();
       this->refToGenFrameConverter_.reset(this->mode_.remainTime());
       this->actToGenFrameConverter_.reset();
       this->externalForceHandler_.reset();
@@ -904,7 +907,12 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
   if(i_param.default_zmp_offsets.length() == NUM_LEGS){
     for(int i=0;i<NUM_LEGS; i++) {
       if(i_param.default_zmp_offsets[i].length() == 2){
-        for(int j=0;j<2;j++) this->gaitParam_.copOffset[i][j] = i_param.default_zmp_offsets[i][j];
+        cnoid::Vector3 copOffset = cnoid::Vector3::Zero();
+        for(int j=0;j<2;j++) copOffset[j] = i_param.default_zmp_offsets[i][j];
+        if(copOffset != this->gaitParam_.copOffset[i].getGoal()) {
+          if(this->mode_.isABCRunning()) this->gaitParam_.copOffset[i].setGoal(copOffset, 2.0);
+          else this->gaitParam_.copOffset[i].reset(copOffset);
+        }
       }
     }
   }
@@ -919,12 +927,20 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
   if(i_param.leg_default_translate_pos.length() == NUM_LEGS){
     for(int i=0;i<NUM_LEGS; i++) {
       if(i_param.leg_default_translate_pos[i].length() == 2){
-        for(int j=0;j<2;j++) this->gaitParam_.defaultTranslatePos[i][j] = i_param.leg_default_translate_pos[i][j];
+        cnoid::Vector3 defaultTranslatePos = cnoid::Vector3::Zero();
+        for(int j=0;j<2;j++) defaultTranslatePos[j] = i_param.leg_default_translate_pos[i][j];
+        if(defaultTranslatePos != this->gaitParam_.defaultTranslatePos[i].getGoal()){
+          if(this->mode_.isABCRunning()) this->gaitParam_.defaultTranslatePos[i].setGoal(defaultTranslatePos, 2.0);
+          this->gaitParam_.defaultTranslatePos[i].reset(defaultTranslatePos);
+        }
       }
     }
   }
 
-  if((this->refToGenFrameConverter_.handFixMode.getGoal() == 1.0) != i_param.is_hand_fix_mode) this->refToGenFrameConverter_.handFixMode.setGoal(i_param.is_hand_fix_mode ? 1.0 : 0.0, 1.0); // 1.0[s]で補間
+  if((this->refToGenFrameConverter_.handFixMode.getGoal() == 1.0) != i_param.is_hand_fix_mode) {
+    if(this->mode_.isABCRunning()) this->refToGenFrameConverter_.handFixMode.setGoal(i_param.is_hand_fix_mode ? 1.0 : 0.0, 1.0); // 1.0[s]で補間
+    else this->refToGenFrameConverter_.handFixMode.reset(i_param.is_hand_fix_mode ? 1.0 : 0.0);
+  }
 
   this->externalForceHandler_.useDisturbanceCompensation = i_param.use_disturbance_compensation;
   this->externalForceHandler_.disturbanceCompensationTimeConst = std::max(i_param.disturbance_compensation_time_const, 0.01);
@@ -1097,7 +1113,7 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
   i_param.default_zmp_offsets.length(NUM_LEGS);
   for(int i=0;i<NUM_LEGS; i++) {
     i_param.default_zmp_offsets[i].length(2);
-    for(int j=0;j<2;j++) i_param.default_zmp_offsets[i][j] = this->gaitParam_.copOffset[i][j];
+    for(int j=0;j<2;j++) i_param.default_zmp_offsets[i][j] = this->gaitParam_.copOffset[i].value()[j];
   }
   i_param.leg_hull.length(NUM_LEGS);
   for(int i=0;i<NUM_LEGS;i++){
@@ -1110,7 +1126,7 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
   i_param.leg_default_translate_pos.length(NUM_LEGS);
   for(int i=0;i<NUM_LEGS; i++) {
     i_param.leg_default_translate_pos[i].length(2);
-    for(int j=0;j<2;j++) i_param.leg_default_translate_pos[i][j] = this->gaitParam_.defaultTranslatePos[i][j];
+    for(int j=0;j<2;j++) i_param.leg_default_translate_pos[i][j] = this->gaitParam_.defaultTranslatePos[i].value()[j];
   }
 
   i_param.is_hand_fix_mode = (this->refToGenFrameConverter_.handFixMode.getGoal() == 1.0);

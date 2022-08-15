@@ -212,7 +212,7 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
       this->copTask_->A() = Eigen::SparseMatrix<double,Eigen::RowMajor>(3*NUM_LEGS,dim);
       int idx = 0;
       for(int i=0;i<NUM_LEGS;i++) {
-        cnoid::Vector3 cop = gaitParam.actEEPose[i].translation() + gaitParam.actEEPose[i].linear() * gaitParam.copOffset[i];
+        cnoid::Vector3 cop = gaitParam.actEEPose[i].translation() + gaitParam.actEEPose[i].linear() * gaitParam.copOffset[i].value();
         for(int j=0;j<gaitParam.legHull[i].size();j++){
           cnoid::Vector3 pos = gaitParam.actEEPose[i].translation() + gaitParam.actEEPose[i].linear() * gaitParam.legHull[i][j];
           cnoid::Vector3 a = (pos - cop) / alpha[i];

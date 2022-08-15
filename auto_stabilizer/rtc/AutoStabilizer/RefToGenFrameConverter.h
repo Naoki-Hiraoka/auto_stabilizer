@@ -7,7 +7,7 @@
 class RefToGenFrameConverter {
 public:
   // RefToGenFrameConverterだけでつかうパラメータ
-  cpp_filters::TwoPointInterpolator<double> handFixMode = cpp_filters::TwoPointInterpolator<double>(0.0,0.0,0.0,cpp_filters::HOFFARBIB); // 0~1. 0ならHandは重心の動きに合わせて左右に揺れる. 1なら揺れない
+  cpp_filters::TwoPointInterpolator<double> handFixMode = cpp_filters::TwoPointInterpolator<double>(0.0,0.0,0.0,cpp_filters::HOFFARBIB); // 0~1. 0ならHandは重心の動きに合わせて左右に揺れる. 1なら揺れない. 滑らかに変化する
   std::vector<cpp_filters::TwoPointInterpolator<double> > refFootOriginWeight = std::vector<cpp_filters::TwoPointInterpolator<double> >(NUM_LEGS,cpp_filters::TwoPointInterpolator<double>(1.0,0.0,0.0,cpp_filters::HOFFARBIB)); // 要素数2. 0: rleg. 1: lleg. Reference座標系のfootOriginを計算するときに用いるweight. このfootOriginからの相対位置で、GaitGeneratorに管理されていないEndEffectorのReference位置が解釈される. interpolatorによって連続的に変化する. 全てのLegのrefFootOriginWeightが同時に0になることはない
 
 protected:
@@ -29,7 +29,7 @@ public:
 public:
   /*
     次の2つの座標系が一致するようにreference frameとgenerate frameを対応付ける
-    - refRobotRawの、refFootOriginWeightとdefaultTranslatePosとcopOffsetに基づいて求めた足裏中間座標 (イメージとしては静止状態の目標ZMP位置にdefaultTranslatePosを作用させたもの)
+    - refRobotRawの、refFootOriginWeightとdefaultTranslatePosとcopOffset.value()に基づいて求めた足裏中間座標 (イメージとしては静止状態の目標ZMP位置にdefaultTranslatePosを作用させたもの)
     - 位置XYはgenRobotの重心位置. 位置ZはgenRobotの重心位置 - dz. 姿勢はfootMidCoords. (ただしHandFixModeなら、位置のfootMidCoords座標系Y成分はfootMidCoordsの位置.)
       - handControlWeight = 0なら、位置も姿勢もfootMidCoords
    */
@@ -43,7 +43,7 @@ public:
   bool convertFrame(const cnoid::BodyPtr& refRobotRaw, const GaitParam& gaitParam, double dt,// input
                     cnoid::BodyPtr& refRobot, std::vector<cnoid::Position>& o_refEEPose, std::vector<cnoid::Vector6>& o_refEEWrench, double& o_refdz, cpp_filters::TwoPointInterpolatorSE3& o_footMidCoords) const; // output
 protected:
-  // refFootOriginWeightとdefaultTranslatePosとcopOffset に基づいて両足中間座標を求める
+  // refFootOriginWeightとdefaultTranslatePosとcopOffset.value() に基づいて両足中間座標を求める
   cnoid::Position calcRefFootMidCoords(const cnoid::BodyPtr& robot, const GaitParam& gaitParam) const;
 };
 

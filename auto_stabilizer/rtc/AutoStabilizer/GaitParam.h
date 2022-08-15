@@ -90,9 +90,9 @@ public:
 
 public:
   // param
-  std::vector<cnoid::Vector3> copOffset = std::vector<cnoid::Vector3>{cnoid::Vector3(0.0,0.02,0.0),cnoid::Vector3(0.0,-0.02,0.0)}; // 要素数2. rleg: 0. lleg: 1. leg frame. 足裏COPの目標位置. 幾何的な位置はcopOffset無しで考えるが、目標COPを考えるときはcopOffsetを考慮する. クロスできたりジャンプできたりする脚でないと左右方向(外側向き)の着地位置修正は難しいので、その方向に転びそうになることが極力ないように内側にcopをオフセットさせておくとよい
+  std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> > copOffset = std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >{cpp_filters::TwoPointInterpolator<cnoid::Vector3>(cnoid::Vector3(0.0,0.02,0.0),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::HOFFARBIB),cpp_filters::TwoPointInterpolator<cnoid::Vector3>(cnoid::Vector3(0.0,-0.02,0.0),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::HOFFARBIB)}; // 要素数2. rleg: 0. lleg: 1. leg frame. 足裏COPの目標位置. 幾何的な位置はcopOffset.value()無しで考えるが、目標COPを考えるときはcopOffset.value()を考慮する. クロスできたりジャンプできたりする脚でないと左右方向(外側向き)の着地位置修正は難しいので、その方向に転びそうになることが極力ないように内側にcopをオフセットさせておくとよい. 滑らかに変化する
   std::vector<std::vector<cnoid::Vector3> > legHull = std::vector<std::vector<cnoid::Vector3> >(2, std::vector<cnoid::Vector3>{cnoid::Vector3(0.115,0.065,0.0),cnoid::Vector3(-0.115,0.065,0.0),cnoid::Vector3(-0.115,-0.065,0.0),cnoid::Vector3(0.115,-0.065,0.0)}); // 要素数2. rleg: 0. lleg: 1. leg frame.  凸形状で,上から見て半時計回り. Z成分はあったほうが計算上扱いやすいからありにしているが、0でなければならない
-  std::vector<cnoid::Vector3> defaultTranslatePos = std::vector<cnoid::Vector3>(2,cnoid::Vector3::Zero()); // goPos, goVelocity, その場足踏みをするときの右脚と左脚の中心からの相対位置. あるいは、reference frameとgenerate frameの対応付けに用いられる. (Z軸は鉛直). Z成分はあったほうが計算上扱いやすいからありにしているが、0でなければならない
+  std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> > defaultTranslatePos = std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >(2,cpp_filters::TwoPointInterpolator<cnoid::Vector3>(cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::HOFFARBIB)); // goPos, goVelocity, その場足踏みをするときの右脚と左脚の中心からの相対位置. あるいは、reference frameとgenerate frameの対応付けに用いられる. (Z軸は鉛直). Z成分はあったほうが計算上扱いやすいからありにしているが、0でなければならない. 滑らかに変化する
 
   std::vector<bool> isLegAutoControlMode = std::vector<bool>{true,true}; // 要素数2. rleg: 0. lleg: 1. 脚軌道生成器が自動で位置姿勢を生成するか(true)、reference軌道を使うか(false) TODO
 
@@ -106,6 +106,22 @@ public:
   }
 
 public:
+  // startAutoStabilizer時に呼ばれる
+  void reset(){
+    for(int i=0;i<NUM_LEGS;i++){
+      copOffset[i].reset(copOffset[i].getGoal());
+      defaultTranslatePos[i].reset(defaultTranslatePos[i].getGoal());
+    }
+  }
+
+  // 内部の補間器をdtだけ進める
+  void update(double dt){
+    for(int i=0;i<NUM_LEGS;i++){
+      copOffset[i].interpolate(dt);
+      defaultTranslatePos[i].interpolate(dt);
+    }
+  }
+
   void push_backEE(const std::string& name_, const std::string& parentLink_, const cnoid::Position& localT_){
     eeName.push_back(name_);
     eeParentLink.push_back(parentLink_);

@@ -34,11 +34,11 @@ bool RefToGenFrameConverter::convertFrame(const cnoid::BodyPtr& refRobotRaw, con
   cpp_filters::TwoPointInterpolatorSE3 footMidCoords = gaitParam.footMidCoords;
   {
     cnoid::Position rleg = gaitParam.footstepNodesList[0].dstCoords[RLEG];
-    rleg.translation() += rleg.linear() * gaitParam.copOffset[RLEG];
-    rleg.translation() -= rleg.linear() * gaitParam.defaultTranslatePos[RLEG];
+    rleg.translation() += rleg.linear() * gaitParam.copOffset[RLEG].value();
+    rleg.translation() -= rleg.linear() * gaitParam.defaultTranslatePos[RLEG].value();
     cnoid::Position lleg = gaitParam.footstepNodesList[0].dstCoords[LLEG];
-    lleg.translation() += lleg.linear() * gaitParam.copOffset[LLEG];
-    lleg.translation() -= lleg.linear() * gaitParam.defaultTranslatePos[LLEG];
+    lleg.translation() += lleg.linear() * gaitParam.copOffset[LLEG].value();
+    lleg.translation() -= lleg.linear() * gaitParam.defaultTranslatePos[LLEG].value();
     if(gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && gaitParam.footstepNodesList[0].isSupportPhase[LLEG]){ // 両足支持
       cnoid::Position midCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{rleg, lleg}, std::vector<double>{1.0, 1.0});
       midCoords = mathutil::orientCoordToAxis(midCoords, cnoid::Vector3::UnitZ());
@@ -48,11 +48,11 @@ bool RefToGenFrameConverter::convertFrame(const cnoid::BodyPtr& refRobotRaw, con
          (gaitParam.footstepNodesList[1].isSupportPhase[RLEG] && gaitParam.footstepNodesList[1].isSupportPhase[LLEG]) // 次が両足支持
          ){
         cnoid::Position rleg = gaitParam.footstepNodesList[1].dstCoords[RLEG];
-        rleg.translation() += rleg.linear() * gaitParam.copOffset[RLEG];
-        rleg.translation() -= rleg.linear() * gaitParam.defaultTranslatePos[RLEG];
+        rleg.translation() += rleg.linear() * gaitParam.copOffset[RLEG].value();
+        rleg.translation() -= rleg.linear() * gaitParam.defaultTranslatePos[RLEG].value();
         cnoid::Position lleg = gaitParam.footstepNodesList[1].dstCoords[LLEG];
-        lleg.translation() += lleg.linear() * gaitParam.copOffset[LLEG];
-        lleg.translation() -= lleg.linear() * gaitParam.defaultTranslatePos[LLEG];
+        lleg.translation() += lleg.linear() * gaitParam.copOffset[LLEG].value();
+        lleg.translation() -= lleg.linear() * gaitParam.defaultTranslatePos[LLEG].value();
         cnoid::Position midCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{rleg, lleg}, std::vector<double>{1.0, 1.0});
         midCoords = mathutil::orientCoordToAxis(midCoords, cnoid::Vector3::UnitZ());
         footMidCoords.setGoal(midCoords, gaitParam.footstepNodesList[0].remainTime + gaitParam.footstepNodesList[1].remainTime);
@@ -66,11 +66,11 @@ bool RefToGenFrameConverter::convertFrame(const cnoid::BodyPtr& refRobotRaw, con
          (gaitParam.footstepNodesList[1].isSupportPhase[RLEG] && gaitParam.footstepNodesList[1].isSupportPhase[LLEG]) // 次が両足支持
          ){
         cnoid::Position rleg = gaitParam.footstepNodesList[1].dstCoords[RLEG];
-        rleg.translation() += rleg.linear() * gaitParam.copOffset[RLEG];
-        rleg.translation() -= rleg.linear() * gaitParam.defaultTranslatePos[RLEG];
+        rleg.translation() += rleg.linear() * gaitParam.copOffset[RLEG].value();
+        rleg.translation() -= rleg.linear() * gaitParam.defaultTranslatePos[RLEG].value();
         cnoid::Position lleg = gaitParam.footstepNodesList[1].dstCoords[LLEG];
-        lleg.translation() += lleg.linear() * gaitParam.copOffset[LLEG];
-        lleg.translation() -= lleg.linear() * gaitParam.defaultTranslatePos[LLEG];
+        lleg.translation() += lleg.linear() * gaitParam.copOffset[LLEG].value();
+        lleg.translation() -= lleg.linear() * gaitParam.defaultTranslatePos[LLEG].value();
         cnoid::Position midCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{rleg, lleg}, std::vector<double>{1.0, 1.0});
         midCoords = mathutil::orientCoordToAxis(midCoords, cnoid::Vector3::UnitZ());
         footMidCoords.setGoal(midCoords, gaitParam.footstepNodesList[0].remainTime + gaitParam.footstepNodesList[1].remainTime);
@@ -143,11 +143,11 @@ bool RefToGenFrameConverter::convertFrame(const cnoid::BodyPtr& refRobotRaw, con
 cnoid::Position RefToGenFrameConverter::calcRefFootMidCoords(const cnoid::BodyPtr& robot, const GaitParam& gaitParam) const {
 
   cnoid::Position rleg = robot->link(gaitParam.eeParentLink[RLEG])->T()*gaitParam.eeLocalT[RLEG];
-  rleg.translation() += rleg.linear() * gaitParam.copOffset[RLEG];
-  rleg.translation() -= rleg.linear() * gaitParam.defaultTranslatePos[RLEG];
+  rleg.translation() += rleg.linear() * gaitParam.copOffset[RLEG].value();
+  rleg.translation() -= rleg.linear() * gaitParam.defaultTranslatePos[RLEG].value();
   cnoid::Position lleg = robot->link(gaitParam.eeParentLink[LLEG])->T()*gaitParam.eeLocalT[LLEG];
-  lleg.translation() += lleg.linear() * gaitParam.copOffset[LLEG];
-  lleg.translation() -= lleg.linear() * gaitParam.defaultTranslatePos[LLEG];
+  lleg.translation() += lleg.linear() * gaitParam.copOffset[LLEG].value();
+  lleg.translation() -= lleg.linear() * gaitParam.defaultTranslatePos[LLEG].value();
 
   cnoid::Position bothmidcoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{rleg, lleg},
                                                           std::vector<double>{1.0, 1.0});

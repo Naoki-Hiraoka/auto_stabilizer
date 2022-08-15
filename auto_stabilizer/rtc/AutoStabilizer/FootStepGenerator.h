@@ -116,7 +116,7 @@ public:
 
 protected:
   // footstepNodesList[1:]の着地位置(XYZ,yaw)をcmdVelに基づき更新する
-  void updateGoVelocitySteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cnoid::Vector3>& defaultTranslatePos) const;
+  void updateGoVelocitySteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >& defaultTranslatePos) const;
   // footstepNodesList[idx:] idxより先のstepの位置をtransformOrigin frameでtransformだけ動かす
   void transformFutureSteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, int index, const cnoid::Position& transformOrigin/*generate frame*/, const cnoid::Position& transform/*transformOrigin frame*/) const;
   // footstepNodesList[idx:] idxより先のstepの位置をgenerate frameでtransformだけ動かす
@@ -124,9 +124,9 @@ protected:
   // indexのsupportLegが次にswingするまでの間の位置を、generate frameでtransformだけ動かす
   void transformCurrentSupportSteps(int leg, std::vector<GaitParam::FootStepNodes>& footstepNodesList, const cnoid::Position& transform/*generate frame*/, int index) const;
   // footstepNodesの次の一歩を作る. RLEGとLLEGどちらをswingすべきかも決める
-  void calcDefaultNextStep(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cnoid::Vector3>& defaultTranslatePos, const cnoid::Vector3& offset = cnoid::Vector3::Zero()) const;
+  void calcDefaultNextStep(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >& defaultTranslatePos, const cnoid::Vector3& offset = cnoid::Vector3::Zero()) const;
   // footstepNodesの次の一歩を作る.
-  GaitParam::FootStepNodes calcDefaultSwingStep(const int& swingLeg, const GaitParam::FootStepNodes& footstepNodes, const std::vector<cnoid::Vector3>& defaultTranslatePos, const cnoid::Vector3& offset = cnoid::Vector3::Zero(), bool startWithSingleSupport = false) const;
+  GaitParam::FootStepNodes calcDefaultSwingStep(const int& swingLeg, const GaitParam::FootStepNodes& footstepNodes, const std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >& defaultTranslatePos, const cnoid::Vector3& offset = cnoid::Vector3::Zero(), bool startWithSingleSupport = false) const;
   GaitParam::FootStepNodes calcDefaultDoubleSupportStep(const GaitParam::FootStepNodes& footstepNodes) const;
   GaitParam::FootStepNodes calcDefaultDoubleSupportStep(const GaitParam::FootStepNodes& footstepNodes, double doubleSupportTime) const;
   // 着地位置・タイミング修正

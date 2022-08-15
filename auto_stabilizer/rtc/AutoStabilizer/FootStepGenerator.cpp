@@ -100,9 +100,9 @@ bool FootStepGenerator::goPos(const GaitParam& gaitParam, double x/*m*/, double 
   cnoid::Position currentPose;
   {
     cnoid::Position rleg = footstepNodesList.back().dstCoords[RLEG];
-    rleg.translation() -= rleg.linear() * gaitParam.defaultTranslatePos[RLEG];
+    rleg.translation() -= rleg.linear() * gaitParam.defaultTranslatePos[RLEG].value();
     cnoid::Position lleg = footstepNodesList.back().dstCoords[LLEG];
-    lleg.translation() -= lleg.linear() * gaitParam.defaultTranslatePos[LLEG];
+    lleg.translation() -= lleg.linear() * gaitParam.defaultTranslatePos[LLEG].value();
     currentPose = mathutil::calcMidCoords(std::vector<cnoid::Position>{rleg, lleg}, std::vector<double>{footstepNodesList.back().isSupportPhase[RLEG] ? 1.0 : 0.0, footstepNodesList.back().isSupportPhase[LLEG] ? 1.0 : 0.0});
     currentPose = mathutil::orientCoordToAxis(currentPose, cnoid::Vector3::UnitZ());
   }
@@ -123,9 +123,9 @@ bool FootStepGenerator::goPos(const GaitParam& gaitParam, double x/*m*/, double 
     steps++;
     {
       cnoid::Position rleg = footstepNodesList.back().dstCoords[RLEG];
-      rleg.translation() -= rleg.linear() * gaitParam.defaultTranslatePos[RLEG];
+      rleg.translation() -= rleg.linear() * gaitParam.defaultTranslatePos[RLEG].value();
       cnoid::Position lleg = footstepNodesList.back().dstCoords[LLEG];
-      lleg.translation() -= lleg.linear() * gaitParam.defaultTranslatePos[LLEG];
+      lleg.translation() -= lleg.linear() * gaitParam.defaultTranslatePos[LLEG].value();
       currentPose = mathutil::calcMidCoords(std::vector<cnoid::Position>{rleg, lleg}, std::vector<double>{footstepNodesList[footstepNodesList.size()-2].isSupportPhase[LLEG] ? 1.0 : 0.0, footstepNodesList[footstepNodesList.size()-2].isSupportPhase[RLEG] ? 1.0 : 0.0}); // 前回swingした足の位置を見る
       currentPose = mathutil::orientCoordToAxis(currentPose, cnoid::Vector3::UnitZ());
     }
@@ -227,7 +227,7 @@ bool FootStepGenerator::advanceFootStepNodesList(const GaitParam& gaitParam, dou
   return true;
 }
 
-void FootStepGenerator::updateGoVelocitySteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cnoid::Vector3>& defaultTranslatePos) const{
+void FootStepGenerator::updateGoVelocitySteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >& defaultTranslatePos) const{
   for(int i=1;i<footstepNodesList.size()-1;i++){
     if(((footstepNodesList[i].isSupportPhase[RLEG] && !footstepNodesList[i].isSupportPhase[LLEG]) || (!footstepNodesList[i].isSupportPhase[RLEG] && footstepNodesList[i].isSupportPhase[LLEG])) && // 今が片脚支持期
        (footstepNodesList[i+1].isSupportPhase[RLEG] && footstepNodesList[i+1].isSupportPhase[LLEG])){ // 次が両足支持期
@@ -236,7 +236,7 @@ void FootStepGenerator::updateGoVelocitySteps(std::vector<GaitParam::FootStepNod
       cnoid::Vector3 offset = this->cmdVel * (footstepNodesList[i].remainTime + footstepNodesList[i+1].remainTime);
       cnoid::Position transform = cnoid::Position::Identity(); // supportLeg相対(Z軸は鉛直)での次のswingLegの位置
       transform.linear() = cnoid::Matrix3(Eigen::AngleAxisd(mathutil::clamp(offset[2],this->defaultStrideLimitationTheta), cnoid::Vector3::UnitZ()));
-      transform.translation() = - defaultTranslatePos[supportLeg] + cnoid::Vector3(offset[0], offset[1], 0.0) + transform.linear() * defaultTranslatePos[swingLeg];
+      transform.translation() = - defaultTranslatePos[supportLeg].value() + cnoid::Vector3(offset[0], offset[1], 0.0) + transform.linear() * defaultTranslatePos[swingLeg].value();
       transform.translation() = mathutil::calcNearestPointOfHull(transform.translation(), this->defaultStrideLimitationHull[swingLeg]);
       cnoid::Position prevOrigin = mathutil::orientCoordToAxis(footstepNodesList[i-1].dstCoords[supportLeg], cnoid::Vector3::UnitZ());
       cnoid::Position dstCoords = prevOrigin * transform;
@@ -278,7 +278,7 @@ void FootStepGenerator::transformCurrentSupportSteps(int leg, std::vector<GaitPa
   }
 }
 
-void FootStepGenerator::calcDefaultNextStep(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cnoid::Vector3>& defaultTranslatePos, const cnoid::Vector3& offset) const{
+void FootStepGenerator::calcDefaultNextStep(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >& defaultTranslatePos, const cnoid::Vector3& offset) const{
   if(footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG]){
     footstepNodesList.back().remainTime = std::max(footstepNodesList.back().remainTime, this->defaultStepTime * this->defaultDoubleSupportRatio);
     if(footstepNodesList.size() == 1 ||
@@ -286,15 +286,15 @@ void FootStepGenerator::calcDefaultNextStep(std::vector<GaitParam::FootStepNodes
        (!footstepNodesList[footstepNodesList.size()-2].isSupportPhase[RLEG] && !footstepNodesList[footstepNodesList.size()-2].isSupportPhase[LLEG]) ){
       // offsetを、両足の中間からの距離と解釈する(これ以外のケースでは支持脚からの距離と解釈する)
       cnoid::Position rleg = footstepNodesList[0].dstCoords[RLEG];
-      rleg.translation() -= rleg.linear() * defaultTranslatePos[RLEG];
+      rleg.translation() -= rleg.linear() * defaultTranslatePos[RLEG].value();
       cnoid::Position lleg = footstepNodesList[0].dstCoords[LLEG];
-      lleg.translation() -= lleg.linear() * defaultTranslatePos[LLEG];
+      lleg.translation() -= lleg.linear() * defaultTranslatePos[LLEG].value();
       cnoid::Position midCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{rleg, lleg}, std::vector<double>{1.0, 1.0});
       rleg = mathutil::orientCoordToAxis(rleg, cnoid::Vector3::UnitZ());
       lleg = mathutil::orientCoordToAxis(lleg, cnoid::Vector3::UnitZ());
       midCoords = mathutil::orientCoordToAxis(midCoords, cnoid::Vector3::UnitZ());
       // どっちをswingしてもいいので、進行方向に近いLegをswingする
-      cnoid::Vector2 rlegTolleg = (defaultTranslatePos[LLEG] - defaultTranslatePos[RLEG]).head<2>();
+      cnoid::Vector2 rlegTolleg = (defaultTranslatePos[LLEG].value() - defaultTranslatePos[RLEG].value()).head<2>();
       if(rlegTolleg.dot(offset.head<2>()) > 0) {
         cnoid::Position rlegTomidCoords = rleg.inverse() * midCoords;
         cnoid::Vector3 offset_rlegLocal;
@@ -326,13 +326,13 @@ void FootStepGenerator::calcDefaultNextStep(std::vector<GaitParam::FootStepNodes
   }// footstepNodesListの末尾の要素が両方falseであることは無い
 }
 
-GaitParam::FootStepNodes FootStepGenerator::calcDefaultSwingStep(const int& swingLeg, const GaitParam::FootStepNodes& footstepNodes, const std::vector<cnoid::Vector3>& defaultTranslatePos, const cnoid::Vector3& offset, bool startWithSingleSupport) const{
+GaitParam::FootStepNodes FootStepGenerator::calcDefaultSwingStep(const int& swingLeg, const GaitParam::FootStepNodes& footstepNodes, const std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >& defaultTranslatePos, const cnoid::Vector3& offset, bool startWithSingleSupport) const{
   GaitParam::FootStepNodes fs;
   int supportLeg = (swingLeg == RLEG) ? LLEG : RLEG;
 
   cnoid::Position transform = cnoid::Position::Identity(); // supportLeg相対(Z軸は鉛直)での次のswingLegの位置
   transform.linear() = cnoid::Matrix3(Eigen::AngleAxisd(mathutil::clamp(offset[2],this->defaultStrideLimitationTheta), cnoid::Vector3::UnitZ()));
-  transform.translation() = - defaultTranslatePos[supportLeg] + cnoid::Vector3(offset[0], offset[1], 0.0) + transform.linear() * defaultTranslatePos[swingLeg];
+  transform.translation() = - defaultTranslatePos[supportLeg].value() + cnoid::Vector3(offset[0], offset[1], 0.0) + transform.linear() * defaultTranslatePos[swingLeg].value();
   transform.translation() = mathutil::calcNearestPointOfHull(transform.translation(), this->defaultStrideLimitationHull[swingLeg]);
 
   fs.dstCoords[supportLeg] = footstepNodes.dstCoords[supportLeg];
@@ -460,7 +460,7 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
           //   cnoid::Vector3 p = endDCM - gaitParam.l - footstepNodesList[0].dstCoords[swingLeg].linear() * this->safeLegHull[swingLeg][k]; // こっちのほうが厳密であり、着地位置時刻修正を最小限にできるが、ロバストさに欠ける
           //   capturableVetices.emplace_back(p[0], p[1], 0.0);
           // }
-          cnoid::Vector3 p = endDCM - gaitParam.l - footstepNodesList[0].dstCoords[swingLeg].linear() * gaitParam.copOffset[swingLeg];
+          cnoid::Vector3 p = endDCM - gaitParam.l - footstepNodesList[0].dstCoords[swingLeg].linear() * gaitParam.copOffset[swingLeg].value();
           capturableVetices.emplace_back(p[0], p[1], 0.0);
         }
       }
