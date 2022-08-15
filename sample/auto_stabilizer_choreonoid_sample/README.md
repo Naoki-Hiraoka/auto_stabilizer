@@ -10,6 +10,7 @@ roseus
 (setq *robot* *jaxon_jvrc*)
 ;;(send *ri* :start-auto-balancer)
 ;;(send *ri* :start-st)
+
 (send *ri* :go-velocity 0 0 0)
 (send *ri* :go-stop)
 (send *ri* :go-pos 1 0 0)
@@ -21,6 +22,11 @@ roseus
               (make-coords :pos (float-vector 0 190 0) :name :lleg))
         (list 70 70)
         (list 1.0 1.0))
+
+(send *ri* :start-impedance :arms)
+(send *ri* :stop-impedance :arms)
+
+(print-ros-msg (send *ri* :get-auto-stabilizer-param))
 
 ;; stair
 (send *robot* :reset-pose)
