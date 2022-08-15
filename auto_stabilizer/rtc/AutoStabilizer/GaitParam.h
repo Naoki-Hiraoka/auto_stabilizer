@@ -144,13 +144,15 @@ public:
   }
 
 public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
   // for debug
   mutable struct timeval prevTime;
   void resetTime() const { gettimeofday(&prevTime, NULL);}
-  void printTime() const {
+  void printTime(const std::string& message="") const {
     struct timeval currentTime;
     gettimeofday(&currentTime, NULL);
-    std::cerr << (currentTime.tv_sec - prevTime.tv_sec) + (currentTime.tv_usec - prevTime.tv_usec) * 1e-6 << std::endl;
+    std::cerr << message << (currentTime.tv_sec - prevTime.tv_sec) + (currentTime.tv_usec - prevTime.tv_usec) * 1e-6 << std::endl;
   }
 };
 

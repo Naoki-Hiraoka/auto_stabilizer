@@ -23,45 +23,32 @@ bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobot, const cnoid::Body
   // - 目標反力を満たすように重力補償+仮想仕事の原理
   // - 目標足裏反力を満たすようにDamping Control.
 
-  gaitParam.resetTime();
-
   // root attitude control
   this->moveBasePosRotForBodyRPYControl(refRobot, actRobot, dt, gaitParam, // input
                                         o_stOffsetRootRpy); // output
-
-  gaitParam.printTime();
 
   // 現在のactual重心位置から、目標ZMPを計算
   cnoid::Vector3 tgtForce; // generate frame
   this->calcZMP(gaitParam, dt, mass, // input
                 o_stTargetZmp, tgtForce); // output
 
-  gaitParam.printTime();
-
   // 目標ZMPを満たすように目標EndEffector反力を計算
   std::vector<cnoid::Vector6> tgtEEWrench; // 要素数EndEffector数. generate frame. EndEffector origin
   this->calcWrench(gaitParam, o_stTargetZmp, tgtForce, // input
                    tgtEEWrench); // output
 
-  gaitParam.printTime();
-
   // 目標反力を満たすように重力補償+仮想仕事の原理
   this->calcTorque(actRobot, dt, gaitParam, tgtEEWrench, // input
                    actRobotTqc); // output
-
-  gaitParam.printTime();
 
   // 目標足裏反力を満たすようにDamping Control
   this->calcDampingControl(dt, gaitParam, tgtEEWrench, // input
                            o_stEEOffsetDampingControl); // output
 
-  gaitParam.printTime();
-
   // 目標遊脚位置を満たすように、SwingEEModification
   this->calcSwingEEModification(dt, gaitParam, //input
                                 o_stEEOffsetSwingEEModification); //output
 
-  gaitParam.printTime();
   return true;
 }
 
@@ -117,6 +104,8 @@ bool Stabilizer::calcZMP(const GaitParam& gaitParam, double dt, double mass,
 bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tgtZmp/*generate座標系*/, const cnoid::Vector3& tgtForce/*generate座標系 ロボットが受ける力*/,
                             std::vector<cnoid::Vector6>& o_tgtEEWrench) const{
   std::vector<cnoid::Vector6> tgtEEWrench(gaitParam.eeName.size(), cnoid::Vector6::Zero()); /* 要素数EndEffector数. generate frame. EndEffector origin*/
+
+  gaitParam.resetTime();
 
   // leg以外はref値をそのまま
   for(int i = NUM_LEGS;i<gaitParam.eeName.size();i++){
@@ -176,22 +165,25 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
 
       this->constraintTask_->w() = cnoid::VectorX::Ones(dim) * 1e-6;
       this->constraintTask_->toSolve() = false;
-      this->constraintTask_->solver().settings()->setVerbosity(0);
+      //this->constraintTask_->solver().settings()->setVerbosity(0);
     }
     {
       // 2. ZMPがtgtZmp
       // tgtZmpまわりのトルクの和を求めて、tgtForceの向きの単位ベクトルとの外積が0なら良い
-      this->tgtZmpTask_->A() = Eigen::SparseMatrix<double,Eigen::RowMajor>(3,dim);
+      //this->tgtZmpTask_->A() = Eigen::SparseMatrix<double,Eigen::RowMajor>(3,dim);
       cnoid::Vector3 tgtForceDir = tgtForce.normalized();
       int idx = 0;
+      Eigen::SparseMatrix<double,Eigen::ColMajor> A_ColMajor(3,dim); // insert()する順序がColMajorなので、RowMajorのAに直接insertすると計算効率が著しく悪い(ミリ秒単位で時間がかかる).
       for(int i=0;i<NUM_LEGS;i++){
         for(int j=0;j<gaitParam.legHull[i].size();j++){
-          cnoid::Vector3 pos = gaitParam.actEEPose[i].translation() + gaitParam.actEEPose[i].linear() * gaitParam.legHull[i][j];
+          cnoid::Vector3 pos = gaitParam.actEEPose[i] * gaitParam.legHull[i][j];
           cnoid::Vector3 a = tgtForceDir.cross( (pos - tgtZmp).cross(tgtForce));
-          for(int k=0;k<3;k++) this->tgtZmpTask_->A().insert(k,idx) = a[k];
+          for(int k=0;k<3;k++) A_ColMajor.insert(k,idx) = a[k];
           idx ++;
         }
       }
+      this->tgtZmpTask_->A() = A_ColMajor;
+      gaitParam.printTime();
       this->tgtZmpTask_->b() = Eigen::VectorXd::Zero(3);
       this->tgtZmpTask_->wa() = cnoid::VectorX::Ones(3);
 
@@ -202,13 +194,14 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
 
       this->tgtZmpTask_->w() = cnoid::VectorX::Ones(dim) * 1e-6;
       this->tgtZmpTask_->toSolve() = false; // 常にtgtZmpが支持領域内にあるなら解く必要がないので高速化のためfalseにする. ない場合があるならtrueにする. calcWrenchでtgtZmpをtruncateしているのでfalseでよい
-      this->tgtZmpTask_->solver().settings()->setVerbosity(0);
+      //this->tgtZmpTask_->solver().settings()->setVerbosity(0);
     }
+    gaitParam.printTime();
     {
       // 3. 各脚の各頂点のノルムの重心がCOPOffsetと一致 (fzの値でスケールされてしまうので、alphaを用いて左右をそろえる)
 
       // 各EndEffectorとtgtZmpの距離を用いてalphaを求める
-      std::vector<double> alpha(2);
+      std::vector<double> alpha(NUM_LEGS);
       {
         cnoid::Vector3 rleg2leg = gaitParam.actEEPose[LLEG].translation() - gaitParam.actEEPose[RLEG].translation();
         rleg2leg[2] = 0.0;
@@ -222,18 +215,18 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
           alpha[LLEG] = mathutil::clamp(rleg2tgtZmpRatio, 0.05, 1.0-0.05);
         }
       }
-
-      this->copTask_->A() = Eigen::SparseMatrix<double,Eigen::RowMajor>(3*NUM_LEGS,dim);
+      Eigen::SparseMatrix<double,Eigen::ColMajor> A_ColMajor(3*NUM_LEGS,dim); // insert()する順序がColMajorなので、RowMajorのAに直接insertすると計算効率が著しく悪い(ミリ秒単位で時間がかかる).
       int idx = 0;
       for(int i=0;i<NUM_LEGS;i++) {
         cnoid::Vector3 cop = gaitParam.actEEPose[i].translation() + gaitParam.actEEPose[i].linear() * gaitParam.copOffset[i].value();
         for(int j=0;j<gaitParam.legHull[i].size();j++){
           cnoid::Vector3 pos = gaitParam.actEEPose[i].translation() + gaitParam.actEEPose[i].linear() * gaitParam.legHull[i][j];
           cnoid::Vector3 a = (pos - cop) / alpha[i];
-          for(int k=0;k<3;k++) this->copTask_->A().insert(i*3+k,idx) = a[k];
+          for(int k=0;k<3;k++) A_ColMajor.insert(i*3+k,idx) = a[k];
           idx ++;
         }
       }
+      this->copTask_->A() = A_ColMajor;
       this->copTask_->b() = Eigen::VectorXd::Zero(3*NUM_LEGS);
       this->copTask_->wa() = cnoid::VectorX::Ones(3*NUM_LEGS);
 
@@ -244,12 +237,15 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
 
       this->copTask_->w() = cnoid::VectorX::Ones(dim) * 1e-6;
       this->copTask_->toSolve() = true;
-      this->copTask_->solver().settings()->setCheckTermination(5); // default 25. 高速化
-      this->copTask_->solver().settings()->setVerbosity(0);
+      this->copTask_->options().setToReliable();
+      this->copTask_->options().printLevel = qpOASES::PL_NONE; // PL_HIGH or PL_NONE
+      //this->copTask_->solver().settings()->setCheckTermination(5); // default 25. 高速化
+      //this->copTask_->solver().settings()->setVerbosity(0);
     }
 
     std::vector<std::shared_ptr<prioritized_qp_base::Task> > tasks{this->constraintTask_,this->tgtZmpTask_,this->copTask_};
     cnoid::VectorX result;
+    gaitParam.printTime();
     if(!prioritized_qp_base::solve(tasks,
                                    result,
                                    0 // debuglevel
@@ -267,6 +263,7 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
         }
       }
     }
+    gaitParam.printTime();
   }
 
   o_tgtEEWrench = tgtEEWrench;

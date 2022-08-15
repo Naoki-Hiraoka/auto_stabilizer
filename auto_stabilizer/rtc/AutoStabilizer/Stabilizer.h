@@ -2,7 +2,7 @@
 #define Stabilizer_H
 
 #include "GaitParam.h"
-#include <prioritized_qp/PrioritizedQPSolver.h>
+#include <prioritized_qp_qpoases/PrioritizedQPSolverqpOASES.h>
 
 class Stabilizer{
 public:
@@ -34,9 +34,9 @@ public:
   }
 protected:
   // 計算高速化のためのキャッシュ. クリアしなくても別に副作用はない.
-  mutable std::shared_ptr<prioritized_qp::Task> constraintTask_ = std::make_shared<prioritized_qp::Task>();
-  mutable std::shared_ptr<prioritized_qp::Task> tgtZmpTask_ = std::make_shared<prioritized_qp::Task>();;
-  mutable std::shared_ptr<prioritized_qp::Task> copTask_ = std::make_shared<prioritized_qp::Task>();;
+  mutable std::shared_ptr<prioritized_qp_qpoases::Task> constraintTask_ = std::make_shared<prioritized_qp_qpoases::Task>();
+  mutable std::shared_ptr<prioritized_qp_qpoases::Task> tgtZmpTask_ = std::make_shared<prioritized_qp_qpoases::Task>();;
+  mutable std::shared_ptr<prioritized_qp_qpoases::Task> copTask_ = std::make_shared<prioritized_qp_qpoases::Task>();;
 public:
   void initStabilizerOutput(const GaitParam& gaitParam,
                             cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/, cnoid::Vector3& o_stTargetZmp) const;
