@@ -25,10 +25,6 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
   // swing期は、remainTime - supportTime - delayTimeOffset後にdstCoordsに到達するようなantececdent軌道を生成し(genCoords.getGoal()の値)、その軌道にdelayTimeOffset遅れで滑らかに追従するような軌道(genCoords.value()の値)を生成する.
   //   rectangle以外の軌道タイプや跳躍についてはひとまず考えない TODO
   //   srcCoordsとdstCoordsを結ぶ軌道を生成する. srcCoordsの高さ+[0]とdstCoordsの高さ+[1]の高い方(heightとおく)に上げるようなrectangle軌道を生成する
-  //     dstに到達するまでの時間が(height-dstCoords)/touchVel以下の場合、dstまで直線で移動する
-  //     そうで無い場合、今の位置がheight - eps(ひとまず0)よりも低ければ、heightの高さまで上げてからdstCoordsの上空(XYと回転はdstCoordsと同じ)まで直線で移動する軌道を,残りの自由に使える時間で実行する
-  //                     今の位置がheight - eps(ひとまず0)以上であれば、dstCoordsの上空(XYと回転はdstCoordsと同じ)まで直線で移動する軌道を,残りの自由に使える時間で実行する
-  //                     両者はチャタリングしそうだが、delayTimeOffset遅れで滑らかに追従するので大丈夫
   // support期は、現FootStepNodesの終了時にdstCoordsに到達するような軌道を線形補間によって生成する.
 
   // refZmpTrajを更新し進める
