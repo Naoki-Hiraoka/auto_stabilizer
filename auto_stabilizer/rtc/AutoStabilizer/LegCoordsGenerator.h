@@ -11,6 +11,7 @@ public:
   double touchVel = 0.5; // 0より大きい. 足を下ろすときの速さ(この値より速く下ろす) [m/s]
   double finalDistanceWeight = 3.0; // 0より大きい. swing期のDOWN_PHASEの速さを、他のPHASEとくらべ何倍遅くするか. 着地時の衝撃をやわらげる
 
+  double footGuidedBalanceTime = 0.4; // [s]. refZmpTrajの終端時間. 0より大きい. (1.0[s]だと大きすぎて, 両足で立っているときに傾いたまま戻ってこなかったり、少しずつ傾いていくことがある)
 public:
   void initLegCoords(const GaitParam& gaitParam,
                      std::vector<footguidedcontroller::LinearTrajectory<cnoid::Vector3> >& o_refZmpTraj, std::vector<cpp_filters::TwoPointInterpolatorSE3>& o_genCoords) const;

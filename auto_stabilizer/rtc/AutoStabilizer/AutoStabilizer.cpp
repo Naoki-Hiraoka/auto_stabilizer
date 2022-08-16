@@ -840,7 +840,6 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
   this->externalForceHandler_.useDisturbanceCompensation = i_param.use_disturbance_compensation;
   this->externalForceHandler_.disturbanceCompensationTimeConst = std::max(i_param.disturbance_compensation_time_const, 0.01);
   this->externalForceHandler_.disturbanceCompensationStepNum = std::max(i_param.disturbance_compensation_step_num, 1);
-  this->externalForceHandler_.disturbanceCompensationStaticTime = std::max(i_param.disturbance_compensation_static_time, 0.01);
   this->externalForceHandler_.disturbanceCompensationLimit = std::max(i_param.disturbance_compensation_limit, 0.0);
 
   if(i_param.impedance_M_p.length() == this->gaitParam_.eeName.size() &&
@@ -927,6 +926,7 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
   this->legCoordsGenerator_.delayTimeOffset = std::max(i_param.swing_trajectory_delay_time_offset, 0.0);
   this->legCoordsGenerator_.touchVel = std::max(i_param.swing_trajectory_touch_vel, 0.001);
   this->legCoordsGenerator_.finalDistanceWeight = std::max(i_param.swing_trajectory_final_distance_weight, 0.01);
+  this->legCoordsGenerator_.footGuidedBalanceTime = std::max(i_param.footguided_balance_time, 0.01);
 
   if(i_param.eefm_body_attitude_control_gain.length() == 2 &&
      i_param.eefm_body_attitude_control_time_const.length() == 2 &&
@@ -1033,7 +1033,6 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
   i_param.use_disturbance_compensation = this->externalForceHandler_.useDisturbanceCompensation;
   i_param.disturbance_compensation_time_const = this->externalForceHandler_.disturbanceCompensationTimeConst;
   i_param.disturbance_compensation_step_num = this->externalForceHandler_.disturbanceCompensationStepNum;
-  i_param.disturbance_compensation_static_time = this->externalForceHandler_.disturbanceCompensationStaticTime;
   i_param.disturbance_compensation_limit = this->externalForceHandler_.disturbanceCompensationLimit;
 
   i_param.impedance_M_p.length(this->gaitParam_.eeName.size());
@@ -1114,6 +1113,7 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
   i_param.swing_trajectory_delay_time_offset = this->legCoordsGenerator_.delayTimeOffset;
   i_param.swing_trajectory_touch_vel = this->legCoordsGenerator_.touchVel;
   i_param.swing_trajectory_final_distance_weight = this->legCoordsGenerator_.finalDistanceWeight;
+  i_param.footguided_balance_time = this->legCoordsGenerator_.footGuidedBalanceTime;
 
   i_param.eefm_body_attitude_control_gain.length(2);
   i_param.eefm_body_attitude_control_time_const.length(2);

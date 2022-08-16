@@ -79,21 +79,29 @@ bool ExternalForceHandler::handleExternalForce(const GaitParam& gaitParam, doubl
     if(this->isInitial) actCPVel = cnoid::Vector3::Zero();
     else actCPVel = (actCP - this->actCPPrev) / dt;
     this->actCPPrev = actCP;
-    cnoid::Vector3 tmpOffset = cnoid::Vector3::Zero();
-    tmpOffset.head<2>() = (actCP - actCPVel / omega - gaitParam.stTargetZmp).head<2>();
-    this->disturbance = (this->disturbance * this->disturbanceTime + tmpOffset * dt) / (this->disturbanceTime + dt);
-    this->disturbanceTime += dt;
-    if(this->disturbanceTime > 0.0 &&
-       ((gaitParam.isStatic() && this->disturbanceTime >= this->disturbanceCompensationStaticTime) || // 歩いていないときに、この時間で区切ってステップとする
-        (gaitParam.prevSupportPhase[RLEG] != gaitParam.footstepNodesList[0].isSupportPhase[RLEG] || gaitParam.prevSupportPhase[LLEG] != gaitParam.footstepNodesList[0].isSupportPhase[LLEG]))){ // footStepNodesListの変わり目
-      this->disturbanceQueue.emplace_back(this->disturbance, this->disturbanceTime);
-      this->disturbance = cnoid::Vector3::Zero();
-      this->disturbanceTime = 0.0;
-      while(this->disturbanceQueue.size() > this->disturbanceCompensationStepNum) this->disturbanceQueue.pop_front();
-    }
 
     cnoid::Vector3 targetOffset = cnoid::Vector3::Zero();
+    double timeConst = this->disturbanceCompensationTimeConst;
     if(this->useDisturbanceCompensation && useActState){
+      if(!gaitParam.isStatic()) {// 非静止状態. (着地の衝撃が大きかったり、右脚と左脚とで誤差ののり方が反対向きになったりするので、一歩ごとに積算する) (逆に静止状態時に、適当に1[s]などで区切って一歩分の誤差として積算すると、BangBang的な挙動をしてしまう)
+        cnoid::Vector3 tmpOffset = cnoid::Vector3::Zero(); // 今の外乱の大きさ
+        tmpOffset.head<2>() = (actCP - actCPVel / omega - gaitParam.stTargetZmp).head<2>();
+        this->disturbance = (this->disturbance * this->disturbanceTime + tmpOffset * dt) / (this->disturbanceTime + dt);
+        this->disturbanceTime += dt;
+        if(this->disturbanceTime > 0.0 &&
+           (gaitParam.prevSupportPhase[RLEG] != gaitParam.footstepNodesList[0].isSupportPhase[RLEG] || gaitParam.prevSupportPhase[LLEG] != gaitParam.footstepNodesList[0].isSupportPhase[LLEG])){ // footStepNodesListの変わり目
+          this->disturbanceQueue.emplace_back(this->disturbance, this->disturbanceTime);
+          this->disturbance = cnoid::Vector3::Zero();
+          this->disturbanceTime = 0.0;
+          while(this->disturbanceQueue.size() > this->disturbanceCompensationStepNum) this->disturbanceQueue.pop_front();
+        }
+      } else { // 静止状態
+        cnoid::Vector3 tmpOffset = cnoid::Vector3::Zero(); // 今の外乱の大きさ. (ReferenceForceUpdator等の話になる. 安易に現在の誤差を積分すると不安定になるので、現状は何もしない)
+        disturbanceQueue = {std::pair<cnoid::Vector3, double>{tmpOffset,1.0}};
+        disturbance = cnoid::Vector3::Zero();
+        disturbanceTime = 0.0;
+      }
+
       double tm = 0;
       for(std::list<std::pair<cnoid::Vector3, double> >::iterator it = this->disturbanceQueue.begin(); it != this->disturbanceQueue.end(); it++){
         targetOffset += it->first * it->second;
@@ -101,12 +109,17 @@ bool ExternalForceHandler::handleExternalForce(const GaitParam& gaitParam, doubl
       }
       targetOffset /= tm;
       targetOffset -= sbpOffset; // フィードフォワード外乱補償では足りない分のみを扱う
+
+    }else{ // if(this->useDisturbanceCompensation && useActState)
+      disturbanceQueue = {std::pair<cnoid::Vector3, double>{cnoid::Vector3::Zero(),1.0}};
+      disturbance = cnoid::Vector3::Zero();
+      disturbanceTime = 0.0;
     }
 
     cnoid::Vector3 offset = this->offsetPrev;
     for(int i=0;i<2;i++){
       double timeConst = this->disturbanceCompensationTimeConst;
-      if(std::abs(offset[i]) > std::abs(targetOffset[i])) timeConst *= 0.1;
+      if(std::abs(offset[i]) > std::abs(targetOffset[i])) timeConst *= 0.1; // 減る方向には速く
       offset[i] += (targetOffset[i] - offset[i]) * dt / timeConst;
       offset[i] = mathutil::clamp(offset[i], this->disturbanceCompensationLimit);
     }

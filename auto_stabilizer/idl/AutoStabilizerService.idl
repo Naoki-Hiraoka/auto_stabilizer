@@ -150,8 +150,6 @@ module OpenHRP
       double disturbance_compensation_time_const;
       /// 下限1
       long disturbance_compensation_step_num;
-      /// 下限0.01[s]
-      double disturbance_compensation_static_time;
       /// 下限0[m]
       double disturbance_compensation_limit;
 
@@ -206,6 +204,7 @@ module OpenHRP
       long emergency_step_num;
       /// CP margin [m]
       double emergency_step_cp_check_margin;
+
       // LegCoordsGenerator
       /// Time offset [s] for swing trajectory by delay_hoffarbib_trajectory_generator. 下限0.0
       double swing_trajectory_delay_time_offset;
@@ -213,6 +212,8 @@ module OpenHRP
       double swing_trajectory_touch_vel;
       /// Weight parameter for distance of final path of delay_hoffarbib_trajectory_generator. 下限0.01
       double swing_trajectory_final_distance_weight;
+      /// [s]. 下限0.01[s]
+      double footguided_balance_time;
 
       // Stabilizer
       /// Body attitude control gain [rad/s] (roll, pitch). 下限0.0

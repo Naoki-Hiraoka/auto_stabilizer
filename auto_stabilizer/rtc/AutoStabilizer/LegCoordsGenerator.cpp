@@ -85,8 +85,8 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
         refZmp = zmpGoalPos;
       }
     }
-    // 末尾に1sぶん加える. そうしないと終端条件が厳しすぎる
-    refZmpTraj.push_back(footguidedcontroller::LinearTrajectory<cnoid::Vector3>(refZmp,refZmp, 1.0));
+    // 末尾にfootGuidedBalanceTime[s]ぶん加える. そうしないと終端条件が厳しすぎる
+    refZmpTraj.push_back(footguidedcontroller::LinearTrajectory<cnoid::Vector3>(refZmp,refZmp, this->footGuidedBalanceTime));
 
     // dtだけ進める
     if(refZmpTraj[0].getTime() <= dt){
