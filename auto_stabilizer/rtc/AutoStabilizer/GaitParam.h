@@ -91,7 +91,6 @@ public:
   cnoid::Vector3 stTargetZmp; // generate frame. stで計算された目標ZMP
   std::vector<cpp_filters::TwoPointInterpolator<double> > stServoPGainPercentage; // 要素数と順序はrobot->numJoints()と同じ. 0~100. 現状, setGoal(*,dt)以下の時間でgoal指定するとwriteOutPortDataが破綻する
   std::vector<cpp_filters::TwoPointInterpolator<double> > stServoDGainPercentage; // 要素数と順序はrobot->numJoints()と同じ. 0~100. 現状, setGoal(*,dt)以下の時間でgoal指定するとwriteOutPortDataが破綻する
-  std::vector<cpp_filters::TwoPointInterpolator<double> > stServoTorqueGainPercentage; // 要素数と順序はrobot->numJoints()と同じ. 0~100. 現状, setGoal(*,dt)以下の時間でgoal指定するとwriteOutPortDataが破綻する
 
 public:
   // param
@@ -132,7 +131,6 @@ public:
   void init(const cnoid::BodyPtr& genRobot){
     stServoPGainPercentage.resize(genRobot->numJoints(), cpp_filters::TwoPointInterpolator<double>(100.0, 0.0, 0.0, cpp_filters::LINEAR));
     stServoDGainPercentage.resize(genRobot->numJoints(), cpp_filters::TwoPointInterpolator<double>(100.0, 0.0, 0.0, cpp_filters::LINEAR));
-    stServoTorqueGainPercentage.resize(genRobot->numJoints(), cpp_filters::TwoPointInterpolator<double>(0.0, 0.0, 0.0, cpp_filters::LINEAR));
   }
 
   void push_backEE(const std::string& name_, const std::string& parentLink_, const cnoid::Position& localT_){

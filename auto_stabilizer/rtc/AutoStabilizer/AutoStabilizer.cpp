@@ -391,7 +391,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
     legCoordsGenerator.initLegCoords(gaitParam,
                                      gaitParam.refZmpTraj, gaitParam.genCoords);
     stabilizer.initStabilizerOutput(gaitParam,
-                                    gaitParam.stOffsetRootRpy, gaitParam.stEEOffsetDampingControl, gaitParam.stEEOffsetSwingEEModification, gaitParam.stTargetZmp, gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage, gaitParam.stServoTorqueGainPercentage);
+                                    gaitParam.stOffsetRootRpy, gaitParam.stEEOffsetDampingControl, gaitParam.stEEOffsetSwingEEModification, gaitParam.stTargetZmp, gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage);
   }
 
   // FootOrigin座標系を用いてrefRobotRawをgenerate frameに投影しrefRobotとする
@@ -431,9 +431,10 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
   // Stabilizer
   if(mode.isSTRunning()){
     stabilizer.execStabilizer(refRobot, actRobot, genRobot, gaitParam, dt, genRobot->mass(),
-                              actRobotTqc, gaitParam.stOffsetRootRpy, gaitParam.stEEOffsetDampingControl, gaitParam.stEEOffsetSwingEEModification, gaitParam.stTargetZmp, gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage, gaitParam.stServoTorqueGainPercentage);
+                              actRobotTqc, gaitParam.stOffsetRootRpy, gaitParam.stEEOffsetDampingControl, gaitParam.stEEOffsetSwingEEModification, gaitParam.stTargetZmp, gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage);
   }else{
     gaitParam.stTargetZmp = gaitParam.refZmpTraj[0].getStart();
+    for(int i=0;i<actRobotTqc->numJoints();i++) actRobotTqc->joint(i)->u() = 0.0;
     if(mode.isSyncToStopSTInit()){ // stopST直後の初回
       gaitParam.stOffsetRootRpy.setGoal(cnoid::Vector3::Zero(),mode.remainTime());
       for(int i=0;i<gaitParam.eeName.size();i++){
@@ -443,7 +444,6 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
       for(int i=0;i<genRobot->numJoints();i++){
         if(gaitParam.stServoPGainPercentage[i].getGoal() != 100.0) gaitParam.stServoPGainPercentage[i].setGoal(100.0, mode.remainTime());
         if(gaitParam.stServoDGainPercentage[i].getGoal() != 100.0) gaitParam.stServoDGainPercentage[i].setGoal(100.0, mode.remainTime());
-        if(gaitParam.stServoTorqueGainPercentage[i].getGoal() != 0.0) gaitParam.stServoTorqueGainPercentage[i].setGoal(0.0, mode.remainTime());
       }
     }
   }
@@ -463,7 +463,6 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
   for(int i=0;i<genRobot->numJoints();i++){
     gaitParam.stServoPGainPercentage[i].interpolate(dt);
     gaitParam.stServoDGainPercentage[i].interpolate(dt);
-    gaitParam.stServoTorqueGainPercentage[i].interpolate(dt);
   }
 
   // FullbodyIKSolver
@@ -631,9 +630,6 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const cnoid:
         }
         if(gaitParam.stServoDGainPercentage[i].remain_time() > 0.0 && gaitParam.stServoDGainPercentage[i].current_time() <= dt) { // 補間が始まった初回
           ports.m_robotHardwareService0_->setServoDGainPercentageWithTime(actRobotTqc->joint(i)->name().c_str(),gaitParam.stServoDGainPercentage[i].getGoal(),gaitParam.stServoDGainPercentage[i].goal_time());
-        }
-        if(gaitParam.stServoTorqueGainPercentage[i].remain_time() > 0.0 && gaitParam.stServoTorqueGainPercentage[i].current_time() <= dt) { // 補間が始まった初回
-          ports.m_robotHardwareService0_->setServoTorqueGainPercentage(actRobotTqc->joint(i)->name().c_str(),gaitParam.stServoTorqueGainPercentage[i].getGoal()); // 時間が指定できない
         }
       }
     }

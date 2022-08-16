@@ -89,6 +89,7 @@ class JAXON_RED_HrpsysConfigurator(ChoreonoidHrpsysConfigurator):
             self.el_svc.setServoErrorLimit("LARM_F_JOINT1", sys.float_info.max)
         ###
         self.rh_svc.setJointControlMode("all",OpenHRP.RobotHardwareService.TORQUE)
+        self.rh_svc.setServoTorqueGainPercentage("all",100)
         self.ast_svc.startAutoBalancer()
         # Suppress limit over message and behave like real robot that always angle-vector is in seq.
         # Latter four 0.0 are for hands.

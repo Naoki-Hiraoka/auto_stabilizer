@@ -5,7 +5,7 @@
 #include <cnoid/src/Body/InverseDynamics.h>
 
 void Stabilizer::initStabilizerOutput(const GaitParam& gaitParam,
-                                      cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/, cnoid::Vector3& o_stTargetZmp, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoTorqueGainPercentage) const{
+                                      cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/, cnoid::Vector3& o_stTargetZmp, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage) const{
 
   for(int i=0;i<gaitParam.eeName.size();i++){
     o_stEEOffsetDampingControl[i].reset(cnoid::Vector6::Zero());
@@ -16,12 +16,11 @@ void Stabilizer::initStabilizerOutput(const GaitParam& gaitParam,
   for(int i=0;i<o_stServoPGainPercentage.size();i++){
     o_stServoPGainPercentage[i].reset(100.0);
     o_stServoDGainPercentage[i].reset(100.0);
-    o_stServoTorqueGainPercentage[i].reset(0.0);
   }
 }
 
 bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobot, const cnoid::BodyPtr actRobot, const cnoid::BodyPtr genRobot, const GaitParam& gaitParam, double dt, double mass,
-                                cnoid::BodyPtr& actRobotTqc, cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/, cnoid::Vector3& o_stTargetZmp, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoTorqueGainPercentage) const{
+                                cnoid::BodyPtr& actRobotTqc, cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/, cnoid::Vector3& o_stTargetZmp, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage) const{
   // - root attitude control
   // - 現在のactual重心位置から、目標ZMPを計算
   // - 目標ZMPを満たすように目標足裏反力を計算
@@ -53,7 +52,9 @@ bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobot, const cnoid::Body
   if(this->isTorqueControlMode){
     // 目標反力を満たすように重力補償+仮想仕事の原理
     this->calcTorque(actRobot, dt, gaitParam, tgtEEWrench, // input
-                     actRobotTqc, o_stServoPGainPercentage, o_stServoDGainPercentage, o_stServoTorqueGainPercentage); // output
+                     actRobotTqc, o_stServoPGainPercentage, o_stServoDGainPercentage); // output
+  }else{
+    for(int i=0;i<actRobotTqc->numJoints();i++) actRobotTqc->joint(i)->u() = 0.0;
   }
 
   return true;
@@ -351,7 +352,7 @@ bool Stabilizer::calcSwingEEModification(double dt, const GaitParam& gaitParam,
 }
 
 bool Stabilizer::calcTorque(const cnoid::BodyPtr actRobot, double dt, const GaitParam& gaitParam, const std::vector<cnoid::Vector6>& tgtEEWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/,
-                            cnoid::BodyPtr& actRobotTqc, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoTorqueGainPercentage) const{
+                            cnoid::BodyPtr& actRobotTqc, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage) const{
   // 速度・加速度を考慮しない重力補償
   actRobotTqc->rootLink()->T() = actRobot->rootLink()->T();
   actRobotTqc->rootLink()->v() = cnoid::Vector3::Zero();
@@ -363,8 +364,8 @@ bool Stabilizer::calcTorque(const cnoid::BodyPtr actRobot, double dt, const Gait
     actRobotTqc->joint(i)->dq() = 0.0;
     actRobotTqc->joint(i)->ddq() = 0.0;
   }
-  actRobotTqc->calcForwardKinematics(true, true); // actRobotTqc->joint()->u()に書き込まれる
-  cnoid::calcInverseDynamics(actRobotTqc->rootLink());
+  actRobotTqc->calcForwardKinematics(true, true);
+  cnoid::calcInverseDynamics(actRobotTqc->rootLink()); // actRobotTqc->joint()->u()に書き込まれる
 
   // tgtEEWrench
   for(int i=0;i<gaitParam.eeName.size();i++){
@@ -380,15 +381,25 @@ bool Stabilizer::calcTorque(const cnoid::BodyPtr actRobot, double dt, const Gait
 
   // Gain
   if(this->isTorqueControlMode){
-    for(int i=0;i<actRobotTqc->numJoints();i++){
-      if(o_stServoTorqueGainPercentage[i].getGoal() != 100.0) o_stServoTorqueGainPercentage[i].setGoal(100.0, 0.1);
-    }
     for(int i=0;i<NUM_LEGS;i++){
       cnoid::JointPath jointPath(actRobotTqc->rootLink(), actRobotTqc->link(gaitParam.eeParentLink[i]));
       if(gaitParam.footstepNodesList[0].isSupportPhase[i]){
+        double transitionTime = std::max(this->landing2SupportTransitionTime, dt*2); // 現状, setGoal(*,dt)以下の時間でgoal指定するとwriteOutPortDataが破綻するのでテンポラリ
         for(int j=0;j<jointPath.numJoints();j++){
-          if(o_stServoPGainPercentage[jointPath.joint(j)->jointId()].getGoal() != this->supportPgain[i][j]) o_stServoPGainPercentage[jointPath.joint(j)->jointId()].setGoal(this->supportPgain[i][j], 4.0);
-          if(o_stServoDGainPercentage[jointPath.joint(j)->jointId()].getGoal() != this->supportDgain[i][j]) o_stServoDGainPercentage[jointPath.joint(j)->jointId()].setGoal(this->supportDgain[i][j], 4.0);
+          if(o_stServoPGainPercentage[jointPath.joint(j)->jointId()].getGoal() != this->supportPgain[i][j]) o_stServoPGainPercentage[jointPath.joint(j)->jointId()].setGoal(this->supportPgain[i][j], transitionTime);
+          if(o_stServoDGainPercentage[jointPath.joint(j)->jointId()].getGoal() != this->supportDgain[i][j]) o_stServoDGainPercentage[jointPath.joint(j)->jointId()].setGoal(this->supportDgain[i][j], transitionTime);
+        }
+      }else if(gaitParam.footstepNodesList[0].swingState[i] == GaitParam::FootStepNodes::DOWN_PHASE) {
+        double transitionTime = std::max(this->swing2LandingTransitionTime, dt*2); // 現状, setGoal(*,dt)以下の時間でgoal指定するとwriteOutPortDataが破綻するのでテンポラリ
+        for(int j=0;j<jointPath.numJoints();j++){
+          if(o_stServoPGainPercentage[jointPath.joint(j)->jointId()].getGoal() != this->landingPgain[i][j]) o_stServoPGainPercentage[jointPath.joint(j)->jointId()].setGoal(this->landingPgain[i][j], transitionTime);
+          if(o_stServoDGainPercentage[jointPath.joint(j)->jointId()].getGoal() != this->landingDgain[i][j]) o_stServoDGainPercentage[jointPath.joint(j)->jointId()].setGoal(this->landingDgain[i][j], transitionTime);
+        }
+      }else{
+        double transitionTime = std::max(this->support2SwingTransitionTime, dt*2); // 現状, setGoal(*,dt)以下の時間でgoal指定するとwriteOutPortDataが破綻するのでテンポラリ
+        for(int j=0;j<jointPath.numJoints();j++){
+          if(o_stServoPGainPercentage[jointPath.joint(j)->jointId()].getGoal() != this->swingPgain[i][j]) o_stServoPGainPercentage[jointPath.joint(j)->jointId()].setGoal(this->swingPgain[i][j], transitionTime);
+          if(o_stServoDGainPercentage[jointPath.joint(j)->jointId()].getGoal() != this->swingDgain[i][j]) o_stServoDGainPercentage[jointPath.joint(j)->jointId()].setGoal(this->swingDgain[i][j], transitionTime);
         }
       }
     }
