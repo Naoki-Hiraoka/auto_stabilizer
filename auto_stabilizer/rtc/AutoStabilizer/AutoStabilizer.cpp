@@ -41,7 +41,9 @@ AutoStabilizer::Ports::Ports() :
   m_genBasePosOut_("genBasePosOut", m_genBasePos_),
   m_genBaseRpyOut_("genBaseRpyOut", m_genBaseRpy_),
 
-  m_AutoStabilizerServicePort_("AutoStabilizerService") {
+  m_AutoStabilizerServicePort_("AutoStabilizerService"),
+
+  m_RobotHardwareServicePort_("RobotHardwareService"){
 }
 
 AutoStabilizer::AutoStabilizer(RTC::Manager* manager) : RTC::DataFlowComponentBase(manager),
@@ -69,7 +71,8 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
   this->addOutPort("genBaseRpyOut", this->ports_.m_genBaseRpyOut_);
   this->ports_.m_AutoStabilizerServicePort_.registerProvider("service0", "AutoStabilizerService", this->ports_.m_service0_);
   this->addPort(this->ports_.m_AutoStabilizerServicePort_);
-
+  this->ports_.m_RobotHardwareServicePort_.registerConsumer("service0", "RobotHardwareService", this->ports_.m_robotHardwareService0_);
+  this->addPort(this->ports_.m_RobotHardwareServicePort_);
   {
     // load dt
     std::string buf; this->getProperty("dt", buf);
@@ -207,6 +210,9 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
         joint->setJointVelocityRange(joint->dq_lower()+0.01,joint->dq_upper()-0.01);
       }
     }
+
+    // init gaitParam
+    this->gaitParam_.init(this->genRobot_);
   }
 
   {
@@ -236,6 +242,11 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
     for(int i=0;i<this->gaitParam_.eeName.size();i++){
       this->impedanceController_.push_back();
     }
+  }
+
+  {
+    // init Stabilizer
+    this->stabilizer_.init(this->gaitParam_, this->actRobotTqc_);
   }
 
   {
@@ -380,7 +391,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
     legCoordsGenerator.initLegCoords(gaitParam,
                                      gaitParam.refZmpTraj, gaitParam.genCoords);
     stabilizer.initStabilizerOutput(gaitParam,
-                                    gaitParam.stOffsetRootRpy, gaitParam.stEEOffsetDampingControl, gaitParam.stEEOffsetSwingEEModification, gaitParam.stTargetZmp);
+                                    gaitParam.stOffsetRootRpy, gaitParam.stEEOffsetDampingControl, gaitParam.stEEOffsetSwingEEModification, gaitParam.stTargetZmp, gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage, gaitParam.stServoTorqueGainPercentage);
   }
 
   // FootOrigin座標系を用いてrefRobotRawをgenerate frameに投影しrefRobotとする
@@ -420,7 +431,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
   // Stabilizer
   if(mode.isSTRunning()){
     stabilizer.execStabilizer(refRobot, actRobot, genRobot, gaitParam, dt, genRobot->mass(),
-                              actRobotTqc, gaitParam.stOffsetRootRpy, gaitParam.stEEOffsetDampingControl, gaitParam.stEEOffsetSwingEEModification, gaitParam.stTargetZmp);
+                              actRobotTqc, gaitParam.stOffsetRootRpy, gaitParam.stEEOffsetDampingControl, gaitParam.stEEOffsetSwingEEModification, gaitParam.stTargetZmp, gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage, gaitParam.stServoTorqueGainPercentage);
   }else{
     gaitParam.stTargetZmp = gaitParam.refZmpTraj[0].getStart();
     if(mode.isSyncToStopSTInit()){ // stopST直後の初回
@@ -428,6 +439,11 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
       for(int i=0;i<gaitParam.eeName.size();i++){
         gaitParam.stEEOffsetDampingControl[i].setGoal(cnoid::Vector6::Zero(),mode.remainTime());
         gaitParam.stEEOffsetSwingEEModification[i].setGoal(cnoid::Vector6::Zero(),mode.remainTime());
+      }
+      for(int i=0;i<genRobot->numJoints();i++){
+        if(gaitParam.stServoPGainPercentage[i].getGoal() != 100.0) gaitParam.stServoPGainPercentage[i].setGoal(100.0, mode.remainTime());
+        if(gaitParam.stServoDGainPercentage[i].getGoal() != 100.0) gaitParam.stServoDGainPercentage[i].setGoal(100.0, mode.remainTime());
+        if(gaitParam.stServoTorqueGainPercentage[i].getGoal() != 0.0) gaitParam.stServoTorqueGainPercentage[i].setGoal(0.0, mode.remainTime());
       }
     }
   }
@@ -444,6 +460,11 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
     gaitParam.stEETargetPose[i].translation() = stOffsetSwingEEModification.head<3>() + gaitParam.stEETargetPose[i].translation();
     gaitParam.stEETargetPose[i].linear() = cnoid::AngleAxisd(stOffsetSwingEEModification.tail<3>().norm(),(stOffsetSwingEEModification.tail<3>().norm()>0)?stOffsetSwingEEModification.tail<3>().normalized() : cnoid::Vector3::UnitX()) * gaitParam.stEETargetPose[i].linear();
   }
+  for(int i=0;i<genRobot->numJoints();i++){
+    gaitParam.stServoPGainPercentage[i].interpolate(dt);
+    gaitParam.stServoDGainPercentage[i].interpolate(dt);
+    gaitParam.stServoTorqueGainPercentage[i].interpolate(dt);
+  }
 
   // FullbodyIKSolver
   fullbodyIKSolver.solveFullbodyIK(refRobot, dt, gaitParam,// input
@@ -458,7 +479,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
 }
 
 // static function
-bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr genRobot, const AutoStabilizer::ControlMode& mode, AutoStabilizer::OutputOffsetInterpolators& outputOffsetInterpolators, double dt){
+bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const cnoid::BodyPtr& refRobotRaw, const cnoid::BodyPtr& genRobot, const cnoid::BodyPtr& actRobotTqc, const AutoStabilizer::ControlMode& mode, AutoStabilizer::OutputOffsetInterpolators& outputOffsetInterpolators, double dt, const GaitParam& gaitParam){
   if(outputOffsetInterpolators.qInterpolator.size() == 0){ // 初回のみ
     for(int i=0;i<genRobot->numJoints();i++){
       outputOffsetInterpolators.qInterpolator.emplace_back(0.0,0.0,0.0,cpp_filters::HOFFARBIB);
@@ -471,16 +492,26 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, cnoid::BodyP
     ports.m_q_.tm = ports.m_qRef_.tm;
     ports.m_q_.data.length(genRobot->numJoints());
     for(int i=0;i<genRobot->numJoints();i++){
-      if(!mode.isSyncToABC() && !mode.isSyncToIdle()){
-        ports.m_q_.data[i] = genRobot->joint(i)->q();
-      }else{
-        if(mode.isSyncToABCInit() || mode.isSyncToIdleInit()){
+      if(mode.now() == AutoStabilizer::ControlMode::MODE_IDLE || !gaitParam.jointControllable[i]){
+        ports.m_q_.data[i] = refRobotRaw->joint(i)->q();
+      }else if(mode.isSyncToABC()){
+        if(mode.isSyncToABCInit()){
           outputOffsetInterpolators.qInterpolator[i].reset(ports.m_q_.data[i]-genRobot->joint(i)->q());
         }
         outputOffsetInterpolators.qInterpolator[i].setGoal(0.0,mode.remainTime());
         double x,v,a;
         outputOffsetInterpolators.qInterpolator[i].get(x,v,a,dt);
         ports.m_q_.data[i] = genRobot->joint(i)->q() + x;
+      }else if(mode.isSyncToIdle()){
+        if(mode.isSyncToIdleInit()){
+          outputOffsetInterpolators.qInterpolator[i].reset(ports.m_q_.data[i]-refRobotRaw->joint(i)->q());
+        }
+        outputOffsetInterpolators.qInterpolator[i].setGoal(0.0,mode.remainTime());
+        double x,v,a;
+        outputOffsetInterpolators.qInterpolator[i].get(x,v,a,dt);
+        ports.m_q_.data[i] = refRobotRaw->joint(i)->q() + x;
+      }else{
+        ports.m_q_.data[i] = genRobot->joint(i)->q();
       }
     }
     ports.m_qOut_.write();
@@ -489,18 +520,28 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, cnoid::BodyP
   {
     // tau
     ports.m_genTau_.tm = ports.m_qRef_.tm;
-    ports.m_genTau_.data.length(genRobot->numJoints());
-    for(int i=0;i<genRobot->numJoints();i++){
-      if(!mode.isSyncToABC() && !mode.isSyncToIdle()){
-        ports.m_genTau_.data[i] = genRobot->joint(i)->u();
-      }else{
-        if(mode.isSyncToABCInit() || mode.isSyncToIdleInit()){
-          outputOffsetInterpolators.genTauInterpolator[i].reset(ports.m_genTau_.data[i]-genRobot->joint(i)->u());
+    ports.m_genTau_.data.length(actRobotTqc->numJoints());
+    for(int i=0;i<actRobotTqc->numJoints();i++){
+      if(mode.now() == AutoStabilizer::ControlMode::MODE_IDLE || !gaitParam.jointControllable[i]){
+        ports.m_genTau_.data[i] = refRobotRaw->joint(i)->u();
+      }else if(mode.isSyncToABC()){
+        if(mode.isSyncToABCInit()){
+          outputOffsetInterpolators.genTauInterpolator[i].reset(ports.m_genTau_.data[i]-actRobotTqc->joint(i)->u());
         }
         outputOffsetInterpolators.genTauInterpolator[i].setGoal(0.0,mode.remainTime());
         double x,v,a;
         outputOffsetInterpolators.genTauInterpolator[i].get(x,v,a,dt);
-        ports.m_genTau_.data[i] = genRobot->joint(i)->u() + x;
+        ports.m_genTau_.data[i] = actRobotTqc->joint(i)->u() + x;
+      }else if(mode.isSyncToIdle()){
+        if(mode.isSyncToIdleInit()){
+          outputOffsetInterpolators.genTauInterpolator[i].reset(ports.m_genTau_.data[i]-refRobotRaw->joint(i)->u());
+        }
+        outputOffsetInterpolators.genTauInterpolator[i].setGoal(0.0,mode.remainTime());
+        double x,v,a;
+        outputOffsetInterpolators.genTauInterpolator[i].get(x,v,a,dt);
+        ports.m_genTau_.data[i] = refRobotRaw->joint(i)->u() + x;
+      }else{
+        ports.m_genTau_.data[i] = actRobotTqc->joint(i)->u();
       }
     }
     ports.m_genTauOut_.write();
@@ -508,18 +549,33 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, cnoid::BodyP
 
   {
     // basePose
-    cnoid::Position basePose = genRobot->rootLink()->T();
-    if(!mode.isSyncToABC() && !mode.isSyncToIdle()){
-      if(mode.isSyncToABCInit() || mode.isSyncToIdleInit()){
+    cnoid::Position basePose;
+    if(mode.now() == AutoStabilizer::ControlMode::MODE_IDLE){
+      basePose = refRobotRaw->rootLink()->T();
+    }else if(mode.isSyncToABC()){
+      if(mode.isSyncToABCInit()){
         cnoid::Position prevPose;
         prevPose.translation()= cnoid::Vector3(ports.m_genBasePose_.data.position.x,ports.m_genBasePose_.data.position.x,ports.m_genBasePose_.data.position.x);
         prevPose.linear() = cnoid::rotFromRpy(ports.m_genBasePose_.data.orientation.r, ports.m_genBasePose_.data.orientation.p, ports.m_genBasePose_.data.orientation.y);
-        outputOffsetInterpolators.genBasePoseInterpolator.reset(prevPose * basePose.inverse());
+        outputOffsetInterpolators.genBasePoseInterpolator.reset(prevPose * genRobot->rootLink()->T().inverse());
       }
       outputOffsetInterpolators.genBasePoseInterpolator.setGoal(cnoid::Position::Identity(),mode.remainTime());
       outputOffsetInterpolators.genBasePoseInterpolator.interpolate(dt);
       cnoid::Position offsetPose = outputOffsetInterpolators.genBasePoseInterpolator.value();
-      basePose = offsetPose * basePose;
+      basePose = offsetPose * genRobot->rootLink()->T();
+    }else if(mode.isSyncToIdle()){
+      if(mode.isSyncToIdleInit()){
+        cnoid::Position prevPose;
+        prevPose.translation()= cnoid::Vector3(ports.m_genBasePose_.data.position.x,ports.m_genBasePose_.data.position.x,ports.m_genBasePose_.data.position.x);
+        prevPose.linear() = cnoid::rotFromRpy(ports.m_genBasePose_.data.orientation.r, ports.m_genBasePose_.data.orientation.p, ports.m_genBasePose_.data.orientation.y);
+        outputOffsetInterpolators.genBasePoseInterpolator.reset(prevPose * refRobotRaw->rootLink()->T().inverse());
+      }
+      outputOffsetInterpolators.genBasePoseInterpolator.setGoal(cnoid::Position::Identity(),mode.remainTime());
+      outputOffsetInterpolators.genBasePoseInterpolator.interpolate(dt);
+      cnoid::Position offsetPose = outputOffsetInterpolators.genBasePoseInterpolator.value();
+      basePose = offsetPose * refRobotRaw->rootLink()->T();
+    }else{
+      basePose = genRobot->rootLink()->T();
     }
     cnoid::Vector3 basePos = basePose.translation();
     cnoid::Matrix3 baseR = basePose.linear();
@@ -558,6 +614,31 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, cnoid::BodyP
     ports.m_genBaseRpyOut_.write();
   }
 
+  // Gains
+  if(!CORBA::is_nil(ports.m_robotHardwareService0_._ptr()) && //コンシューマにプロバイダのオブジェクト参照がセットされていない(接続されていない)状態
+     !ports.m_robotHardwareService0_->_non_existent()){ //プロバイダのオブジェクト参照は割り当てられているが、相手のオブジェクトが非活性化 (RTC は Inactive 状態) になっている状態
+    for(int i=0;i<genRobot->numJoints();i++){
+      if(mode.now() == AutoStabilizer::ControlMode::MODE_IDLE || !gaitParam.jointControllable[i]){
+        // pass
+      }else if(mode.isSyncToABC()){
+        // pass
+      }else if(mode.isSyncToIdle()){
+        // pass
+      }else{
+        // Stabilizerが動いている間にonDeactivated()->onActivated()が呼ばれると、ゲインがもとに戻らない. onDeactivated()->onActivated()が呼ばれるのはサーボオン直前で、通常、サーボオン時にゲインを指令するので、問題ない.
+        if(gaitParam.stServoPGainPercentage[i].remain_time() > 0.0 && gaitParam.stServoPGainPercentage[i].current_time() <= dt) { // 補間が始まった初回
+          ports.m_robotHardwareService0_->setServoPGainPercentageWithTime(actRobotTqc->joint(i)->name().c_str(),gaitParam.stServoPGainPercentage[i].getGoal(),gaitParam.stServoPGainPercentage[i].goal_time());
+        }
+        if(gaitParam.stServoDGainPercentage[i].remain_time() > 0.0 && gaitParam.stServoDGainPercentage[i].current_time() <= dt) { // 補間が始まった初回
+          ports.m_robotHardwareService0_->setServoDGainPercentageWithTime(actRobotTqc->joint(i)->name().c_str(),gaitParam.stServoDGainPercentage[i].getGoal(),gaitParam.stServoDGainPercentage[i].goal_time());
+        }
+        if(gaitParam.stServoTorqueGainPercentage[i].remain_time() > 0.0 && gaitParam.stServoTorqueGainPercentage[i].current_time() <= dt) { // 補間が始まった初回
+          ports.m_robotHardwareService0_->setServoTorqueGainPercentage(actRobotTqc->joint(i)->name().c_str(),gaitParam.stServoTorqueGainPercentage[i].getGoal()); // 時間が指定できない
+        }
+      }
+    }
+  }
+
   return true;
 }
 
@@ -573,9 +654,7 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
   this->gaitParam_.update(this->dt_);
   this->refToGenFrameConverter_.update(this->dt_);
 
-  if(!this->mode_.isABCRunning()) {
-    cnoidbodyutil::copyRobotState(this->refRobotRaw_, this->genRobot_);
-  }else{
+  if(this->mode_.isABCRunning()) {
     if(this->mode_.isSyncToABCInit()){ // startAutoBalancer直後の初回. 内部パラメータのリセット
       this->gaitParam_.reset();
       this->refToGenFrameConverter_.reset(this->mode_.remainTime());
@@ -587,7 +666,7 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
     AutoStabilizer::execAutoStabilizer(this->mode_, this->refRobotRaw_, this->refRobot_, this->actRobotRaw_, this->actRobot_, this->genRobot_, this->actRobotTqc_, this->gaitParam_, this->dt_, this->footStepGenerator_, this->legCoordsGenerator_, this->refToGenFrameConverter_, this->actToGenFrameConverter_, this->impedanceController_, this->stabilizer_,this->externalForceHandler_, this->fullbodyIKSolver_);
   }
 
-  AutoStabilizer::writeOutPortData(this->ports_, this->genRobot_, this->mode_, this->outputOffsetInterpolators_, this->dt_);
+  AutoStabilizer::writeOutPortData(this->ports_, this->refRobotRaw_, this->genRobot_, this->actRobotTqc_, this->mode_, this->outputOffsetInterpolators_, this->dt_, this->gaitParam_);
 
   return RTC::RTC_OK;
 }

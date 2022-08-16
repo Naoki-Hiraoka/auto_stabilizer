@@ -49,6 +49,7 @@ target_link_libraries(AutoStabilizer
   ${CHOREONOID_BODY_LIBRARIES}
   ${openrtm_aist_LIBRARIES}
   ${${PROJECT_NAME}_IDLLIBRARY_DIRS}
+  RobotHardwareServiceSkel RobotHardwareServiceStub
   #OsqpEigen::OsqpEigen # -isystemでこのワークスペースのdevel/includeがinclude_directoriesに入るのだが、優先順位末尾に入ってしまう
   #$<TARGET_PROPERTY:OsqpEigen::OsqpEigen,INTERFACE_LINK_LIBRARIES> # なくても良い?
   )

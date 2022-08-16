@@ -183,23 +183,23 @@ bool FootStepGenerator::calcFootSteps(const GaitParam& gaitParam, const double& 
     }
   }
 
-  if(useActState && this->isModifyFootSteps && this->isEmergencyStepMode){
-    this->checkEmergencyStep(footstepNodesList, gaitParam);
-  }
-
-  if(useActState && this->isModifyFootSteps){
-    this->modifyFootSteps(footstepNodesList, gaitParam);
-  }
-
   if(useActState){
+    if(this->isModifyFootSteps && this->isEmergencyStepMode){
+      this->checkEmergencyStep(footstepNodesList, gaitParam);
+    }
+
+    if(this->isModifyFootSteps){
+      this->modifyFootSteps(footstepNodesList, gaitParam);
+    }
+
     // 早づきしたらremainTimeをdtに減らしてすぐに次のnodeへ移る. この機能が無いと少しでもロボットが傾いて早づきするとジャンプするような挙動になる. 遅づきに備えるために、着地位置を下方にオフセットさせる
     //   remainTimeをdtに減らしてすぐに次のnodeへ移ろうとしているときに着地位置修正が入ると不安定になるので、modifyFootStepsよりも後にやる必要がある.
     this->checkEarlyTouchDown(footstepNodesList, gaitParam, dt);
-  }
 
-  if(useActState && this->isModifyFootSteps && this->isStableGoStopMode){
-    if(footstepNodesList[0].remainTime <= dt) { // footstepの切り替わりのタイミング. 着地位置修正量を毎周期チェックすると、歩行の最中に一時的に修正が大きくなった場合に反応してしまう. checkEarlyTouchDownがremainTimeを突然dtに減らすことがあるので、checkEarlyTouchDownよりも後にやる必要がある
-      this->checkStableGoStop(footstepNodesList, gaitParam);
+    if(this->isModifyFootSteps && this->isStableGoStopMode){
+      if(footstepNodesList[0].remainTime <= dt) { // footstepの切り替わりのタイミング. 着地位置修正量を毎周期チェックすると、歩行の最中に一時的に修正が大きくなった場合に反応してしまう. checkEarlyTouchDownがremainTimeを突然dtに減らすことがあるので、checkEarlyTouchDownよりも後にやる必要がある
+        this->checkStableGoStop(footstepNodesList, gaitParam);
+      }
     }
   }
 

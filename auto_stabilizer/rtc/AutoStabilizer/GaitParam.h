@@ -89,6 +89,9 @@ public:
   std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> > stEEOffsetSwingEEModification; // 要素数と順序はeeNameと同じ.generate frame. endEffector origin. stで計算されるオフセット(SwingEEModification)
   std::vector<cnoid::Position> stEETargetPose; // 要素数と順序はeeNameと同じ.generate frame. stで計算された目標位置姿勢
   cnoid::Vector3 stTargetZmp; // generate frame. stで計算された目標ZMP
+  std::vector<cpp_filters::TwoPointInterpolator<double> > stServoPGainPercentage; // 要素数と順序はrobot->numJoints()と同じ. 0~100. 現状, setGoal(*,dt)以下の時間でgoal指定するとwriteOutPortDataが破綻する
+  std::vector<cpp_filters::TwoPointInterpolator<double> > stServoDGainPercentage; // 要素数と順序はrobot->numJoints()と同じ. 0~100. 現状, setGoal(*,dt)以下の時間でgoal指定するとwriteOutPortDataが破綻する
+  std::vector<cpp_filters::TwoPointInterpolator<double> > stServoTorqueGainPercentage; // 要素数と順序はrobot->numJoints()と同じ. 0~100. 現状, setGoal(*,dt)以下の時間でgoal指定するとwriteOutPortDataが破綻する
 
 public:
   // param
@@ -96,7 +99,7 @@ public:
   std::vector<std::vector<cnoid::Vector3> > legHull = std::vector<std::vector<cnoid::Vector3> >(2, std::vector<cnoid::Vector3>{cnoid::Vector3(0.115,0.065,0.0),cnoid::Vector3(-0.105,0.065,0.0),cnoid::Vector3(-0.105,-0.065,0.0),cnoid::Vector3(0.115,-0.065,0.0)}); // 要素数2. rleg: 0. lleg: 1. leg frame.  凸形状で,上から見て半時計回り. Z成分はあったほうが計算上扱いやすいからありにしているが、0でなければならない
   std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> > defaultTranslatePos = std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >(2,cpp_filters::TwoPointInterpolator<cnoid::Vector3>(cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::HOFFARBIB)); // goPos, goVelocity, その場足踏みをするときの右脚と左脚の中心からの相対位置. あるいは、reference frameとgenerate frameの対応付けに用いられる. (Z軸は鉛直). Z成分はあったほうが計算上扱いやすいからありにしているが、0でなければならない. 滑らかに変化する
 
-  std::vector<bool> jointControllable; // 要素数と順序はnumJoints()と同じ. falseの場合、qやtauはrefの値をそのまま出力する. その関節は存在しないかのように扱う. このパラメータはMODE_IDLEのときにしか変更されない
+  std::vector<bool> jointControllable; // 要素数と順序はnumJoints()と同じ. falseの場合、qやtauはrefの値をそのまま出力する(writeOutputPort時にref値で上書き). IKでは動かさない(ref値をそのまま). トルク計算では目標トルクを通常通り計算する. このパラメータはMODE_IDLEのときにしか変更されない
 
   std::vector<bool> isLegAutoControlMode = std::vector<bool>{true,true}; // 要素数2. rleg: 0. lleg: 1. 脚軌道生成器が自動で位置姿勢を生成するか(true)、reference軌道を使うか(false) TODO
 
@@ -124,6 +127,12 @@ public:
       copOffset[i].interpolate(dt);
       defaultTranslatePos[i].interpolate(dt);
     }
+  }
+
+  void init(const cnoid::BodyPtr& genRobot){
+    stServoPGainPercentage.resize(genRobot->numJoints(), cpp_filters::TwoPointInterpolator<double>(100.0, 0.0, 0.0, cpp_filters::LINEAR));
+    stServoDGainPercentage.resize(genRobot->numJoints(), cpp_filters::TwoPointInterpolator<double>(100.0, 0.0, 0.0, cpp_filters::LINEAR));
+    stServoTorqueGainPercentage.resize(genRobot->numJoints(), cpp_filters::TwoPointInterpolator<double>(0.0, 0.0, 0.0, cpp_filters::LINEAR));
   }
 
   void push_backEE(const std::string& name_, const std::string& parentLink_, const cnoid::Position& localT_){

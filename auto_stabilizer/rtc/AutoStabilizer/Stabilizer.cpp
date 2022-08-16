@@ -1,11 +1,11 @@
 #include "Stabilizer.h"
 #include "MathUtil.h"
-#include <cnoid/JointPath>
 #include <cnoid/Jacobian>
 #include <cnoid/EigenUtil>
+#include <cnoid/src/Body/InverseDynamics.h>
 
 void Stabilizer::initStabilizerOutput(const GaitParam& gaitParam,
-                                      cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/, cnoid::Vector3& o_stTargetZmp) const{
+                                      cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/, cnoid::Vector3& o_stTargetZmp, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoTorqueGainPercentage) const{
 
   for(int i=0;i<gaitParam.eeName.size();i++){
     o_stEEOffsetDampingControl[i].reset(cnoid::Vector6::Zero());
@@ -13,15 +13,20 @@ void Stabilizer::initStabilizerOutput(const GaitParam& gaitParam,
   }
   o_stOffsetRootRpy.reset(cnoid::Vector3::Zero());
   o_stTargetZmp = gaitParam.refZmpTraj[0].getStart();
+  for(int i=0;i<o_stServoPGainPercentage.size();i++){
+    o_stServoPGainPercentage[i].reset(100.0);
+    o_stServoDGainPercentage[i].reset(100.0);
+    o_stServoTorqueGainPercentage[i].reset(0.0);
+  }
 }
 
 bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobot, const cnoid::BodyPtr actRobot, const cnoid::BodyPtr genRobot, const GaitParam& gaitParam, double dt, double mass,
-                                cnoid::BodyPtr& actRobotTqc, cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/, cnoid::Vector3& o_stTargetZmp) const{
+                                cnoid::BodyPtr& actRobotTqc, cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/, cnoid::Vector3& o_stTargetZmp, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoTorqueGainPercentage) const{
   // - root attitude control
   // - 現在のactual重心位置から、目標ZMPを計算
   // - 目標ZMPを満たすように目標足裏反力を計算
-  // - 目標反力を満たすように重力補償+仮想仕事の原理
   // - 目標足裏反力を満たすようにDamping Control.
+  // - 目標反力を満たすように重力補償+仮想仕事の原理
 
   // root attitude control
   this->moveBasePosRotForBodyRPYControl(refRobot, actRobot, dt, gaitParam, // input
@@ -37,10 +42,6 @@ bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobot, const cnoid::Body
   this->calcWrench(gaitParam, o_stTargetZmp, tgtForce, // input
                    tgtEEWrench); // output
 
-  // 目標反力を満たすように重力補償+仮想仕事の原理
-  this->calcTorque(actRobot, dt, gaitParam, tgtEEWrench, // input
-                   actRobotTqc); // output
-
   // 目標足裏反力を満たすようにDamping Control
   this->calcDampingControl(dt, gaitParam, tgtEEWrench, // input
                            o_stEEOffsetDampingControl); // output
@@ -48,6 +49,12 @@ bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobot, const cnoid::Body
   // 目標遊脚位置を満たすように、SwingEEModification
   this->calcSwingEEModification(dt, gaitParam, //input
                                 o_stEEOffsetSwingEEModification); //output
+
+  if(this->isTorqueControlMode){
+    // 目標反力を満たすように重力補償+仮想仕事の原理
+    this->calcTorque(actRobot, dt, gaitParam, tgtEEWrench, // input
+                     actRobotTqc, o_stServoPGainPercentage, o_stServoDGainPercentage, o_stServoTorqueGainPercentage); // output
+  }
 
   return true;
 }
@@ -264,36 +271,6 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
   return true;
 }
 
-bool Stabilizer::calcTorque(const cnoid::BodyPtr actRobot, double dt, const GaitParam& gaitParam, const std::vector<cnoid::Vector6>& tgtEEWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/,
-                            cnoid::BodyPtr& actRobotTqc) const{
-  // 速度・加速度を考慮しない重力補償
-  actRobotTqc->rootLink()->T() = actRobot->rootLink()->T();
-  actRobotTqc->rootLink()->v() = cnoid::Vector3::Zero();
-  actRobotTqc->rootLink()->w() = cnoid::Vector3::Zero();
-  actRobotTqc->rootLink()->dv() = cnoid::Vector3::Zero();
-  actRobotTqc->rootLink()->dw() = cnoid::Vector3::Zero();
-  for(int i=0;i<actRobotTqc->numJoints();i++){
-    actRobotTqc->joint(i)->q() = actRobot->joint(i)->q();
-    actRobotTqc->joint(i)->dq() = 0.0;
-    actRobotTqc->joint(i)->ddq() = 0.0;
-  }
-  actRobotTqc->calcForwardKinematics(true, true); // actRobotTqc->joint()->u()に書き込まれる
-
-  // tgtEEWrench
-  for(int i=0;i<gaitParam.eeName.size();i++){
-    cnoid::JointPath jointPath(actRobotTqc->rootLink(), actRobotTqc->link(gaitParam.eeParentLink[i]));
-    cnoid::MatrixXd J = cnoid::MatrixXd::Zero(6,jointPath.numJoints()); // generate frame. endeffector origin
-    cnoid::setJacobian<0x3f,0,0,true>(jointPath,actRobotTqc->link(gaitParam.eeParentLink[i]),gaitParam.eeLocalT[i].translation(), // input
-                                      J); // output
-    cnoid::VectorX tau = - J.transpose() * tgtEEWrench[i];
-    for(int j=0;j<jointPath.numJoints();j++){
-      jointPath.joint(j)->u() += tau[j];
-    }
-  }
-
-  return true;
-}
-
 bool Stabilizer::calcDampingControl(double dt, const GaitParam& gaitParam, const std::vector<cnoid::Vector6>& tgtEEWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/,
                                     std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/) const{
 
@@ -372,3 +349,51 @@ bool Stabilizer::calcSwingEEModification(double dt, const GaitParam& gaitParam,
   }
   return true;
 }
+
+bool Stabilizer::calcTorque(const cnoid::BodyPtr actRobot, double dt, const GaitParam& gaitParam, const std::vector<cnoid::Vector6>& tgtEEWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/,
+                            cnoid::BodyPtr& actRobotTqc, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoTorqueGainPercentage) const{
+  // 速度・加速度を考慮しない重力補償
+  actRobotTqc->rootLink()->T() = actRobot->rootLink()->T();
+  actRobotTqc->rootLink()->v() = cnoid::Vector3::Zero();
+  actRobotTqc->rootLink()->w() = cnoid::Vector3::Zero();
+  actRobotTqc->rootLink()->dv() = cnoid::Vector3(0.0,0.0,gaitParam.g);
+  actRobotTqc->rootLink()->dw() = cnoid::Vector3::Zero();
+  for(int i=0;i<actRobotTqc->numJoints();i++){
+    actRobotTqc->joint(i)->q() = actRobot->joint(i)->q();
+    actRobotTqc->joint(i)->dq() = 0.0;
+    actRobotTqc->joint(i)->ddq() = 0.0;
+  }
+  actRobotTqc->calcForwardKinematics(true, true); // actRobotTqc->joint()->u()に書き込まれる
+  cnoid::calcInverseDynamics(actRobotTqc->rootLink());
+
+  // tgtEEWrench
+  for(int i=0;i<gaitParam.eeName.size();i++){
+    cnoid::JointPath jointPath(actRobotTqc->rootLink(), actRobotTqc->link(gaitParam.eeParentLink[i]));
+    cnoid::MatrixXd J = cnoid::MatrixXd::Zero(6,jointPath.numJoints()); // generate frame. endeffector origin
+    cnoid::setJacobian<0x3f,0,0,true>(jointPath,actRobotTqc->link(gaitParam.eeParentLink[i]),gaitParam.eeLocalT[i].translation(), // input
+                                      J); // output
+    cnoid::VectorX tau = - J.transpose() * tgtEEWrench[i];
+    for(int j=0;j<jointPath.numJoints();j++){
+      jointPath.joint(j)->u() += tau[j];
+    }
+  }
+
+  // Gain
+  if(this->isTorqueControlMode){
+    for(int i=0;i<actRobotTqc->numJoints();i++){
+      if(o_stServoTorqueGainPercentage[i].getGoal() != 100.0) o_stServoTorqueGainPercentage[i].setGoal(100.0, 0.1);
+    }
+    for(int i=0;i<NUM_LEGS;i++){
+      cnoid::JointPath jointPath(actRobotTqc->rootLink(), actRobotTqc->link(gaitParam.eeParentLink[i]));
+      if(gaitParam.footstepNodesList[0].isSupportPhase[i]){
+        for(int j=0;j<jointPath.numJoints();j++){
+          if(o_stServoPGainPercentage[jointPath.joint(j)->jointId()].getGoal() != this->supportPgain[i][j]) o_stServoPGainPercentage[jointPath.joint(j)->jointId()].setGoal(this->supportPgain[i][j], 4.0);
+          if(o_stServoDGainPercentage[jointPath.joint(j)->jointId()].getGoal() != this->supportDgain[i][j]) o_stServoDGainPercentage[jointPath.joint(j)->jointId()].setGoal(this->supportDgain[i][j], 4.0);
+        }
+      }
+    }
+  }
+
+  return true;
+}
+

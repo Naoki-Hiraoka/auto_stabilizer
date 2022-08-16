@@ -25,6 +25,7 @@
 // #include <joint_limit_table/JointLimitTable.h>
 
 #include "AutoStabilizerService_impl.h"
+#include "hrpsys/idl/RobotHardwareService.hh"
 #include "GaitParam.h"
 #include "RefToGenFrameConverter.h"
 #include "ActToGenFrameConverter.h"
@@ -102,6 +103,9 @@ protected:
 
     AutoStabilizerService_impl m_service0_;
     RTC::CorbaPort m_AutoStabilizerServicePort_;
+
+    RTC::CorbaConsumer<OpenHRP::RobotHardwareService> m_robotHardwareService0_;
+    RTC::CorbaPort m_RobotHardwareServicePort_;
 
     // only for log
     RTC::TimedPoint3D m_genBasePos_; // Generate World frame
@@ -225,7 +229,7 @@ protected:
     std::vector<cpp_filters::TwoPointInterpolator<double> > genTauInterpolator; // 要素数はrobot->numJoints(). jointIdの順
   };
   OutputOffsetInterpolators outputOffsetInterpolators_; // refereceに加えるoffset
-  static bool writeOutPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr genRobot, const AutoStabilizer::ControlMode& mode, AutoStabilizer::OutputOffsetInterpolators& outputOffsetInterpolators, double dt);
+  static bool writeOutPortData(AutoStabilizer::Ports& ports, const cnoid::BodyPtr& refRobotRaw, const cnoid::BodyPtr& genRobot, const cnoid::BodyPtr& actRobotTqc, const AutoStabilizer::ControlMode& mode, AutoStabilizer::OutputOffsetInterpolators& outputOffsetInterpolators, double dt, const GaitParam& gaitParam);
 };
 
 

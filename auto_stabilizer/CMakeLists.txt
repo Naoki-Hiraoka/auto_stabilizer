@@ -20,7 +20,7 @@ rtmbuild2_init(hrpsys_ros_bridge rtmbuild2)
 
 catkin_package(
 #  INCLUDE_DIRS include
-#  LIBRARIES auto_stabilizer
+  LIBRARIES AutoStabilizerServiceSkel AutoStabilizerServiceStub
   CATKIN_DEPENDS hrpsys_ros_bridge rtmbuild2
 #  DEPENDS system_lib
 )

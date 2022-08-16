@@ -67,6 +67,7 @@ class JAXON_RED_HrpsysConfigurator(ChoreonoidHrpsysConfigurator):
                     connectPorts(self.rmfo.port("off_" + sen), self.ast.port("act"+sen+"In"))
                 else:
                     connectPorts(self.rh.port(sen), self.ast.port("act"+sen+"In"))
+            connectPorts(self.ast.port("RobotHardwareService"), self.rh.port("RobotHardwareService"))
 
     def defJointGroups (self):
         rarm_group = ['rarm', ['RARM_JOINT0', 'RARM_JOINT1', 'RARM_JOINT2', 'RARM_JOINT3', 'RARM_JOINT4', 'RARM_JOINT5', 'RARM_JOINT6', 'RARM_JOINT7']]
@@ -87,6 +88,7 @@ class JAXON_RED_HrpsysConfigurator(ChoreonoidHrpsysConfigurator):
             self.el_svc.setServoErrorLimit("LARM_F_JOINT0", sys.float_info.max)
             self.el_svc.setServoErrorLimit("LARM_F_JOINT1", sys.float_info.max)
         ###
+        self.rh_svc.setJointControlMode("all",OpenHRP.RobotHardwareService.TORQUE)
         self.ast_svc.startAutoBalancer()
         # Suppress limit over message and behave like real robot that always angle-vector is in seq.
         # Latter four 0.0 are for hands.

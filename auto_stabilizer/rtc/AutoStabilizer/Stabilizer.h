@@ -3,6 +3,7 @@
 
 #include "GaitParam.h"
 #include <prioritized_qp/PrioritizedQPSolver.h>
+#include <cnoid/JointPath>
 
 class Stabilizer{
 public:
@@ -20,6 +21,13 @@ public:
   std::vector<cnoid::Vector6> springGain = std::vector<cnoid::Vector6>(NUM_LEGS); // 要素数2. [rleg. lleg].  EndEffector frame(offset+abcTargetPose). endEffector origin. 0より大きい
   std::vector<cnoid::Vector6> springTimeConst = std::vector<cnoid::Vector6>(NUM_LEGS); // 要素数2. [rleg. lleg]. EndEffector frame(offset+abcTargetPose). endEffector origin. 単位は[s]. 0より大きい
 
+  bool isTorqueControlMode = true; // falseなら位置制御のみ. この値はisSTRunning時には変更されない
+  std::vector<std::vector<double> > supportPgain = std::vector<std::vector<double> >(2); // 要素数2. [rleg, lleg]. rootLinkから各endeffectorまでの各関節のゲイン. 0~100
+  std::vector<std::vector<double> > supportDgain = std::vector<std::vector<double> >(2); // 要素数2. [rleg, lleg]. rootLinkから各endeffectorまでの各関節のゲイン. 0~100
+  std::vector<std::vector<double> > landingPgain = std::vector<std::vector<double> >(2); // 要素数2. [rleg, lleg]. rootLinkから各endeffectorまでの各関節のゲイン. 0~100
+  std::vector<std::vector<double> > landingDgain = std::vector<std::vector<double> >(2); // 要素数2. [rleg, lleg]. rootLinkから各endeffectorまでの各関節のゲイン. 0~100
+  std::vector<std::vector<double> > swingPgain = std::vector<std::vector<double> >(2); // 要素数2. [rleg, lleg]. rootLinkから各endeffectorまでの各関節のゲイン. 0~100
+  std::vector<std::vector<double> > swingDgain = std::vector<std::vector<double> >(2); // 要素数2. [rleg, lleg]. rootLinkから各endeffectorまでの各関節のゲイン. 0~100
   Stabilizer(){
     for(int i=0;i<NUM_LEGS;i++){
       dampingCompensationLimit[i] << 0.08, 0.08, 0.08, 0.523599, 0.523599, 0.523599; // 0.523599rad = 30deg
@@ -32,6 +40,26 @@ public:
       springTimeConst[i] << 1.0, 1.0, 1.0, 1.0, 1.0, 1.0;
     }
   }
+  void init(const GaitParam& gaitParam, cnoid::BodyPtr& actRobotTqc){
+    for(int i=0;i<NUM_LEGS;i++){
+      cnoid::JointPath jointPath(actRobotTqc->rootLink(), actRobotTqc->link(gaitParam.eeParentLink[i]));
+      if(jointPath.numJoints() == 6){
+        supportPgain[i] = {5,10,10,5,0.1,0.1};
+        supportDgain[i] = {10,20,20,10,10,10};
+        landingPgain[i] = {5,1,1,1,0.1,0.1};
+        landingDgain[i] = {10,10,10,10,5,5};
+        swingPgain[i] = {5,30,20,10,5,5};
+        swingDgain[i] = {10,30,20,20,10,10};
+      }else{
+        supportPgain[i].resize(jointPath.numJoints(), 100.0);
+        supportDgain[i].resize(jointPath.numJoints(), 100.0);
+        landingPgain[i].resize(jointPath.numJoints(), 100.0);
+        landingDgain[i].resize(jointPath.numJoints(), 100.0);
+        swingPgain[i].resize(jointPath.numJoints(), 100.0);
+        swingDgain[i].resize(jointPath.numJoints(), 100.0);
+      }
+    }
+  }
 protected:
   // 計算高速化のためのキャッシュ. クリアしなくても別に副作用はない.
   mutable std::shared_ptr<prioritized_qp::Task> constraintTask_ = std::make_shared<prioritized_qp::Task>();
@@ -39,10 +67,10 @@ protected:
   mutable std::shared_ptr<prioritized_qp::Task> copTask_ = std::make_shared<prioritized_qp::Task>();;
 public:
   void initStabilizerOutput(const GaitParam& gaitParam,
-                            cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/, cnoid::Vector3& o_stTargetZmp) const;
+                            cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/, cnoid::Vector3& o_stTargetZmp, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoTorqueGainPercentage) const;
 
   bool execStabilizer(const cnoid::BodyPtr refRobot, const cnoid::BodyPtr actRobot, const cnoid::BodyPtr genRobot, const GaitParam& gaitParam, double dt, double mass,
-                      cnoid::BodyPtr& actRobotTqc, cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/, cnoid::Vector3& o_stTargetZmp) const;
+                      cnoid::BodyPtr& actRobotTqc, cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/, cnoid::Vector3& o_stTargetZmp, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPgainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDgainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoTorquegainPercentage) const;
 
 protected:
   bool moveBasePosRotForBodyRPYControl(const cnoid::BodyPtr refRobot, const cnoid::BodyPtr actRobot, double dt, const GaitParam& gaitParam,
@@ -52,7 +80,7 @@ protected:
   bool calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tgtZmp/*generate座標系*/, const cnoid::Vector3& tgtForce/*generate座標系. ロボットが受ける力*/,
                   std::vector<cnoid::Vector6>& o_tgtEEWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/) const;
   bool calcTorque(const cnoid::BodyPtr actRobot, double dt, const GaitParam& gaitParam, const std::vector<cnoid::Vector6>& tgtEEWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/,
-                  cnoid::BodyPtr& actRobotTqc) const;
+                  cnoid::BodyPtr& actRobotTqc, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoTorqueGainPercentage) const;
   bool calcDampingControl(double dt, const GaitParam& gaitParam, const std::vector<cnoid::Vector6>& tgtEEWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/,
                           std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/) const;
   bool calcSwingEEModification(double dt, const GaitParam& gaitParam,

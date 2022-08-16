@@ -3,16 +3,21 @@
 
 bool FullbodyIKSolver::solveFullbodyIK(const cnoid::BodyPtr& refRobot, double dt, const GaitParam& gaitParam,
                                        cnoid::BodyPtr& genRobot) const{
+  // !jointControllableの関節は指令値をそのまま入れる
+  for(size_t i=0;i<genRobot->numJoints();i++){
+    if(!gaitParam.jointControllable[i]) genRobot->joint(i)->q() = refRobot->joint(i)->q();
+  }
 
   // update joint limit
   for(int i=0;i<refRobot->numJoints();i++){
+    if(!gaitParam.jointControllable[i]) continue;
     cnoid::LinkPtr joint = genRobot->joint(i);
     double u = refRobot->joint(i)->q_upper();
     double l = refRobot->joint(i)->q_lower();
     for(int j=0;j<gaitParam.jointLimitTables[i].size();j++){
       u = std::min(u,gaitParam.jointLimitTables[i][j]->getUlimit());
       l = std::max(l,gaitParam.jointLimitTables[i][j]->getLlimit());
-    }
+      }
     joint->q() = std::min(u, std::max(l, joint->q()));
     joint->setJointRange(l, u);
   }
