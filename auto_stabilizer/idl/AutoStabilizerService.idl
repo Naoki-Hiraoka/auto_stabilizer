@@ -198,7 +198,14 @@ module OpenHRP
       double contact_detection_threshould;
       /// [N]. 上限0.0. 歩行中は変更不可
       double goal_offset;
-
+      /// whether step when emergency
+      boolean is_emergency_step_mode;
+      /// whether gostop after becoming stable
+      boolean is_stable_go_stop_mode;
+      /// 下限1
+      long emergency_step_num;
+      /// CP margin [m]
+      double emergency_step_cp_check_margin;
       // LegCoordsGenerator
       /// Time offset [s] for swing trajectory by delay_hoffarbib_trajectory_generator. 下限0.0
       double swing_trajectory_delay_time_offset;

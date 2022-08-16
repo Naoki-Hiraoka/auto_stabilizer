@@ -45,7 +45,7 @@ bool FootStepGenerator::setFootSteps(const GaitParam& gaitParam, const std::vect
   footstepNodesList.push_back(gaitParam.footstepNodesList[0]);
 
   if(footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG]){ // 両足支持期を延長
-    footstepNodesList.back().remainTime = this->defaultStepTime * this->defaultDoubleSupportRatio;
+    footstepNodesList.back().remainTime = this->defaultStepTime; // this->defaultStepTime * this->defaultDoubleSupportRatio にするよりも重心を動かす時間が十分とれるので安定する
   }else if(!footstepNodesList.back().isSupportPhase[RLEG] && footsteps[1].l_r == LLEG){ // RLEGを下ろす必要がある
     this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos);
   }else if(!footstepNodesList.back().isSupportPhase[LLEG] && footsteps[1].l_r == RLEG){ // LLEGを下ろす必要がある
@@ -95,7 +95,7 @@ bool FootStepGenerator::goPos(const GaitParam& gaitParam, double x/*m*/, double 
   footstepNodesList.push_back(gaitParam.footstepNodesList[0]);
 
   if(footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG]){ // 両足支持期を延長
-    footstepNodesList.back().remainTime = this->defaultStepTime * this->defaultDoubleSupportRatio;
+    footstepNodesList.back().remainTime = this->defaultStepTime; // this->defaultStepTime * this->defaultDoubleSupportRatio にするよりも重心を動かす時間が十分とれるので安定する
   }
 
   cnoid::Position currentPose;
@@ -184,7 +184,7 @@ bool FootStepGenerator::calcFootSteps(const GaitParam& gaitParam, const double& 
   }
 
   if(useActState && this->isModifyFootSteps && this->isEmergencyStepMode){
-    // TODO
+    this->checkEmergencyStep(footstepNodesList, gaitParam);
   }
 
   if(useActState && this->isModifyFootSteps){
@@ -195,6 +195,12 @@ bool FootStepGenerator::calcFootSteps(const GaitParam& gaitParam, const double& 
     // 早づきしたらremainTimeをdtに減らしてすぐに次のnodeへ移る. この機能が無いと少しでもロボットが傾いて早づきするとジャンプするような挙動になる. 遅づきに備えるために、着地位置を下方にオフセットさせる
     //   remainTimeをdtに減らしてすぐに次のnodeへ移ろうとしているときに着地位置修正が入ると不安定になるので、modifyFootStepsよりも後にやる必要がある.
     this->checkEarlyTouchDown(footstepNodesList, gaitParam, dt);
+  }
+
+  if(useActState && this->isModifyFootSteps && this->isStableGoStopMode){
+    if(footstepNodesList[0].remainTime <= dt) { // footstepの切り替わりのタイミング. 着地位置修正量を毎周期チェックすると、歩行の最中に一時的に修正が大きくなった場合に反応してしまう. checkEarlyTouchDownがremainTimeを突然dtに減らすことがあるので、checkEarlyTouchDownよりも後にやる必要がある
+      this->checkStableGoStop(footstepNodesList, gaitParam);
+    }
   }
 
   o_footstepNodesList = footstepNodesList;
@@ -279,9 +285,9 @@ void FootStepGenerator::transformCurrentSupportSteps(int leg, std::vector<GaitPa
   }
 }
 
-void FootStepGenerator::calcDefaultNextStep(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >& defaultTranslatePos, const cnoid::Vector3& offset) const{
+void FootStepGenerator::calcDefaultNextStep(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >& defaultTranslatePos, const cnoid::Vector3& offset /*leg frame*/) const{
   if(footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG]){
-    footstepNodesList.back().remainTime = std::max(footstepNodesList.back().remainTime, this->defaultStepTime * this->defaultDoubleSupportRatio);
+    footstepNodesList.back().remainTime = std::max(footstepNodesList.back().remainTime, this->defaultStepTime * this->defaultDoubleSupportRatio); // 両足支持期を延長
     if(footstepNodesList.size() == 1 ||
        (footstepNodesList[footstepNodesList.size()-2].isSupportPhase[RLEG] && footstepNodesList[footstepNodesList.size()-2].isSupportPhase[LLEG]) ||
        (!footstepNodesList[footstepNodesList.size()-2].isSupportPhase[RLEG] && !footstepNodesList[footstepNodesList.size()-2].isSupportPhase[LLEG]) ){
@@ -295,7 +301,7 @@ void FootStepGenerator::calcDefaultNextStep(std::vector<GaitParam::FootStepNodes
       lleg = mathutil::orientCoordToAxis(lleg, cnoid::Vector3::UnitZ());
       midCoords = mathutil::orientCoordToAxis(midCoords, cnoid::Vector3::UnitZ());
       // どっちをswingしてもいいので、進行方向に近いLegをswingする
-      cnoid::Vector2 rlegTolleg = (defaultTranslatePos[LLEG].value() - defaultTranslatePos[RLEG].value()).head<2>();
+      cnoid::Vector2 rlegTolleg = (defaultTranslatePos[LLEG].value() - defaultTranslatePos[RLEG].value()).head<2>(); // leg frame
       if(rlegTolleg.dot(offset.head<2>()) > 0) {
         cnoid::Position rlegTomidCoords = rleg.inverse() * midCoords;
         cnoid::Vector3 offset_rlegLocal;
@@ -619,5 +625,50 @@ void FootStepGenerator::checkEarlyTouchDown(std::vector<GaitParam::FootStepNodes
 
   }else{
     footstepNodesList[0].goalOffset[swingLeg] = this->goalOffset;
+  }
+}
+
+// emergengy step.
+void FootStepGenerator::checkEmergencyStep(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const GaitParam& gaitParam) const{
+  // 現在静止状態で、CapturePointがsafeLegHullの外にあるなら、footstepNodesListがemergencyStepNumのサイズになるまで歩くnodeが末尾に入る.
+  if(!(footstepNodesList.size() == 1 && footstepNodesList[0].remainTime == 0)) return; // static 状態でないなら何もしない
+
+  std::vector<cnoid::Vector3> supportVertices; // generate frame
+  for(int i=0;i<NUM_LEGS;i++){
+    if(footstepNodesList[0].isSupportPhase[i]){
+      for(int j=0;j<this->safeLegHull[i].size();j++){
+        supportVertices.push_back(gaitParam.actEEPose[i] * this->safeLegHull[i][j]); // generate frame
+      }
+    }
+  }
+  std::vector<cnoid::Vector3> supportHull = mathutil::calcConvexHull(supportVertices); // generate frame. Z成分はてきとう
+
+  // dx = w ( x - z - l)
+  cnoid::Vector3 actDCM = gaitParam.actCog + gaitParam.actCogVel.value() / gaitParam.omega; // generate frame
+  cnoid::Vector3 actCMP = actDCM - gaitParam.l; // generate frame
+
+  if(!mathutil::isInsideHull(actCMP, supportHull) || // supportHullに入っていない
+     (actCMP.head<2>() - gaitParam.refZmpTraj[0].getStart().head<2>()).norm() > this->emergencyStepCpCheckMargin // 目標重心位置からの距離が閾値以上 (supportHullによるチェックだけだと両足支持の場合の左右方向の踏み出しがなかなか起こらず、左右方向の踏み出しは得意ではないため、踏み出しが起きたときには時既に遅しで転倒してしまう)
+     ){
+    cnoid::Vector3 dir = gaitParam.footMidCoords.value().linear().transpose() * (actCMP - gaitParam.footMidCoords.value().translation()); // footmidcoords frame
+    dir[2] = 0.0;
+    if(dir.norm() > 0.0) dir = dir.normalized();
+    while(footstepNodesList.size() < this->emergencyStepNum){
+      this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos, 1e-6 * dir); // 現在両足で支持している場合、dirの方向の足を最初にswingする
+    }
+  }
+}
+
+// Stable Go Stop
+void FootStepGenerator::checkStableGoStop(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const GaitParam& gaitParam) const{
+  // 現在非静止状態で、着地位置修正を行ったなら、footstepNodesListがemergencyStepNumのサイズになるまで歩くnodeが末尾に入る.
+  if(footstepNodesList.size() == 1 && footstepNodesList[0].remainTime == 0) return; // static 状態なら何もしない
+
+  for(int i=0;i<NUM_LEGS; i++){
+    if((footstepNodesList[0].dstCoords[i].translation().head<2>() - gaitParam.dstCoordsOrg[i].translation().head<2>()).norm() > 0.01){ // 1cm以上着地位置修正を行ったなら
+      while(footstepNodesList.size() < this->emergencyStepNum){
+        this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos);
+      }
+    }
   }
 }
