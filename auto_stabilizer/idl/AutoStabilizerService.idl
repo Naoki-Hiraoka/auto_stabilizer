@@ -250,6 +250,26 @@ module OpenHRP
       sequence<double, 2> eefm_swing_pos_spring_velocity_limit;
       /// Sequence of all end-effector rot compensation limit [rad/s]. 下限0.0
       sequence<double, 2> eefm_swing_rot_spring_velocity_limit;
+      ///
+      boolean is_torque_control_mode;
+      /// 下限0.01[s]
+      double swing2landing_transition_time;
+      /// 下限0.01[s]
+      double landing2support_transition_time;
+      /// 下限0.01[s]
+      double support2swing_transition_time;
+      /// 下限0 上限100
+      sequence<sequence<double> > support_pgain;
+      /// 下限0 上限100
+      sequence<sequence<double> > support_dgain;
+      /// 下限0 上限100
+      sequence<sequence<double> > landing_pgain;
+      /// 下限0 上限100
+      sequence<sequence<double> > landing_dgain;
+      /// 下限0 上限100
+      sequence<sequence<double> > swing_pgain;
+      /// 下限0 上限100
+      sequence<sequence<double> > swing_dgain;
     };
 
     /**

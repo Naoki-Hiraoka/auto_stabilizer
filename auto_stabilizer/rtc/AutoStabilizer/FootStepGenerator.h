@@ -14,7 +14,7 @@ public:
   double defaultStepHeight = 0.07; // [m]. 0以上
   unsigned int goVelocityStepNum = 6; // 1以上
   bool isModifyFootSteps = true; // 着地位置時間修正を行うかどうか
-  double overwritableMinTime = 0.5; // 0より大きい. 次indexまでの残り時間がこの値を下回るようには着地時間修正を行わない. もともと下回っている場合には、その値を下回るようには着地時刻修正を行わない. 最低限、この時間で足上げ足下げが行えるような時間にすること.
+  double overwritableMinTime = 0.6; // 0より大きい. 次indexまでの残り時間がこの値を下回るようには着地時間修正を行わない. もともと下回っている場合には、その値を下回るようには着地時刻修正を行わない. 最低限、この時間で足上げ足下げが行えるような時間にすること.
   double overwritableMaxTime = 1.0; // overwritableMinTimeより大きい. 次indexまでの残り時間がこの値を上回るようには着地時間修正を行わない
   double overwritableMaxSwingVelocity = 1.0; //0より大きい [m/s]. 今の遊脚の位置のXYから着地位置のXYまで移動するための速度がこの値を上回るようには着地位置時間修正を行わない
   std::vector<std::vector<cnoid::Vector3> > safeLegHull = std::vector<std::vector<cnoid::Vector3> >(2, std::vector<cnoid::Vector3>{cnoid::Vector3(0.075,0.055,0.0),cnoid::Vector3(-0.075,0.055,0.0),cnoid::Vector3(-0.075,-0.055,0.0),cnoid::Vector3(0.075,-0.055,0.0)}); // 要素数2. rleg: 0. lleg: 1. leg frame.  凸形状で,上から見て半時計回り. Z成分はあったほうが計算上扱いやすいからありにしているが、0でなければならない. 大きさはgaitParam.legHull以下

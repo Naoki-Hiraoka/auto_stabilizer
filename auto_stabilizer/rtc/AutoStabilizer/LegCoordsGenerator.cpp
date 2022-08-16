@@ -120,7 +120,7 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
       // phase transition
       if(swingState[i] == GaitParam::FootStepNodes::LIFT_PHASE){
         if(swingTime <= this->delayTimeOffset) swingState[i] = GaitParam::FootStepNodes::DOWN_PHASE;
-        else if(antecedentCoords.translation()[2] >= height) swingState[i] = GaitParam::FootStepNodes::SWING_PHASE;
+        else if(antecedentCoords.translation()[2] >= height - 1e-3) swingState[i] = GaitParam::FootStepNodes::SWING_PHASE;
       }else if(swingState[i] == GaitParam::FootStepNodes::SWING_PHASE){
         if(swingTime <= this->delayTimeOffset) swingState[i] = GaitParam::FootStepNodes::DOWN_PHASE;
         else if(antecedentCoords.translation()[2] < dstCoords.translation()[2]) swingState[i] = GaitParam::FootStepNodes::LIFT_PHASE;
@@ -140,13 +140,9 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
         if(ratio * totalLength < length0){
           goal = antecedentCoords.translation();
           goal[2] += ratio * totalLength;
-        }else if(ratio * totalLength < length0 + length1){
+        }else{
           goal = antecedentCoords.translation();
           goal[2] = height;
-          goal.head<2>() += (dstCoordsWithOffset.translation() - antecedentCoords.translation()).head<2>().normalized() * (ratio * totalLength - length0);
-        }else{
-          goal = dstCoordsWithOffset.translation();
-          goal[2] = height - (ratio * totalLength - length0 - length1) / this->finalDistanceWeight;
         }
         cnoid::Position nextCoords;
         nextCoords.translation() = goal;
@@ -167,7 +163,7 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
           goal += (viaPos - antecedentCoords.translation()).normalized() * (ratio * totalLength);
         }else{
           goal = dstCoordsWithOffset.translation();
-          goal[2] = height - (ratio * totalLength - length1) / this->finalDistanceWeight;
+          goal[2] = height;
         }
         double dstCoordsRatio = 1.0 - std::abs((gaitParam.footstepNodesList[0].goalOffset[i] * this->finalDistanceWeight) / totalLength); // もとのdstCoords (offsetなし)に至るタイミング
         cnoid::Position nextCoords;
