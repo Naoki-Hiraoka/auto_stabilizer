@@ -340,15 +340,16 @@ bool Stabilizer::calcSwingEEModification(double dt, const GaitParam& gaitParam,
     cnoid::Vector6 offset = o_stEEOffsetSwingEEModification[i].value();
     offset -= offset.cwiseQuotient(this->springTimeConst[i]) * dt;
     if(!gaitParam.footstepNodesList[0].isSupportPhase[i]){
-      if(gaitParam.isManualControlMode[i].getGoal() == 1.0) continue; // ManualControlModeであれば行わない
-      cnoid::Vector6 diff; // generage frame. endeffeector origin
-      diff.head<3>() = gaitParam.abcEETargetPose[i].translation() - gaitParam.actEEPose[i].translation();
-      Eigen::AngleAxisd diffR = Eigen::AngleAxisd(gaitParam.abcEETargetPose[i].linear() * gaitParam.actEEPose[i].linear().inverse());
-      diff.tail<3>() = diffR.angle() * diffR.axis();
-      cnoid::Vector6 dp = this->springGain[i].cwiseProduct(diff);
-      dp = mathutil::clampMatrix(dp, this->springCompensationVelocityLimit[i]);
-      offset += dp * dt;
-      offset = mathutil::clampMatrix(offset, this->springCompensationLimit[i]);
+      if(gaitParam.isManualControlMode[i].getGoal() == 0.0){ // ManualControlModeであれば行わない
+        cnoid::Vector6 diff; // generage frame. endeffeector origin
+        diff.head<3>() = gaitParam.abcEETargetPose[i].translation() - gaitParam.actEEPose[i].translation();
+        Eigen::AngleAxisd diffR = Eigen::AngleAxisd(gaitParam.abcEETargetPose[i].linear() * gaitParam.actEEPose[i].linear().inverse());
+        diff.tail<3>() = diffR.angle() * diffR.axis();
+        cnoid::Vector6 dp = this->springGain[i].cwiseProduct(diff);
+        dp = mathutil::clampMatrix(dp, this->springCompensationVelocityLimit[i]);
+        offset += dp * dt;
+        offset = mathutil::clampMatrix(offset, this->springCompensationLimit[i]);
+      }
     }
     o_stEEOffsetSwingEEModification[i].reset(offset);
   }
