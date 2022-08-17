@@ -279,9 +279,13 @@ bool Stabilizer::calcDampingControl(double dt, const GaitParam& gaitParam, const
     wrenchError[i] = gaitParam.actEEWrench[i] - tgtEEWrench[i];
   }
   // force difference control
-  if(gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && !gaitParam.footstepNodesList[0].isSupportPhase[LLEG]) wrenchError[RLEG][2] = 0.0;
-  else if(!gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && gaitParam.footstepNodesList[0].isSupportPhase[LLEG]) wrenchError[LLEG][2] = 0.0;
-  else if(gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && gaitParam.footstepNodesList[0].isSupportPhase[LLEG]) {
+  if(gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && !gaitParam.footstepNodesList[0].isSupportPhase[LLEG]) {
+    wrenchError[RLEG].head<3>().setZero();
+    wrenchError[RLEG][5] = 0.0;
+  }else if(!gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && gaitParam.footstepNodesList[0].isSupportPhase[LLEG]) {
+    wrenchError[LLEG].head<3>().setZero();
+    wrenchError[LLEG][5] = 0.0;
+  }else if(gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && gaitParam.footstepNodesList[0].isSupportPhase[LLEG]) {
     double averageFzError = (wrenchError[RLEG][2] + wrenchError[LLEG][2]) / 2.0;
     wrenchError[RLEG][2] -= averageFzError;
     wrenchError[LLEG][2] -= averageFzError;

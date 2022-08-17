@@ -31,11 +31,29 @@ roseus
               (make-coords :pos (float-vector 0 100 0) :name :lleg)
               (make-coords :pos (float-vector 0 100 0) :name :lleg)
               (make-coords :pos (float-vector 0 100 0) :name :lleg)))
+
+(send *robot* :reset-pose)
+(send *robot* :larm :move-end-pos #F(0 100 0))
+(send *ri* :angle-vector (send *robot* :angle-vector) 3000)
+(send *ri* :wait-interpolation)
+(send *ri* :set-auto-stabilizer-param
+      :ref-foot-origin-frame (list nil t)
+      :is-hand-fix-mode t
+      )
 (send *ri* :set-foot-steps-with-param
-        (list (make-coords :pos (float-vector 0 -100 0) :name :rleg)
-        (make-coords :pos (float-vector 0 100 50) :name :lleg))
+        (list (make-coords :pos (float-vector 0 100 0) :name :lleg)
+        (make-coords :pos (float-vector 0 -100 50) :name :rleg))
         (list 70 70)
         (list 1.0 1.0) (list nil t))
+(send *robot* :rleg :move-end-pos #F(0 0 50))
+(send *ri* :angle-vector (send *robot* :angle-vector) 3000)
+(send *ri* :wait-interpolation)
+(send *ri* :set-auto-stabilizer-param
+      :is-manual-control-mode (list t nil)
+      )
+(send *robot* :rleg :move-end-pos #F(0 -50 50))
+(send *robot* :rleg :move-end-rot 15 :y :local)
+(send *ri* :angle-vector (send *robot* :angle-vector) 3000)
 
 (send *ri* :start-impedance :arms)
 (send *ri* :stop-impedance :arms)
