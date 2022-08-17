@@ -14,4 +14,5 @@
 
   <depend>auto_stabilizer</depend>
   <depend>hrpsys_choreonoid_tutorials</depend>
+  <depend>vnoid_world</depend>
 </package>
