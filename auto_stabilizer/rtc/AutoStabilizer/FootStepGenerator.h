@@ -70,10 +70,11 @@ public:
     int l_r; // 0: RLEG. 1: LLEG
     cnoid::Position coords;
     double stepHeight, stepTime; // stepHeightは0以上でなければならない. stepTimeは0より大きくなければならない
+    bool swingEnd;
   public:
-    StepNode () : l_r(RLEG), coords(cnoid::Position::Identity()), stepHeight(), stepTime(){};
-    StepNode (const int _l_r, const cnoid::Position& _coords, const double _stepHeight, const double _stepTime)
-      : l_r(_l_r), coords(_coords), stepHeight(_stepHeight), stepTime(_stepTime) {};
+    StepNode () : l_r(RLEG), coords(cnoid::Position::Identity()), stepHeight(), stepTime(), swingEnd(false){};
+    StepNode (const int _l_r, const cnoid::Position& _coords, const double _stepHeight, const double _stepTime, const bool _swingEnd)
+      : l_r(_l_r), coords(_coords), stepHeight(_stepHeight), stepTime(_stepTime), swingEnd(_swingEnd) {};
     friend std::ostream &operator<<(std::ostream &os, const StepNode &sn) {
       os << "footstep" << std::endl;
       os << "  name = [" << ((sn.l_r==LLEG)?std::string("lleg"):
@@ -82,7 +83,7 @@ public:
       os << (sn.coords.translation()).format(Eigen::IOFormat(Eigen::StreamPrecision, 0, ", ", ", ", "", "", " [", "]")) << std::endl;
       os << "  rot =";
       os << (sn.coords.linear()).format(Eigen::IOFormat(Eigen::StreamPrecision, 0, ", ", "", " [", "]")) << std::endl;
-      os << "  step_height = " << sn.stepHeight << "[m], step_time = " << sn.stepTime << "[s]";
+      os << "  step_height = " << sn.stepHeight << "[m], step_time = " << sn.stepTime << "[s], swing_end = " << sn.swingEnd;
       return os;
     };
   };

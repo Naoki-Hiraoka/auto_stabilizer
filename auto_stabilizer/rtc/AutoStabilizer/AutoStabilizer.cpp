@@ -713,6 +713,7 @@ bool AutoStabilizer::setFootSteps(const OpenHRP::AutoStabilizerService::Footstep
   for(int i=0;i<fs.length();i++){
     sps[i].step_height = this->footStepGenerator_.defaultStepHeight;
     sps[i].step_time = this->footStepGenerator_.defaultStepTime;
+    sps[i].swing_end = false;
   }
   return this->setFootStepsWithParam(fs, sps); // この中でmutexをとるので、setFootSteps関数ではmutexはとらない
 }
@@ -737,6 +738,7 @@ bool AutoStabilizer::setFootStepsWithParam(const OpenHRP::AutoStabilizerService:
       stepNode.coords.linear() = Eigen::Quaterniond(fs[i].rot[0],fs[i].rot[1],fs[i].rot[2],fs[i].rot[3]).toRotationMatrix();
       stepNode.stepHeight = sps[i].step_height;
       stepNode.stepTime = sps[i].step_time;
+      stepNode.swingEnd = sps[i].swing_end;
       footsteps.push_back(stepNode);
     }
     this->footStepGenerator_.setFootSteps(this->gaitParam_, footsteps, // input

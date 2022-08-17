@@ -31,10 +31,8 @@ module OpenHRP
       double step_height;
       /// Step time [s]
       double step_time;
-      /// Maximum toe angle [deg] for toe-off motion (TODO)
-      double toe_angle;
-      /// Maximum heel angle [deg] for heel-contact motion (TODO)
-      double heel_angle;
+      ///
+      boolean swing_end;
     };
 
     /**

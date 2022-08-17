@@ -43,7 +43,7 @@
    (when (send (send self :set-foot-steps-no-wait foot-step-list) :operation_return)
      (send self :wait-foot-steps))) ;; goVelocity中に呼ぶと無限にwaitするため
   (:set-foot-steps-with-param-no-wait
-   (foot-step-list step-height-list step-time-list)
+   (foot-step-list step-height-list step-time-list &optional (swing-end-list (make-list (length foot-step-list) :initial-element nil)))
    "Set foot step with step parameter and do not wait for step finish.
     foot-step-list is list of footstep.
     step-height-list is list of step height[mm].
@@ -54,15 +54,15 @@
                      (send self :eus-footstep->abc-footstep f))
                  foot-step-list)
          :sps
-         (mapcar #'(lambda (sh st)
-                     (instance auto_stabilizer::openhrp_autostabilizerservice_stepparam :init :step_height (* sh 1e-3) :step_time st))
-                 step-height-list step-time-list)
+         (mapcar #'(lambda (sh st se)
+                     (instance auto_stabilizer::openhrp_autostabilizerservice_stepparam :init :step_height (* sh 1e-3) :step_time st :swing_end se))
+                 step-height-list step-time-list swing-end-list)
          ))
   (:set-foot-steps-with-param
-   (foot-step-list step-height-list step-time-list)
+   (foot-step-list step-height-list step-time-list &optional (swing-end-list (make-list (length foot-step-list) :initial-element nil)))
    "Set foot step with step parameter and wait for step finish.
     For arguments, please see :set-foot-steps-with-param-no-wait documentation."
-   (when (send (send self :set-foot-steps-with-param-no-wait foot-step-list step-height-list step-time-list) :operation_return)
+   (when (send (send self :set-foot-steps-with-param-no-wait foot-step-list step-height-list step-time-list swing-end-list) :operation_return)
      (send self :wait-foot-steps))) ;; goVelocity中に呼ぶと無限にwaitするため
   (:go-velocity
    (vx vy vth)
@@ -79,13 +79,17 @@
    (send self :autostabilizerservice_waitFootSteps))
   (:set-auto-stabilizer-param
    (&rest args
-    &key eefm-rot-damping-gain eefm-pos-damping-gain eefm-pos-time-const eefm-rot-time-const
+    &key default-zmp-offsets eefm-rot-damping-gain eefm-pos-damping-gain eefm-pos-time-const eefm-rot-time-const
     &allow-other-keys)
    "Set AutoStabilizer param.
     For arguments, please see (send *ri* :get-auto-stabilizer-param-arguments)."
    (let ((prm (send self :get-auto-stabilizer-param)))
      (send* self :raw-set-auto-stabilizer-param
             (append
+             (if (and (memq :default-zmp-offsets args) default-zmp-offsets)
+                 (let ((tmp (send prm :default_zmp_offsets)))
+                   (setq (tmp . ros::_data) (apply #'concatenate float-vector default-zmp-offsets))
+                   (list :default-zmp-offsets tmp)))
              (if (and (memq :eefm-pos-damping-gain args) eefm-pos-damping-gain)
                  (let ((tmp (send prm :eefm_pos_damping_gain)))
                    (setq (tmp . ros::_data) (apply #'concatenate float-vector eefm-pos-damping-gain))
