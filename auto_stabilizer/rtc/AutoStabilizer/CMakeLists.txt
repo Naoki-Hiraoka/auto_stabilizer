@@ -42,6 +42,7 @@ add_library(AutoStabilizer SHARED
   Stabilizer.cpp
   ImpedanceController.cpp
   FullbodyIKSolver.cpp
+  LegManualController.cpp
   MathUtil.cpp
   )
 target_link_libraries(AutoStabilizer

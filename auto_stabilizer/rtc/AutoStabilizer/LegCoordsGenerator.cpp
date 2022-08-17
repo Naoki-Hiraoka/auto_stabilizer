@@ -13,7 +13,14 @@ void LegCoordsGenerator::initLegCoords(const GaitParam& gaitParam,
 
   genCoords.emplace_back(rlegCoords, cnoid::Vector6::Zero(), cnoid::Vector6::Zero(), cpp_filters::HOFFARBIB);
   genCoords.emplace_back(llegCoords, cnoid::Vector6::Zero(), cnoid::Vector6::Zero(), cpp_filters::HOFFARBIB);
-  cnoid::Vector3 zmp = 0.5 * (rlegCoords.translation() + rlegCoords.linear()*gaitParam.copOffset[RLEG].value()) + 0.5 * (llegCoords.translation() + llegCoords.linear()*gaitParam.copOffset[LLEG].value());
+  cnoid::Vector3 zmp;
+  if(gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && gaitParam.footstepNodesList[0].isSupportPhase[LLEG]){
+    zmp = 0.5 * (rlegCoords.translation() + rlegCoords.linear()*gaitParam.copOffset[RLEG].value()) + 0.5 * (llegCoords.translation() + llegCoords.linear()*gaitParam.copOffset[LLEG].value());
+  }else if(gaitParam.footstepNodesList[0].isSupportPhase[RLEG]){
+    zmp = rlegCoords.translation() + rlegCoords.linear()*gaitParam.copOffset[RLEG].value();
+  }else{
+    zmp = llegCoords.translation() + llegCoords.linear()*gaitParam.copOffset[LLEG].value();
+  }
   refZmpTraj.push_back(footguidedcontroller::LinearTrajectory<cnoid::Vector3>(zmp,zmp,0.0));
 
   o_refZmpTraj = refZmpTraj;

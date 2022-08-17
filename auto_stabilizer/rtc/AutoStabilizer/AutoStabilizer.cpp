@@ -371,7 +371,7 @@ bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr
 }
 
 // static function
-bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobotRaw, cnoid::BodyPtr& refRobot, const cnoid::BodyPtr& actRobotRaw, cnoid::BodyPtr& actRobot, cnoid::BodyPtr& genRobot, cnoid::BodyPtr& actRobotTqc, GaitParam& gaitParam, double dt, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ActToGenFrameConverter& actToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer, const ExternalForceHandler& externalForceHandler, const FullbodyIKSolver& fullbodyIKSolver) {
+bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobotRaw, cnoid::BodyPtr& refRobot, const cnoid::BodyPtr& actRobotRaw, cnoid::BodyPtr& actRobot, cnoid::BodyPtr& genRobot, cnoid::BodyPtr& actRobotTqc, GaitParam& gaitParam, double dt, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ActToGenFrameConverter& actToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer, const ExternalForceHandler& externalForceHandler, const FullbodyIKSolver& fullbodyIKSolver,const LegManualController& legManualController) {
   if(mode.isSyncToABCInit()){ // startAutoBalancer直後の初回. gaitParamのリセット
     refToGenFrameConverter.initGenRobot(refRobotRaw, gaitParam,
                                         genRobot, gaitParam.footMidCoords, gaitParam.genCogVel);
@@ -408,6 +408,10 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
     gaitParam.icEETargetPose[i].translation() = icOffset.head<3>() + gaitParam.refEEPose[i].translation();
     gaitParam.icEETargetPose[i].linear() = cnoid::AngleAxisd(icOffset.tail<3>().norm(),(icOffset.tail<3>().norm()>0)?icOffset.tail<3>().normalized() : cnoid::Vector3::UnitX()) * gaitParam.refEEPose[i].linear();
   }
+
+  // Manual Control Modeの足の現在位置をreferenceで上書きする
+  legManualController.legManualControl(gaitParam, dt,
+                                       gaitParam.genCoords, gaitParam.footstepNodesList, gaitParam.isManualControlMode);
 
   // AutoBalancer
   footStepGenerator.calcFootSteps(gaitParam, dt, mode.isSTRunning(),
@@ -479,6 +483,14 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const cnoid:
     }
   }
 
+  if(mode.isSyncToABC()){
+    if(mode.isSyncToABCInit()){
+      outputOffsetInterpolators.transitionInterpolator.reset(0.0);
+    }
+    outputOffsetInterpolators.transitionInterpolator.setGoal(1.0,mode.remainTime());
+    outputOffsetInterpolators.transitionInterpolator.interpolate(dt);
+  }
+
   {
     // q
     ports.m_q_.tm = ports.m_qRef_.tm;
@@ -487,13 +499,8 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const cnoid:
       if(mode.now() == AutoStabilizer::ControlMode::MODE_IDLE || !gaitParam.jointControllable[i]){
         ports.m_q_.data[i] = refRobotRaw->joint(i)->q();
       }else if(mode.isSyncToABC()){
-        if(mode.isSyncToABCInit()){
-          outputOffsetInterpolators.qInterpolator[i].reset(ports.m_q_.data[i]-genRobot->joint(i)->q());
-        }
-        outputOffsetInterpolators.qInterpolator[i].setGoal(0.0,mode.remainTime());
-        double x,v,a;
-        outputOffsetInterpolators.qInterpolator[i].get(x,v,a,dt);
-        ports.m_q_.data[i] = genRobot->joint(i)->q() + x;
+        double ratio = outputOffsetInterpolators.transitionInterpolator.value();
+        ports.m_q_.data[i] = refRobotRaw->joint(i)->q() * (1.0 - ratio) + genRobot->joint(i)->q() * ratio;
       }else if(mode.isSyncToIdle()){
         if(mode.isSyncToIdleInit()){
           outputOffsetInterpolators.qInterpolator[i].reset(ports.m_q_.data[i]-refRobotRaw->joint(i)->q());
@@ -517,13 +524,8 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const cnoid:
       if(mode.now() == AutoStabilizer::ControlMode::MODE_IDLE || !gaitParam.jointControllable[i]){
         ports.m_genTau_.data[i] = refRobotRaw->joint(i)->u();
       }else if(mode.isSyncToABC()){
-        if(mode.isSyncToABCInit()){
-          outputOffsetInterpolators.genTauInterpolator[i].reset(ports.m_genTau_.data[i]-actRobotTqc->joint(i)->u());
-        }
-        outputOffsetInterpolators.genTauInterpolator[i].setGoal(0.0,mode.remainTime());
-        double x,v,a;
-        outputOffsetInterpolators.genTauInterpolator[i].get(x,v,a,dt);
-        ports.m_genTau_.data[i] = actRobotTqc->joint(i)->u() + x;
+        double ratio = outputOffsetInterpolators.transitionInterpolator.value();
+        ports.m_genTau_.data[i] = refRobotRaw->joint(i)->u() * (1.0 - ratio) + actRobotTqc->joint(i)->u() * ratio;
       }else if(mode.isSyncToIdle()){
         if(mode.isSyncToIdleInit()){
           outputOffsetInterpolators.genTauInterpolator[i].reset(ports.m_genTau_.data[i]-refRobotRaw->joint(i)->u());
@@ -545,16 +547,9 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const cnoid:
     if(mode.now() == AutoStabilizer::ControlMode::MODE_IDLE){
       basePose = refRobotRaw->rootLink()->T();
     }else if(mode.isSyncToABC()){
-      if(mode.isSyncToABCInit()){
-        cnoid::Position prevPose;
-        prevPose.translation()= cnoid::Vector3(ports.m_genBasePose_.data.position.x,ports.m_genBasePose_.data.position.x,ports.m_genBasePose_.data.position.x);
-        prevPose.linear() = cnoid::rotFromRpy(ports.m_genBasePose_.data.orientation.r, ports.m_genBasePose_.data.orientation.p, ports.m_genBasePose_.data.orientation.y);
-        outputOffsetInterpolators.genBasePoseInterpolator.reset(prevPose * genRobot->rootLink()->T().inverse());
-      }
-      outputOffsetInterpolators.genBasePoseInterpolator.setGoal(cnoid::Position::Identity(),mode.remainTime());
-      outputOffsetInterpolators.genBasePoseInterpolator.interpolate(dt);
-      cnoid::Position offsetPose = outputOffsetInterpolators.genBasePoseInterpolator.value();
-      basePose = offsetPose * genRobot->rootLink()->T();
+      double ratio = outputOffsetInterpolators.transitionInterpolator.value();
+      basePose = mathutil::calcMidCoords(std::vector<cnoid::Position>{refRobotRaw->rootLink()->T(), genRobot->rootLink()->T()},
+                                         std::vector<double>{1.0 - ratio, ratio});
     }else if(mode.isSyncToIdle()){
       if(mode.isSyncToIdleInit()){
         cnoid::Position prevPose;
@@ -646,13 +641,13 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
   if(this->mode_.isABCRunning()) {
     if(this->mode_.isSyncToABCInit()){ // startAutoBalancer直後の初回. 内部パラメータのリセット
       this->gaitParam_.reset();
-      this->refToGenFrameConverter_.reset(this->mode_.remainTime());
+      this->refToGenFrameConverter_.reset();
       this->actToGenFrameConverter_.reset();
       this->externalForceHandler_.reset();
       this->footStepGenerator_.reset();
       this->impedanceController_.reset();
     }
-    AutoStabilizer::execAutoStabilizer(this->mode_, this->refRobotRaw_, this->refRobot_, this->actRobotRaw_, this->actRobot_, this->genRobot_, this->actRobotTqc_, this->gaitParam_, this->dt_, this->footStepGenerator_, this->legCoordsGenerator_, this->refToGenFrameConverter_, this->actToGenFrameConverter_, this->impedanceController_, this->stabilizer_,this->externalForceHandler_, this->fullbodyIKSolver_);
+    AutoStabilizer::execAutoStabilizer(this->mode_, this->refRobotRaw_, this->refRobot_, this->actRobotRaw_, this->actRobot_, this->genRobot_, this->actRobotTqc_, this->gaitParam_, this->dt_, this->footStepGenerator_, this->legCoordsGenerator_, this->refToGenFrameConverter_, this->actToGenFrameConverter_, this->impedanceController_, this->stabilizer_,this->externalForceHandler_, this->fullbodyIKSolver_, this->legManualController_);
   }
 
   AutoStabilizer::writeOutPortData(this->ports_, this->refRobotRaw_, this->genRobot_, this->actRobotTqc_, this->mode_, this->outputOffsetInterpolators_, this->dt_, this->gaitParam_);
@@ -896,6 +891,23 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
       }
     }
   }
+  if(i_param.is_manual_control_mode.length() == NUM_LEGS && (i_param.is_manual_control_mode[RLEG] || i_param.is_manual_control_mode[LLEG])){
+    for(int i=0;i<NUM_LEGS; i++) {
+      if(this->mode_.isABCRunning()) {
+        if(i_param.is_manual_control_mode[i] != (this->gaitParam_.isManualControlMode[i].getGoal() == 1.0)){
+          if(i_param.is_manual_control_mode[i]){
+            if(this->gaitParam_.isStatic() && !this->gaitParam_.footstepNodesList[0].isSupportPhase[i]) {
+              this->gaitParam_.isManualControlMode[i].setGoal(1.0, 2.0); // 2.0[s]で遷移
+            }
+          }else{
+            this->gaitParam_.isManualControlMode[i].setGoal(0.0, 2.0); // 2.0[s]で遷移
+          }
+        }
+      }else{
+        this->gaitParam_.isManualControlMode[i].reset(i_param.is_manual_control_mode[i] ? 1.0 : 0.0);
+      }
+    }
+  }
 
   if((this->refToGenFrameConverter_.handFixMode.getGoal() == 1.0) != i_param.is_hand_fix_mode) {
     if(this->mode_.isABCRunning()) this->refToGenFrameConverter_.handFixMode.setGoal(i_param.is_hand_fix_mode ? 1.0 : 0.0, 1.0); // 1.0[s]で補間
@@ -1124,6 +1136,10 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
   i_param.leg_default_translate_pos.length(NUM_LEGS);
   for(int i=0;i<NUM_LEGS; i++) {
     i_param.leg_default_translate_pos[i] = this->gaitParam_.defaultTranslatePos[i].value()[1];
+  }
+  i_param.is_manual_control_mode.length(NUM_LEGS);
+  for(int i=0;i<NUM_LEGS; i++) {
+    i_param.is_manual_control_mode[i] = (this->gaitParam_.isManualControlMode[i].getGoal() == 1.0);
   }
 
   i_param.is_hand_fix_mode = (this->refToGenFrameConverter_.handFixMode.getGoal() == 1.0);

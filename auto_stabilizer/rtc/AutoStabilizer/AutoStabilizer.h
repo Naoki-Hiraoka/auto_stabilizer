@@ -29,6 +29,7 @@
 #include "GaitParam.h"
 #include "RefToGenFrameConverter.h"
 #include "ActToGenFrameConverter.h"
+#include "LegManualController.h"
 #include "FootStepGenerator.h"
 #include "LegCoordsGenerator.h"
 #include "ImpedanceController.h"
@@ -209,6 +210,7 @@ protected:
   ActToGenFrameConverter actToGenFrameConverter_;
   ExternalForceHandler externalForceHandler_;
   ImpedanceController impedanceController_;
+  LegManualController legManualController_;
   FootStepGenerator footStepGenerator_;
   LegCoordsGenerator legCoordsGenerator_;
   Stabilizer stabilizer_;
@@ -218,12 +220,11 @@ protected:
   // utility functions
   bool getProperty(const std::string& key, std::string& ret);
 
-  static void moveCoords(cnoid::BodyPtr robot, const cnoid::Position& target, const cnoid::Position& at);
-
   static bool readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobotRaw, cnoid::BodyPtr actRobotRaw, GaitParam& gaitParam);
-  static bool execAutoStabilizer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobotRaw, cnoid::BodyPtr& refRobot, const cnoid::BodyPtr& actRobotRaw, cnoid::BodyPtr& actRobot, cnoid::BodyPtr& genRobot, cnoid::BodyPtr& actRobotTqc, GaitParam& gaitParam, double dt, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ActToGenFrameConverter& actToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer, const ExternalForceHandler& externalForceHandler, const FullbodyIKSolver& fullbodyIKSolver);
+  static bool execAutoStabilizer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobotRaw, cnoid::BodyPtr& refRobot, const cnoid::BodyPtr& actRobotRaw, cnoid::BodyPtr& actRobot, cnoid::BodyPtr& genRobot, cnoid::BodyPtr& actRobotTqc, GaitParam& gaitParam, double dt, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ActToGenFrameConverter& actToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer, const ExternalForceHandler& externalForceHandler, const FullbodyIKSolver& fullbodyIKSolver, const LegManualController& legManualController);
   class OutputOffsetInterpolators {
   public:
+    cpp_filters::TwoPointInterpolator<double> transitionInterpolator = cpp_filters::TwoPointInterpolator<double>(0.0, 0.0, 0.0, cpp_filters::LINEAR);
     cpp_filters::TwoPointInterpolatorSE3 genBasePoseInterpolator = cpp_filters::TwoPointInterpolatorSE3(cnoid::Position::Identity(),cnoid::Vector6::Zero(),cnoid::Vector6::Zero(),cpp_filters::HOFFARBIB);
     std::vector<cpp_filters::TwoPointInterpolator<double> > qInterpolator; // 要素数はrobot->numJoints(). jointIdの順
     std::vector<cpp_filters::TwoPointInterpolator<double> > genTauInterpolator; // 要素数はrobot->numJoints(). jointIdの順

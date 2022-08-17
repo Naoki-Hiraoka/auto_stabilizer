@@ -116,7 +116,6 @@ bool RefToGenFrameConverter::convertFrame(const cnoid::BodyPtr& refRobotRaw, con
   cnoid::Vector3 trans_footMidCoordsLocal = footMidCoords.value().linear().transpose() * (genFootMidCoords.translation() - footMidCoords.value().translation());
   trans_footMidCoordsLocal[1] *= (1.0 - handFixMode.value());
   genFootMidCoords.translation() = footMidCoords.value().translation() + footMidCoords.value().linear() * trans_footMidCoordsLocal;
-  genFootMidCoords = mathutil::calcMidCoords({footMidCoords.value(), genFootMidCoords}, {1.0-handControlRatio.value(), handControlRatio.value()});
   cnoidbodyutil::moveCoords(refRobot, genFootMidCoords, refFootMidCoords); // 1周期前のfootMidCoordsを使っているが、footMidCoordsは不連続に変化するものではないのでよい
   refRobot->calcForwardKinematics();
   refRobot->calcCenterOfMass();

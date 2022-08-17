@@ -138,6 +138,8 @@ module OpenHRP
       sequence<sequence<sequence<double, 2> >, 2> leg_hull;
       /// Foot position offset in Y axis[m] (rleg and lleg)
       sequence<double, 2> leg_default_translate_pos;
+      ///
+      sequence<boolean, 2> is_manual_control_mode;
 
       // RefToGenFrameConverter
       /// Flag for fix hand while walking.

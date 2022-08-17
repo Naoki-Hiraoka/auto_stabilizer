@@ -8,21 +8,16 @@ class RefToGenFrameConverter {
 public:
   // RefToGenFrameConverterだけでつかうパラメータ
   cpp_filters::TwoPointInterpolator<double> handFixMode = cpp_filters::TwoPointInterpolator<double>(0.0,0.0,0.0,cpp_filters::HOFFARBIB); // 0~1. 0ならHandは重心の動きに合わせて左右に揺れる. 1なら揺れない. 滑らかに変化する. 「左右」という概念を使うので、defaultTranslatePosはX成分は0である必要がある.
-  std::vector<cpp_filters::TwoPointInterpolator<double> > refFootOriginWeight = std::vector<cpp_filters::TwoPointInterpolator<double> >(NUM_LEGS,cpp_filters::TwoPointInterpolator<double>(1.0,0.0,0.0,cpp_filters::HOFFARBIB)); // 要素数2. 0: rleg. 1: lleg. 0~1. Reference座標系のfootOriginを計算するときに用いるweight. このfootOriginからの相対位置で、GaitGeneratorに管理されていないEndEffectorのReference位置が解釈される. interpolatorによって連続的に変化する. 全てのLegのrefFootOriginWeightが同時に0になることはない
+  std::vector<cpp_filters::TwoPointInterpolator<double> > refFootOriginWeight = std::vector<cpp_filters::TwoPointInterpolator<double> >(NUM_LEGS,cpp_filters::TwoPointInterpolator<double>(1.0,0.0,0.0,cpp_filters::HOFFARBIB)); // 要素数2. 0: rleg. 1: lleg. 0~1. Reference座標系のfootOriginを計算するときに用いるweight. このfootOriginからの相対位置で、GaitGeneratorに管理されていないEndEffectorのReference位置が解釈される. interpolatorによって連続的に変化する. 全てのLegのrefFootOriginWeightが同時に0になることはない.
 
-protected:
-  cpp_filters::TwoPointInterpolator<double> handControlRatio = cpp_filters::TwoPointInterpolator<double>(0.0,0.0,0.0,cpp_filters::HOFFARBIB); // 0~1. startAutoBalancer直後の不連続性を減らすためのもの. 0 -> 1へ遷移
 public:
   // startAutoBalancer時に呼ばれる
-  void reset(double handControlRatioTransitionTime = 1.0) {
-    handControlRatio.reset(0.0);
-    handControlRatio.setGoal(1.0, handControlRatioTransitionTime);
+  void reset() {
     handFixMode.reset(handFixMode.getGoal());
     for(int i=0;i<refFootOriginWeight.size();i++) refFootOriginWeight[i].reset(refFootOriginWeight[i].getGoal());
   }
   // 内部の補間器をdtだけ進める
   void update(double dt){
-    handControlRatio.interpolate(dt);
     handFixMode.interpolate(dt);
     for(int i=0;i<refFootOriginWeight.size();i++) refFootOriginWeight[i].interpolate(dt);
   }

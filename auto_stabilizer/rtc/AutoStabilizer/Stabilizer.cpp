@@ -113,8 +113,7 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
                             std::vector<cnoid::Vector6>& o_tgtEEWrench) const{
   std::vector<cnoid::Vector6> tgtEEWrench(gaitParam.eeName.size(), cnoid::Vector6::Zero()); /* 要素数EndEffector数. generate frame. EndEffector origin*/
 
-  // leg以外はref値をそのまま
-  for(int i = NUM_LEGS;i<gaitParam.eeName.size();i++){
+  for(int i = 0;i<gaitParam.eeName.size();i++){
     tgtEEWrench[i] = gaitParam.refEEWrench[i];
   }
 
@@ -138,19 +137,19 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
   // 計算時間は、tgtZmpが支持領域内に無いと遅くなるなので、事前に支持領域内に入るように修正しておくこと
 
   if(gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && !gaitParam.footstepNodesList[0].isSupportPhase[LLEG]){
-    tgtEEWrench[LLEG].setZero();
+    if(gaitParam.isManualControlMode[LLEG].getGoal() == 0.0) tgtEEWrench[LLEG].setZero(); // Manual Control ModeであればrefEEWrenchをそのまま使う
     tgtEEWrench[RLEG].head<3>() = tgtForce;
     tgtEEWrench[RLEG].tail<3>() = (tgtZmp - gaitParam.actEEPose[RLEG].translation()).cross(tgtForce);
   }else if(!gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && gaitParam.footstepNodesList[0].isSupportPhase[LLEG]){
-    tgtEEWrench[RLEG].setZero();
+    if(gaitParam.isManualControlMode[RLEG].getGoal() == 0.0) tgtEEWrench[RLEG].setZero(); // Manual Control ModeであればrefEEWrenchをそのまま使う
     tgtEEWrench[LLEG].head<3>() = tgtForce;
     tgtEEWrench[LLEG].tail<3>() = (tgtZmp - gaitParam.actEEPose[LLEG].translation()).cross(tgtForce);
   }else if(!gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && !gaitParam.footstepNodesList[0].isSupportPhase[LLEG]){
-    tgtEEWrench[RLEG].setZero();
-    tgtEEWrench[LLEG].setZero();
+    if(gaitParam.isManualControlMode[RLEG].getGoal() == 0.0) tgtEEWrench[RLEG].setZero(); // Manual Control ModeであればrefEEWrenchをそのまま使う
+    if(gaitParam.isManualControlMode[LLEG].getGoal() == 0.0) tgtEEWrench[LLEG].setZero(); // Manual Control ModeであればrefEEWrenchをそのまま使う
   }else if(tgtForce.norm() == 0){
-    tgtEEWrench[RLEG].setZero();
-    tgtEEWrench[LLEG].setZero();
+    if(gaitParam.isManualControlMode[RLEG].getGoal() == 0.0) tgtEEWrench[RLEG].setZero(); // Manual Control ModeであればrefEEWrenchをそのまま使う
+    if(gaitParam.isManualControlMode[LLEG].getGoal() == 0.0) tgtEEWrench[LLEG].setZero(); // Manual Control ModeであればrefEEWrenchをそのまま使う
   }else{
     int dim = gaitParam.legHull[RLEG].size() + gaitParam.legHull[LLEG].size();
     {
@@ -288,6 +287,10 @@ bool Stabilizer::calcDampingControl(double dt, const GaitParam& gaitParam, const
     wrenchError[LLEG][2] -= averageFzError;
   }
 
+  for(int i=0;i<NUM_LEGS;i++){ // ManualControlModeであれば行わない
+    if(gaitParam.isManualControlMode[i].getGoal() == 1.0) wrenchError[i].setZero();
+  }
+
   for(int i=0;i<NUM_LEGS;i++){
 
     cnoid::Vector6 offsetPrev; // generate frame. endEffector origin
@@ -337,6 +340,7 @@ bool Stabilizer::calcSwingEEModification(double dt, const GaitParam& gaitParam,
     cnoid::Vector6 offset = o_stEEOffsetSwingEEModification[i].value();
     offset -= offset.cwiseQuotient(this->springTimeConst[i]) * dt;
     if(!gaitParam.footstepNodesList[0].isSupportPhase[i]){
+      if(gaitParam.isManualControlMode[i].getGoal() == 1.0) continue; // ManualControlModeであれば行わない
       cnoid::Vector6 diff; // generage frame. endeffeector origin
       diff.head<3>() = gaitParam.abcEETargetPose[i].translation() - gaitParam.actEEPose[i].translation();
       Eigen::AngleAxisd diffR = Eigen::AngleAxisd(gaitParam.abcEETargetPose[i].linear() * gaitParam.actEEPose[i].linear().inverse());

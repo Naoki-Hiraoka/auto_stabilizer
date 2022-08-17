@@ -12,6 +12,12 @@ bool ImpedanceController::calcImpedanceControl(double dt, const GaitParam& gaitP
                                                std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_icEEOffset /*generate frame, endeffector origin*/) const{
   for(int i=0;i<gaitParam.eeName.size();i++){
     if(!this->isImpedanceMode[i])  continue;
+    double ratio = 1.0;
+    if(i < NUM_LEGS){ // 脚は、isManualControlModeに完全になっている場合のみImpedanceControlを行う.
+      if(!(gaitParam.isManualControlMode[i].isEmpty() && gaitParam.isManualControlMode[i].getGoal() == 0.0)){
+        ratio = 0.0;
+      }
+    }
 
     cnoid::Vector6 offsetPrev; // generate frame. endEffector origin
     cnoid::Vector6 dOffsetPrev; // generate frame. endEffector origin
@@ -43,7 +49,7 @@ bool ImpedanceController::calcImpedanceControl(double dt, const GaitParam& gaitP
       }
 
       dOffsetLocal[j] =
-        ((actWrenchLocal[j] - refWrenchLocal[j]) * this->wrenchGain[i][j] * dt * dt
+        ((actWrenchLocal[j] - refWrenchLocal[j]) * this->wrenchGain[i][j] * ratio * dt * dt
          - this->K[i][j] * offsetPrevLocal[j] * dt * dt
          + this->M[i][j] * dOffsetPrevLocal[j]*dt)
         / (this->M[i][j] + this->D[i][j] * dt + this->K[i][j] * dt * dt);

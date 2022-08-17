@@ -12,14 +12,18 @@ bool ExternalForceHandler::initExternalForceHandlerOutput(const GaitParam& gaitP
   cnoid::Vector3 origin = cnoid::Vector3(0,0,gaitParam.footMidCoords.value().translation()[2]); // generate frame
   feedForwardExternalWrench.head<3>() += - gaitParam.g * genRobot->mass() * cnoid::Vector3::UnitZ();
   feedForwardExternalWrench.tail<3>() += (genRobot->centerOfMass() - origin).cross(- gaitParam.g * genRobot->mass() * cnoid::Vector3::UnitZ());
-  for(int i=NUM_LEGS; i<gaitParam.eeName.size();i++){ // 脚以外の目標反力を足す
+  for(int i=0; i<gaitParam.eeName.size();i++){
+    double ratio = 1.0;
+    if(i < NUM_LEGS){ // 脚は、isManualControlModeの場合のみrefEEWrenchに応じて重心をオフセットする
+      ratio = gaitParam.isManualControlMode[i].value();
+    }
     cnoid::Position eePose = genRobot->link(gaitParam.eeParentLink[i])->T() * gaitParam.eeLocalT[i]; // generate frame
     cnoid::Vector6 eeWrench; /*generate frame. endeffector origin*/
     eeWrench.head<3>() = gaitParam.footMidCoords.value().linear() * gaitParam.refEEWrenchOrigin[i].head<3>();
     eeWrench.tail<3>() = gaitParam.footMidCoords.value().linear() * gaitParam.refEEWrenchOrigin[i].tail<3>();
-    feedForwardExternalWrench.head<3>() += eeWrench.head<3>();
-    feedForwardExternalWrench.tail<3>() += eeWrench.tail<3>();
-    feedForwardExternalWrench.tail<3>() += (eePose.translation() - origin).cross(eeWrench.head<3>());
+    feedForwardExternalWrench.head<3>() += ratio * eeWrench.head<3>();
+    feedForwardExternalWrench.tail<3>() += ratio * eeWrench.tail<3>();
+    feedForwardExternalWrench.tail<3>() += (eePose.translation() - origin).cross(ratio * eeWrench.head<3>());
   }
 
   if(dz <= 0.0) { // 倒立振子近似が成り立たないので計算が破綻する.
@@ -74,11 +78,15 @@ bool ExternalForceHandler::handleFeedForwardExternalForce(const GaitParam& gaitP
    */
 
   cnoid::Vector6 feedForwardExternalWrench = cnoid::Vector6::Zero(); // generate frame. genCog - lの位置origin.
-  for(int i=NUM_LEGS; i<gaitParam.eeName.size();i++){ // 脚以外の目標反力を足す
-    feedForwardExternalWrench.head<3>() += gaitParam.refEEWrench[i].head<3>()/*generate frame. endeffector origin*/;
-    feedForwardExternalWrench.tail<3>() += gaitParam.refEEWrench[i].tail<3>()/*generate frame. endeffector origin*/;
+  for(int i=0; i<gaitParam.eeName.size();i++){ // 脚以外の目標反力を足す
+    double ratio = 1.0;
+    if(i < NUM_LEGS){ // 脚は、isManualControlModeの場合のみrefEEWrenchに応じて重心をオフセットする
+      ratio = gaitParam.isManualControlMode[i].value();
+    }
+    feedForwardExternalWrench.head<3>() += ratio * gaitParam.refEEWrench[i].head<3>()/*generate frame. endeffector origin*/;
+    feedForwardExternalWrench.tail<3>() += ratio * gaitParam.refEEWrench[i].tail<3>()/*generate frame. endeffector origin*/;
     cnoid::Vector3 trans = gaitParam.refEEPose[i].translation() - (gaitParam.genCog - gaitParam.l);
-    feedForwardExternalWrench.tail<3>() += trans.cross(gaitParam.refEEWrench[i].head<3>()/*generate frame. endeffector origin*/);
+    feedForwardExternalWrench.tail<3>() += trans.cross(ratio * gaitParam.refEEWrench[i].head<3>()/*generate frame. endeffector origin*/);
   }
 
   feedForwardExternalWrench[2] = std::min(feedForwardExternalWrench[2], 0.5 * mass * gaitParam.g); // 鉛直上向きの外力が自重と比べて大きいと倒立振子近似が成り立たないので計算が破綻する. てきとうに自重の0.5倍まででリミットする
