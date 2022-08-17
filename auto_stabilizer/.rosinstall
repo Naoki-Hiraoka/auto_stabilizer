@@ -5,7 +5,7 @@
 - git:
     uri: https://github.com/fkanehiro/openhrp3
     local-name: openhrp3
-- git:
+- git: # hrpsysのidlがmasterと異なるため再ビルド必要
     uri: https://github.com/start-jsk/rtmros_common
     local-name: rtm-ros-robotics/rtmros_common
 - git:
@@ -30,3 +30,6 @@
 - git:
     uri: https://github.com/Naoki-Hiraoka/joint_limit_table
     local-name: joint_limit_table
+- git:
+    uri: https://github.com/start-jsk/rtmros_choreonoid
+    local-name: rtm-ros-robotics/rtmros_choreonoid

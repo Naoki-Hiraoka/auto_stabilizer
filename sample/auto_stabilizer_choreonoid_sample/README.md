@@ -1,5 +1,9 @@
+auto_stabilizer と auto_stabilizer_choreonoid_sampleの.rosinstallを使う. choreonoidにはrtmros_choreonoidのpatchをあてる.
+
 ```shell
 rtmlaunch auto_stabilizer_choreonoid_sample jaxon_jvrc_choreonoid.launch
+
+# rtmlaunch auto_stabilizer_choreonoid_sample jaxon_jvrc_choreonoid.launch ENVIRONMENT_YAML:=`rospack find vnoid_world`/sample/sample_field.yaml LOAD_OBJECTS:=true
 ```
 
 ```lisp

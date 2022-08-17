@@ -670,7 +670,6 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
 RTC::ReturnCode_t AutoStabilizer::onActivated(RTC::UniqueId ec_id){
   std::lock_guard<std::mutex> guard(this->mutex_);
   std::cerr << "[" << m_profile.instance_name << "] "<< "onActivated(" << ec_id << ")" << std::endl;
-  // 各種処理を初期化する TODO
   this->mode_.reset();
   return RTC::RTC_OK;
 }
