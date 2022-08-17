@@ -136,12 +136,14 @@ module OpenHRP
       sequence<sequence<double, 2>, 2> default_zmp_offsets;
       /// convex hull.
       sequence<sequence<sequence<double, 2> >, 2> leg_hull;
-      /// Foot position offset[m] (rleg and lleg)
-      sequence<sequence<double, 2>, 2> leg_default_translate_pos;
+      /// Foot position offset in Y axis[m] (rleg and lleg)
+      sequence<double, 2> leg_default_translate_pos;
 
       // RefToGenFrameConverter
       /// Flag for fix hand while walking.
       boolean is_hand_fix_mode;
+      /// reference frameのfootMidCoordsを計算するときに使うか
+      sequence<boolean, 2> ref_foot_origin_frame;
 
       // ExternalForceHandler
       /// Whether use disturbance compensation or not.

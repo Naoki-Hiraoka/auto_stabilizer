@@ -103,6 +103,8 @@ bool RefToGenFrameConverter::convertFrame(const cnoid::BodyPtr& refRobotRaw, con
     - refRobotRawの、refFootOriginWeightとdefaultTranslatePosとcopOffsetに基づいて求めた足裏中間座標 (イメージとしては静止状態の目標ZMP位置にdefaultTranslatePosを作用させたもの)
     - 位置はgenRobotの重心位置 - l. 姿勢はfootMidCoords. (ただしHandFixModeなら、位置のfootMidCoords座標系Y成分はfootMidCoordsの位置.)
       - handControlWeight = 0なら、位置も姿勢もfootMidCoords
+
+    startAutoBalancer直後の初回は、refRobotRawの重心位置とfootOriginのXY位置が異なる場合, refEEPoseが不連続に変化してしまう. startAutoBalancerのtransition_timeで補間してごまかす.
   */
 
   cnoid::Position refFootMidCoords = this->calcRefFootMidCoords(refRobot, gaitParam);

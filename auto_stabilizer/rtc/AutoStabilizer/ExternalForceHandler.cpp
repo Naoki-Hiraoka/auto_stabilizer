@@ -22,13 +22,15 @@ bool ExternalForceHandler::initExternalForceHandlerOutput(const GaitParam& gaitP
     feedForwardExternalWrench.tail<3>() += (eePose.translation() - origin).cross(eeWrench.head<3>());
   }
 
-  if(dz <= 0.0 || feedForwardExternalWrench[2] >= 0.0) { // 倒立振子近似が成り立たないので計算が破綻する.
+  if(dz <= 0.0) { // 倒立振子近似が成り立たないので計算が破綻する.
     o_omega = 1.0;
     o_l = cnoid::Vector3(0.0,0.0,1.0);
     o_sbpOffset.setZero();
     o_genCog = genRobot->centerOfMass();
     return false;
   }
+
+  feedForwardExternalWrench[2] = std::min(feedForwardExternalWrench[2], (0.5 - 1.0) * genRobot->mass() * gaitParam.g); // 鉛直上向きの外力が自重と比べて大きいと倒立振子近似が成り立たないので計算が破綻する. てきとうに自重の0.5倍まででリミットする
 
   cnoid::Vector3 genCog = genRobot->centerOfMass();
   genCog[0] = (-feedForwardExternalWrench[4] / feedForwardExternalWrench[2]);
@@ -43,12 +45,32 @@ bool ExternalForceHandler::initExternalForceHandlerOutput(const GaitParam& gaitP
 
 bool ExternalForceHandler::handleExternalForce(const GaitParam& gaitParam, double mass, const cnoid::BodyPtr& actRobot, bool useActState, double dt,
                                                double& o_omega, cnoid::Vector3& o_l, cnoid::Vector3& o_sbpOffset, cnoid::Vector3& o_actCog) const{
-  /*
-    genCog - lの位置まわりのトルクのXY成分が、脚以外の目標反力と重心に加わる重力の合計がゼロになればよいとする(厳密な力の釣り合いを考えるなら、全く正確ではないが...)
-    脚以外のエンドエフェクタは、RefToGenFrameConverterで、genCog - lの位置からの相対位置が変化しないように動く.(HandFixModeは考えない).
-    よって、脚以外の目標反力による今のgenCog - lの位置まわりのトルクを計算して、ゼロになっていないぶんだけ、COGのoffsetを動かしてやれば良い.
 
-    lやsbpOffsetは連続的に変化することが求められている. refEEPoseやrefEEWrenchが不連続に変化すると不連続に変化してしまうので注意. startAutoBalancer直後の初回は、refEEWrenchが非ゼロの場合に不連続に変化することは避けられない. startAutoBalancerのtransition_timeで補間してごまかす.
+  double omega;
+  cnoid::Vector3 l;
+  cnoid::Vector3 feedForwardSbpOffset;
+  this->handleFeedForwardExternalForce(gaitParam, mass,
+                                       omega, l, feedForwardSbpOffset);
+  cnoid::Vector3 feedBackSbpOffset;
+  this->handleFeedBackExternalForce(gaitParam, actRobot, useActState, dt, omega, feedForwardSbpOffset,
+                                    feedBackSbpOffset);
+
+  o_omega = omega;
+  o_l = l;
+  o_sbpOffset = feedForwardSbpOffset + feedBackSbpOffset;
+  o_actCog = actRobot->centerOfMass() - o_sbpOffset;
+  this->isInitial = false;
+  return true;
+}
+
+bool ExternalForceHandler::handleFeedForwardExternalForce(const GaitParam& gaitParam, double mass,
+                                                          double& o_omega, cnoid::Vector3& o_l, cnoid::Vector3& o_feedForwardSbpOffset) const{
+  /*
+    genCog - lの位置まわりのトルクのXY成分が、gaitParam.refEEPoseに加わる脚以外の目標反力とgenRobot->centerOfMass()に加わる重力の合計がゼロになればよいとする(厳密な力の釣り合いを考えるなら、いろいろツッコミどころがあるが...)
+    脚以外の目標反力による今のgenCog - lの位置まわりのトルクを計算して、ゼロになっていないぶんだけ、COGのoffsetを動かしてやれば良い.
+    脚以外のエンドエフェクタのrefEEPoseは、RefToGenFrameConverterが、HandFixModeで無い場合genCog - lの位置からの相対位置が変化しないように動かすので、歩行中でもoffsetの値は変化しない. 一方HandFixModeの場合,歩行中にgenCog - lの位置からの相対位置が変化するので、offsetの値が変動し、加速度が発生し歩行に影響を与える恐れがある. が、masterのhrpsysもそうなっていたので、実用上問題ないらしい.
+
+    lやsbpOffsetは連続的に変化することが求められている. refEEPoseやrefEEWrenchが不連続に変化すると不連続に変化してしまうので注意.
    */
 
   cnoid::Vector6 feedForwardExternalWrench = cnoid::Vector6::Zero(); // generate frame. genCog - lの位置origin.
@@ -59,79 +81,77 @@ bool ExternalForceHandler::handleExternalForce(const GaitParam& gaitParam, doubl
     feedForwardExternalWrench.tail<3>() += trans.cross(gaitParam.refEEWrench[i].head<3>()/*generate frame. endeffector origin*/);
   }
 
-  if(feedForwardExternalWrench[2] >= mass * gaitParam.g) { // 倒立振子近似が成り立たないので計算が破綻する. 前回の値をそのまま使う
-    return false;
-  }
+  feedForwardExternalWrench[2] = std::min(feedForwardExternalWrench[2], 0.5 * mass * gaitParam.g); // 鉛直上向きの外力が自重と比べて大きいと倒立振子近似が成り立たないので計算が破綻する. てきとうに自重の0.5倍まででリミットする
 
   double omega = std::sqrt((gaitParam.g-feedForwardExternalWrench[2]/mass) / gaitParam.refdz);
   cnoid::Vector3 l = cnoid::Vector3::Zero();
-  cnoid::Vector3 sbpOffset = cnoid::Vector3::Zero();
+  cnoid::Vector3 feedForwardSbpOffset = cnoid::Vector3::Zero();
   l[2] = gaitParam.refdz;
 
-  // フィードフォワード外乱補償
-  sbpOffset[0] = (-feedForwardExternalWrench[4] / (mass * gaitParam.g));
-  sbpOffset[1] = (feedForwardExternalWrench[3] / (mass * gaitParam.g));
+  feedForwardSbpOffset[0] = (-feedForwardExternalWrench[4] / (mass * gaitParam.g));
+  feedForwardSbpOffset[1] = (feedForwardExternalWrench[3] / (mass * gaitParam.g));
 
-  // 長期的外乱補償
-  {
-    cnoid::Vector3 actCP = actRobot->centerOfMass() + gaitParam.actCogVel.value() / omega; // generate frame. ここではsbpOffsetやlは考えない, 生の重心位置を用いる
-    cnoid::Vector3 actCPVel;
-    if(this->isInitial) actCPVel = cnoid::Vector3::Zero();
-    else actCPVel = (actCP - this->actCPPrev) / dt;
-    this->actCPPrev = actCP;
+  o_omega = omega;
+  o_l = l;
+  o_feedForwardSbpOffset = feedForwardSbpOffset;
 
-    cnoid::Vector3 targetOffset = cnoid::Vector3::Zero();
-    double timeConst = this->disturbanceCompensationTimeConst;
-    if(this->useDisturbanceCompensation && useActState){
-      if(!gaitParam.isStatic()) {// 非静止状態. (着地の衝撃が大きかったり、右脚と左脚とで誤差ののり方が反対向きになったりするので、一歩ごとに積算する) (逆に静止状態時に、適当に1[s]などで区切って一歩分の誤差として積算すると、BangBang的な挙動をしてしまう)
-        cnoid::Vector3 tmpOffset = cnoid::Vector3::Zero(); // 今の外乱の大きさ
-        tmpOffset.head<2>() = (actCP - actCPVel / omega - gaitParam.stTargetZmp).head<2>();
-        this->disturbance = (this->disturbance * this->disturbanceTime + tmpOffset * dt) / (this->disturbanceTime + dt);
-        this->disturbanceTime += dt;
-        if(this->disturbanceTime > 0.0 &&
-           (gaitParam.prevSupportPhase[RLEG] != gaitParam.footstepNodesList[0].isSupportPhase[RLEG] || gaitParam.prevSupportPhase[LLEG] != gaitParam.footstepNodesList[0].isSupportPhase[LLEG])){ // footStepNodesListの変わり目
-          this->disturbanceQueue.emplace_back(this->disturbance, this->disturbanceTime);
-          this->disturbance = cnoid::Vector3::Zero();
-          this->disturbanceTime = 0.0;
-          while(this->disturbanceQueue.size() > this->disturbanceCompensationStepNum) this->disturbanceQueue.pop_front();
-        }
-      } else { // 静止状態
-        cnoid::Vector3 tmpOffset = cnoid::Vector3::Zero(); // 今の外乱の大きさ. (ReferenceForceUpdator等の話になる. 安易に現在の誤差を積分すると不安定になるので、現状は何もしない)
-        disturbanceQueue = {std::pair<cnoid::Vector3, double>{tmpOffset,1.0}};
-        disturbance = cnoid::Vector3::Zero();
-        disturbanceTime = 0.0;
+  return true;
+}
+bool ExternalForceHandler::handleFeedBackExternalForce(const GaitParam& gaitParam, const cnoid::BodyPtr& actRobot, bool useActState, double dt, double omega, const cnoid::Vector3& feedForwardSbpOffset,
+                                                       cnoid::Vector3& o_feedBackSbpOffset) const{
+
+  cnoid::Vector3 actCP = actRobot->centerOfMass() + gaitParam.actCogVel.value() / omega; // generate frame. ここではsbpOffsetやlは考えない, 生の重心位置を用いる
+  cnoid::Vector3 actCPVel;
+  if(this->isInitial) actCPVel = cnoid::Vector3::Zero();
+  else actCPVel = (actCP - this->actCPPrev) / dt;
+  this->actCPPrev = actCP;
+
+  cnoid::Vector3 targetOffset = cnoid::Vector3::Zero();
+  double timeConst = this->disturbanceCompensationTimeConst;
+  if(this->useDisturbanceCompensation && useActState){
+    if(!gaitParam.isStatic()) {// 非静止状態. (着地の衝撃が大きかったり、右脚と左脚とで誤差ののり方が反対向きになったりするので、一歩ごとに積算する) (逆に静止状態時に、適当に1[s]などで区切って一歩分の誤差として積算すると、BangBang的な挙動をしてしまう)
+      cnoid::Vector3 tmpOffset = cnoid::Vector3::Zero(); // 今の外乱の大きさ
+      tmpOffset.head<2>() = (actCP - actCPVel / omega - gaitParam.stTargetZmp).head<2>();
+      this->disturbance = (this->disturbance * this->disturbanceTime + tmpOffset * dt) / (this->disturbanceTime + dt);
+      this->disturbanceTime += dt;
+      if(this->disturbanceTime > 0.0 &&
+         (gaitParam.prevSupportPhase[RLEG] != gaitParam.footstepNodesList[0].isSupportPhase[RLEG] || gaitParam.prevSupportPhase[LLEG] != gaitParam.footstepNodesList[0].isSupportPhase[LLEG])){ // footStepNodesListの変わり目
+        this->disturbanceQueue.emplace_back(this->disturbance, this->disturbanceTime);
+        this->disturbance = cnoid::Vector3::Zero();
+        this->disturbanceTime = 0.0;
+        while(this->disturbanceQueue.size() > this->disturbanceCompensationStepNum) this->disturbanceQueue.pop_front();
       }
-
-      double tm = 0;
-      for(std::list<std::pair<cnoid::Vector3, double> >::iterator it = this->disturbanceQueue.begin(); it != this->disturbanceQueue.end(); it++){
-        targetOffset += it->first * it->second;
-        tm += it->second;
-      }
-      targetOffset /= tm;
-      targetOffset -= sbpOffset; // フィードフォワード外乱補償では足りない分のみを扱う
-
-    }else{ // if(this->useDisturbanceCompensation && useActState)
-      disturbanceQueue = {std::pair<cnoid::Vector3, double>{cnoid::Vector3::Zero(),1.0}};
+    } else { // 静止状態
+      cnoid::Vector3 tmpOffset = cnoid::Vector3::Zero(); // 安易に現在の誤差を積分すると不安定になるので、現状は何もしない
+      disturbanceQueue = {std::pair<cnoid::Vector3, double>{tmpOffset,1.0}};
       disturbance = cnoid::Vector3::Zero();
       disturbanceTime = 0.0;
     }
 
-    cnoid::Vector3 offset = this->offsetPrev;
-    for(int i=0;i<2;i++){
-      double timeConst = this->disturbanceCompensationTimeConst;
-      if(std::abs(offset[i]) > std::abs(targetOffset[i])) timeConst *= 0.1; // 減る方向には速く
-      offset[i] += (targetOffset[i] - offset[i]) * dt / timeConst;
-      offset[i] = mathutil::clamp(offset[i], this->disturbanceCompensationLimit);
+    double tm = 0;
+    for(std::list<std::pair<cnoid::Vector3, double> >::iterator it = this->disturbanceQueue.begin(); it != this->disturbanceQueue.end(); it++){
+      targetOffset += it->first * it->second;
+      tm += it->second;
     }
-    offset[2] = 0.0;
-    sbpOffset += offset; // フィードフォワード外乱補償に足す
-    this->offsetPrev = offset;
+    targetOffset /= tm;
+    targetOffset -= feedForwardSbpOffset; // フィードフォワード外乱補償では足りない分のみを扱う
+
+  }else{ // if(this->useDisturbanceCompensation && useActState)
+    disturbanceQueue = {std::pair<cnoid::Vector3, double>{cnoid::Vector3::Zero(),1.0}};
+    disturbance = cnoid::Vector3::Zero();
+    disturbanceTime = 0.0;
   }
 
-  o_omega = omega;
-  o_l = l;
-  o_sbpOffset = sbpOffset;
-  o_actCog = actRobot->centerOfMass() - sbpOffset;
-  this->isInitial = false;
+  cnoid::Vector3 feedBackSbpOffset = this->feedBackSbpOffsetPrev;
+  for(int i=0;i<2;i++){
+    double timeConst = this->disturbanceCompensationTimeConst;
+    if(std::abs(feedBackSbpOffset[i]) > std::abs(targetOffset[i])) timeConst *= 0.1; // 減る方向には速く
+    feedBackSbpOffset[i] += (targetOffset[i] - feedBackSbpOffset[i]) * dt / timeConst;
+    feedBackSbpOffset[i] = mathutil::clamp(feedBackSbpOffset[i], this->disturbanceCompensationLimit);
+  }
+  feedBackSbpOffset[2] = 0.0;
+  this->feedBackSbpOffsetPrev = feedBackSbpOffset;
+
+  o_feedBackSbpOffset = feedBackSbpOffset;
   return true;
 }
