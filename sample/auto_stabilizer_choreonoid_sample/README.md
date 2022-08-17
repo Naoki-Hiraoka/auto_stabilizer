@@ -31,6 +31,11 @@ roseus
               (make-coords :pos (float-vector 0 100 0) :name :lleg)
               (make-coords :pos (float-vector 0 100 0) :name :lleg)
               (make-coords :pos (float-vector 0 100 0) :name :lleg)))
+(send *ri* :set-foot-steps-with-param
+        (list (make-coords :pos (float-vector 0 -100 0) :name :rleg)
+        (make-coords :pos (float-vector 0 100 50) :name :lleg))
+        (list 70 70)
+        (list 1.0 1.0) (list nil t))
 
 (send *ri* :start-impedance :arms)
 (send *ri* :stop-impedance :arms)
