@@ -186,8 +186,10 @@ module OpenHRP
       boolean modify_footsteps;
       /// overwritable min time[s]. 下限0.0[s]
       double overwritable_min_time;
-      /// overwritable max time[s]. 下限overwritable_min_time[s].
-      double overwritable_max_time;
+      /// overwritable min step time[s]. 下限0.0[s]
+      double overwritable_min_step_time;
+      /// overwritable max step time[s]. 下限overwritable_min_step_time[s].
+      double overwritable_max_step_time;
       /// 下限0.0[m/s].
       double overwritable_max_swing_velocity;
       /// convex hull. [s]

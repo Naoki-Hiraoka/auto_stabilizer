@@ -229,6 +229,7 @@ bool FootStepGenerator::advanceFootStepNodesList(const GaitParam& gaitParam, dou
   std::vector<cnoid::Position> srcCoords = gaitParam.srcCoords;
   std::vector<cnoid::Position> dstCoordsOrg = gaitParam.dstCoordsOrg;
   footstepNodesList[0].remainTime = std::max(0.0, footstepNodesList[0].remainTime - dt);
+  footstepNodesList[0].elapsedTime += dt;
   if(footstepNodesList[0].remainTime <= 0.0 && footstepNodesList.size() > 1){
     footstepNodesList.erase(footstepNodesList.begin()); // vectorではなくlistにするべき?
     for(int i=0;i<NUM_LEGS;i++) {
@@ -431,9 +432,12 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
     std::vector<double> samplingTimes;
     samplingTimes.push_back(footstepNodesList[0].remainTime);
     int sample = 10;
+    double minTime = std::max(this->overwritableMinTime, this->overwritableMinStepTime - footstepNodesList[0].elapsedTime); // 次indexまでの残り時間がthis->overwritableMinTimeを下回るようには着地時間修正を行わない. 現index開始時からの経過時間がthis->overwritableStepMinTimeを下回るようには着地時間修正を行わない.
+    minTime = std::min(minTime, footstepNodesList[0].remainTime); // もともと下回っている場合には、その値を下回るようには着地時刻修正を行わない.
+    double maxTime = std::max(this->overwritableMaxStepTime - footstepNodesList[0].elapsedTime, minTime); // 現index開始時からの経過時間がthis->overwritableStepMaxTimeを上回るようには着地時間修正を行わない.
+    maxTime = std::max(maxTime, footstepNodesList[0].remainTime); // もともと上回っている場合には、その値を上回るようには着地時刻修正を行わない.
     for(int i=0;i<=sample;i++) {
-      double minTime = std::min(this->overwritableMinTime, footstepNodesList[0].remainTime); // 次indexまでの残り時間がthis->overwritableMinTimeを下回るようには着地時間修正を行わない. もともと下回っている場合には、その値を下回るようには着地時刻修正を行わない.
-      double t = minTime + (this->overwritableMaxTime - minTime) / sample * i; // overwritableMaxTimeを上回ったりするようには着地時刻修正を行わない
+      double t = minTime + (maxTime - minTime) / sample * i;
       if(t != footstepNodesList[0].remainTime) samplingTimes.push_back(t);
     }
 
