@@ -40,9 +40,8 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
     std::vector<cnoid::Position> stepCoords{gaitParam.genCoords[RLEG].value(),gaitParam.genCoords[LLEG].value()}; // for文中の現在の脚の位置
     cnoid::Vector3 refZmp = refZmpTraj[0].getStart(); // for文中の現在のrefzmp
     refZmpTraj.clear();
+    // footstepNodesListのサイズが1, footstepNodesList[0].remainTimeが0のときに、copOffsetのパラメータが滑らかに変更になる場合がある. それに対応できるように
     for(int i=0;i<gaitParam.footstepNodesList.size();i++){
-      if(gaitParam.footstepNodesList[i].remainTime == 0) continue;
-
       // 跳躍についてはひとまず考えない TODO
       // if(!gaitParam.footstepNodesList[i].isSupportPhase[RLEG] && !gaitParam.footstepNodesList[i].isSupportPhase[LLEG])
 
@@ -51,7 +50,7 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
         cnoid::Position llegGoalCoords = gaitParam.footstepNodesList[i].dstCoords[LLEG]; // このfootstepNode終了時にdstCoordsに行くように線形補間
         cnoid::Vector3 zmpStartPos = llegStartCoords.translation() + llegStartCoords.linear()*gaitParam.copOffset[LLEG].value();
         cnoid::Vector3 zmpGoalPos = llegGoalCoords.translation() + llegGoalCoords.linear()*gaitParam.copOffset[LLEG].value();
-        refZmpTraj.push_back(footguidedcontroller::LinearTrajectory<cnoid::Vector3>(zmpStartPos,zmpGoalPos,gaitParam.footstepNodesList[i].remainTime));
+        refZmpTraj.push_back(footguidedcontroller::LinearTrajectory<cnoid::Vector3>(zmpStartPos,zmpGoalPos,std::max(gaitParam.footstepNodesList[i].remainTime, dt)));
         stepCoords[RLEG] = gaitParam.footstepNodesList[i].dstCoords[RLEG];
         stepCoords[LLEG] = llegGoalCoords;
         refZmp = zmpGoalPos;
@@ -60,7 +59,7 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
         cnoid::Position rlegGoalCoords = gaitParam.footstepNodesList[i].dstCoords[RLEG]; // このfootstepNode終了時にdstCoordsに行くように線形補間
         cnoid::Vector3 zmpStartPos = rlegStartCoords.translation() + rlegStartCoords.linear()*gaitParam.copOffset[RLEG].value();
         cnoid::Vector3 zmpGoalPos = rlegGoalCoords.translation() + rlegGoalCoords.linear()*gaitParam.copOffset[RLEG].value();
-        refZmpTraj.push_back(footguidedcontroller::LinearTrajectory<cnoid::Vector3>(zmpStartPos,zmpGoalPos,gaitParam.footstepNodesList[i].remainTime));
+        refZmpTraj.push_back(footguidedcontroller::LinearTrajectory<cnoid::Vector3>(zmpStartPos,zmpGoalPos,std::max(gaitParam.footstepNodesList[i].remainTime, dt)));
         stepCoords[RLEG] = rlegGoalCoords;
         stepCoords[LLEG] = gaitParam.footstepNodesList[i].dstCoords[LLEG];
         refZmp = zmpGoalPos;
@@ -82,7 +81,7 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
         }else{// 次は跳躍. TODO
           zmpGoalPos = 0.5 * rlegCOP + 0.5 * llegCOP;
         }
-        refZmpTraj.push_back(footguidedcontroller::LinearTrajectory<cnoid::Vector3>(zmpStartPos,zmpGoalPos,gaitParam.footstepNodesList[i].remainTime));
+        refZmpTraj.push_back(footguidedcontroller::LinearTrajectory<cnoid::Vector3>(zmpStartPos,zmpGoalPos,std::max(gaitParam.footstepNodesList[i].remainTime, dt)));
         stepCoords[RLEG] = rlegGoalCoords;
         stepCoords[LLEG] = llegGoalCoords;
         refZmp = zmpGoalPos;
