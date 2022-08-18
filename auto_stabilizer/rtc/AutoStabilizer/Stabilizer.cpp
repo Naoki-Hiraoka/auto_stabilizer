@@ -286,9 +286,9 @@ bool Stabilizer::calcDampingControl(double dt, const GaitParam& gaitParam, const
     wrenchError[LLEG].head<3>().setZero();
     wrenchError[LLEG][5] = 0.0;
   }else if(gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && gaitParam.footstepNodesList[0].isSupportPhase[LLEG]) {
-    double averageFzError = (wrenchError[RLEG][2] + wrenchError[LLEG][2]) / 2.0;
-    wrenchError[RLEG][2] -= averageFzError;
-    wrenchError[LLEG][2] -= averageFzError;
+    cnoid::Vector3 averageForceError = (wrenchError[RLEG].head<3>() + wrenchError[LLEG].head<3>()) / 2.0;
+    wrenchError[RLEG].head<3>() -= averageForceError;
+    wrenchError[LLEG].head<3>() -= averageForceError;
   }
 
   for(int i=0;i<NUM_LEGS;i++){ // ManualControlModeであれば行わない
@@ -311,10 +311,6 @@ bool Stabilizer::calcDampingControl(double dt, const GaitParam& gaitParam, const
     offsetPrevLocal.head<3>() = eeR.transpose() * offsetPrev.head<3>();
     offsetPrevLocal.tail<3>() = eeR.transpose() * offsetPrev.tail<3>();
 
-    cnoid::Vector6 dOffsetPrevLocal; //endEffector frame. endeffector origin
-    dOffsetPrevLocal.head<3>() = eeR.transpose() * dOffsetPrev.head<3>();
-    dOffsetPrevLocal.tail<3>() = eeR.transpose() * dOffsetPrev.tail<3>();
-
     cnoid::Vector6 dOffsetLocal; //endEffector frame. endeffector origin
     for(size_t j=0;j<6;j++){
       if(this->dampingGain[i][j] == 0.0 || this->dampingTimeConst[i][j] == 0.0){
@@ -322,14 +318,21 @@ bool Stabilizer::calcDampingControl(double dt, const GaitParam& gaitParam, const
         continue;
       }
 
-      dOffsetLocal[j] = (wrenchErrorLocal[j] / this->dampingGain[i][j] - offsetPrevLocal[j] / this->dampingTimeConst[i][j]) * dt;
+      double dampingGain = this->dampingGain[i][j];
+      if(gaitParam.isStatic()) dampingGain *= 4.0; // よく分からないが、旧auto_stabilizerがこういう仕様になっていた
+      dOffsetLocal[j] = (wrenchErrorLocal[j] / dampingGain - offsetPrevLocal[j] / this->dampingTimeConst[i][j]) * dt;
     }
 
     cnoid::Vector6 dOffset; //generate frame. endeffector origin
     dOffset.head<3>() = eeR * dOffsetLocal.head<3>();
     dOffset.tail<3>() = eeR * dOffsetLocal.tail<3>();
 
-    cnoid::Vector6 offset = offsetPrev + dOffset;
+    cnoid::Vector6 offset; //generate frame. endeffector origin
+    offset.head<3>() = offsetPrev.head<3>() + dOffset.head<3>();
+    Eigen::AngleAxisd offsetRPrev(offsetPrev.tail<3>().norm(), (offsetPrev.tail<3>().norm()==0)? cnoid::Vector3::UnitX() : offsetPrev.tail<3>().normalized());
+    Eigen::AngleAxisd dOffsetR(dOffset.tail<3>().norm(), (dOffset.tail<3>().norm()==0)? cnoid::Vector3::UnitX() : dOffset.tail<3>().normalized());
+    Eigen::AngleAxisd offsetR = Eigen::AngleAxisd(dOffsetR * offsetRPrev);
+    offset.tail<3>() = offsetR.axis() * offsetR.angle();
     offset = mathutil::clampMatrix<cnoid::Vector6>(offset, this->dampingCompensationLimit[i]);
     o_stEEOffsetDampingControl[i].reset(offset, dOffset/dt);
   }
@@ -341,7 +344,7 @@ bool Stabilizer::calcDampingControl(double dt, const GaitParam& gaitParam, const
 bool Stabilizer::calcSwingEEModification(double dt, const GaitParam& gaitParam,
                                          std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/) const{
   for(int i=0;i<NUM_LEGS;i++){
-    cnoid::Vector6 offset = o_stEEOffsetSwingEEModification[i].value();
+    cnoid::Vector6 offset = o_stEEOffsetSwingEEModification[i].value(); // generate frame. endeffector origin.
     offset -= offset.cwiseQuotient(this->springTimeConst[i]) * dt;
     if(!gaitParam.footstepNodesList[0].isSupportPhase[i]){
       if(gaitParam.isManualControlMode[i].getGoal() == 0.0){ // ManualControlModeであれば行わない
@@ -351,7 +354,12 @@ bool Stabilizer::calcSwingEEModification(double dt, const GaitParam& gaitParam,
         diff.tail<3>() = diffR.angle() * diffR.axis();
         cnoid::Vector6 dp = this->springGain[i].cwiseProduct(diff);
         dp = mathutil::clampMatrix(dp, this->springCompensationVelocityLimit[i]);
-        offset += dp * dt;
+        offset.head<3>() += dp.head<3>() * dt;
+        Eigen::AngleAxisd offsetRPrev(offset.tail<3>().norm(), (offset.tail<3>().norm()==0)? cnoid::Vector3::UnitX() : offset.tail<3>().normalized());
+        Eigen::AngleAxisd dOffsetR(dp.tail<3>().norm()*dt, (dp.tail<3>().norm()==0)? cnoid::Vector3::UnitX() : dp.tail<3>().normalized());
+        Eigen::AngleAxisd offsetR = Eigen::AngleAxisd(dOffsetR * offsetRPrev);
+        offset.tail<3>() = offsetR.axis() * offsetR.angle();
+
         offset = mathutil::clampMatrix(offset, this->springCompensationLimit[i]);
       }
     }

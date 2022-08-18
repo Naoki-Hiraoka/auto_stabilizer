@@ -79,7 +79,7 @@
    (send self :autostabilizerservice_waitFootSteps))
   (:set-auto-stabilizer-param
    (&rest args
-    &key default-zmp-offsets eefm-rot-damping-gain eefm-pos-damping-gain eefm-pos-time-const eefm-rot-time-const
+    &key default-zmp-offsets eefm-rot-damping-gain eefm-pos-damping-gain eefm-pos-time-const eefm-rot-time-const eefm-swing-pos-spring-gain eefm-swing-rot-spring-gain eefm-swing-pos-time-const eefm-swing-rot-time-const
     &allow-other-keys)
    "Set AutoStabilizer param.
     For arguments, please see (send *ri* :get-auto-stabilizer-param-arguments)."
@@ -106,6 +106,22 @@
                  (let ((tmp (send prm :eefm_rot_time_const)))
                    (setq (tmp . ros::_data) (apply #'concatenate float-vector eefm-rot-time-const))
                    (list :eefm-rot-time-const tmp)))
+             (if (and (memq :eefm-swing-pos-spring-gain args) eefm-swing-pos-spring-gain)
+                 (let ((tmp (send prm :eefm_swing_pos_spring_gain)))
+                   (setq (tmp . ros::_data) (apply #'concatenate float-vector eefm-swing-pos-spring-gain))
+                   (list :eefm-swing-pos-spring-gain tmp)))
+             (if (and (memq :eefm-swing-rot-spring-gain args) eefm-swing-rot-spring-gain)
+                 (let ((tmp (send prm :eefm_swing_rot_spring_gain)))
+                   (setq (tmp . ros::_data) (apply #'concatenate float-vector eefm-swing-rot-spring-gain))
+                   (list :eefm-swing-rot-spring-gain tmp)))
+             (if (and (memq :eefm-swing-pos-time-const args) eefm-swing-pos-time-const)
+                 (let ((tmp (send prm :eefm_swing_pos_time_const)))
+                   (setq (tmp . ros::_data) (apply #'concatenate float-vector eefm-swing-pos-time-const))
+                   (list :eefm-swing-pos-time-const tmp)))
+             (if (and (memq :eefm-swing-rot-time-const args) eefm-swing-rot-time-const)
+                 (let ((tmp (send prm :eefm_swing_rot_time_const)))
+                   (setq (tmp . ros::_data) (apply #'concatenate float-vector eefm-swing-rot-time-const))
+                   (list :eefm-swing-rot-time-const tmp)))
              args))))
   (:eus-footstep->abc-footstep
    (f)

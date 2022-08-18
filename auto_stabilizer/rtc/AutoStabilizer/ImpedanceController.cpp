@@ -59,7 +59,12 @@ bool ImpedanceController::calcImpedanceControl(double dt, const GaitParam& gaitP
     dOffset.head<3>() = eeR * dOffsetLocal.head<3>();
     dOffset.tail<3>() = eeR * dOffsetLocal.tail<3>();
 
-    cnoid::Vector6 offset = offsetPrev + dOffset;
+    cnoid::Vector6 offset;
+    offset.head<3>() = offsetPrev.head<3>() + dOffset.head<3>();
+    Eigen::AngleAxisd offsetRPrev(offsetPrev.tail<3>().norm(), (offsetPrev.tail<3>().norm()==0)? cnoid::Vector3::UnitX() : offsetPrev.tail<3>().normalized());
+    Eigen::AngleAxisd dOffsetR(dOffset.tail<3>().norm(), (dOffset.tail<3>().norm()==0)? cnoid::Vector3::UnitX() : dOffset.tail<3>().normalized());
+    Eigen::AngleAxisd offsetR = Eigen::AngleAxisd(dOffsetR * offsetRPrev);
+    offset.tail<3>() = offsetR.axis() * offsetR.angle();
     offset = mathutil::clampMatrix<cnoid::Vector6>(offset, this->compensationLimit[i]);
     o_icEEOffset[i].reset(offset, dOffset/dt);
   }
