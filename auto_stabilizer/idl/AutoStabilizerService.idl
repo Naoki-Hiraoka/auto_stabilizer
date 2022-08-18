@@ -184,9 +184,9 @@ module OpenHRP
       long go_velocity_step_num;
       /// Whether modify footsteps based on Capture Point
       boolean modify_footsteps;
-      /// overwritable min time[s]. 下限0.0[s]
+      /// overwritable min time[s]. 下限0.01[s]
       double overwritable_min_time;
-      /// overwritable min step time[s]. 下限0.0[s]
+      /// overwritable min step time[s]. 下限0.01[s]
       double overwritable_min_step_time;
       /// overwritable max step time[s]. 下限overwritable_min_step_time[s].
       double overwritable_max_step_time;

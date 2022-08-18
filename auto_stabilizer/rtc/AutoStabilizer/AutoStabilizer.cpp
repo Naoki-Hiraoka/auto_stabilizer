@@ -979,8 +979,8 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
   this->footStepGenerator_.defaultStepHeight = std::max(i_param.default_step_height, 0.0);
   this->footStepGenerator_.goVelocityStepNum = std::max(i_param.go_velocity_step_num, 1);
   this->footStepGenerator_.isModifyFootSteps = i_param.modify_footsteps;
-  this->footStepGenerator_.overwritableMinTime = std::max(i_param.overwritable_min_time, 0.0);
-  this->footStepGenerator_.overwritableMinStepTime = std::max(i_param.overwritable_min_step_time, 0.0);
+  this->footStepGenerator_.overwritableMinTime = std::max(i_param.overwritable_min_time, 0.01);
+  this->footStepGenerator_.overwritableMinStepTime = std::max(i_param.overwritable_min_step_time, 0.01);
   this->footStepGenerator_.overwritableMaxStepTime = std::max(i_param.overwritable_max_step_time, this->footStepGenerator_.overwritableMinStepTime);
   this->footStepGenerator_.overwritableMaxSwingVelocity = std::max(i_param.overwritable_max_swing_velocity, 0.0);
   if(i_param.safe_leg_hull.length() == NUM_LEGS){

@@ -53,10 +53,11 @@ public:
       各足につきそれぞれ、remainTime 後に dstCoordsに動く.
 
       footstepNodesList[0]のisSupportPhaseは、変更されない
-      footstepNodesList[0]のdstCoordsを変更する場合には、footstepNodesList[0]のremainTimeが小さい場合は延長した方が安全
-      footstepNodesList[0]のremainTimeを変更する場合には、小さい値に変更することは避けたほうが安全.
+      footstepNodesList[0]のdstCoordsを変更する場合には、footstepNodesList[0]のremainTimeの小ささに応じて変更量を小さくする. remainTimeがほぼゼロなら変更量もほぼゼロ.
       footstepNodesList[0]のremainTimeは、footstepNodesList[0]が片足支持期でfootstepNodesList[1]が両足支持期の場合に、突然0になる場合がある(footStepGeneratorのearlyTouchDown)
-      footstepNodesList[1]のisSupportPhaseを変更する場合には、footstepNodesList[0]のremainTimeが小さい場合はを延長した方が安全
+      それ以外には、footstepNodesList[0]のremainTimeが突然0になることはない
+      footstepNodesList[1]のisSupportPhaseは、footstepNodesListのサイズが1である場合を除いて変更されない.
+      両足支持期の次のstepのisSupportPhaseを変えたり、後ろに新たにfootstepNodesを追加する場合、必ず両足支持期のremainTimeをそれなりに長い時間にする(片足に重心やrefZmpを移す補間の時間のため)
     */
     std::vector<cnoid::Position> dstCoords = std::vector<cnoid::Position>(NUM_LEGS,cnoid::Position::Identity()); // 要素数2. rleg: 0. lleg: 1. generate frame.
     std::vector<bool> isSupportPhase = std::vector<bool>(NUM_LEGS, true); // 要素数2. rleg: 0. lleg: 1. footstepNodesListの末尾の要素が両方falseであることは無い
