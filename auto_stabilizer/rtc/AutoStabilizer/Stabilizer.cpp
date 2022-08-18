@@ -319,7 +319,7 @@ bool Stabilizer::calcDampingControl(double dt, const GaitParam& gaitParam, const
       }
 
       double dampingGain = this->dampingGain[i][j];
-      if(gaitParam.isStatic()) dampingGain *= 4.0; // よく分からないが、旧auto_stabilizerがこういう仕様になっていた
+      if(gaitParam.isStatic()) dampingGain *= 4.0; // 理由は不明だが、旧auto_stabilizerがこういう仕様になっていたので
       dOffsetLocal[j] = (wrenchErrorLocal[j] / dampingGain - offsetPrevLocal[j] / this->dampingTimeConst[i][j]) * dt;
     }
 
