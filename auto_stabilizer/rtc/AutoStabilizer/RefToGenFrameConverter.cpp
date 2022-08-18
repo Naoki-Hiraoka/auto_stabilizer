@@ -109,7 +109,6 @@ bool RefToGenFrameConverter::convertFrame(const cnoid::BodyPtr& refRobotRaw, con
 
   cnoid::Position refFootMidCoords = this->calcRefFootMidCoords(refRobot, gaitParam);
   double refdz = (refFootMidCoords.inverse() * refRobot->centerOfMass())[2]; // ref重心高さ
-  if(refdz <= 0.0) refdz = gaitParam.refdz; // 倒立振子近似が成り立たないので計算が破綻する. 前回の値をそのまま使う
   cnoid::Position genFootMidCoords;
   genFootMidCoords.linear() = footMidCoords.value().linear();
   genFootMidCoords.translation() = gaitParam.genCog - gaitParam.l; // 1周期前のlを使っているtが、lは不連続に変化するものではないので良い

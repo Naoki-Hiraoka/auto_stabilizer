@@ -26,21 +26,14 @@ bool ExternalForceHandler::initExternalForceHandlerOutput(const GaitParam& gaitP
     feedForwardExternalWrench.tail<3>() += (eePose.translation() - origin).cross(ratio * eeWrench.head<3>());
   }
 
-  if(dz <= 0.0) { // 倒立振子近似が成り立たないので計算が破綻する.
-    o_omega = 1.0;
-    o_l = cnoid::Vector3(0.0,0.0,1.0);
-    o_sbpOffset.setZero();
-    o_genCog = genRobot->centerOfMass();
-    return false;
-  }
-
   feedForwardExternalWrench[2] = std::min(feedForwardExternalWrench[2], (0.5 - 1.0) * genRobot->mass() * gaitParam.g); // 鉛直上向きの外力が自重と比べて大きいと倒立振子近似が成り立たないので計算が破綻する. てきとうに自重の0.5倍まででリミットする
 
   cnoid::Vector3 genCog = genRobot->centerOfMass();
   genCog[0] = (-feedForwardExternalWrench[4] / feedForwardExternalWrench[2]);
   genCog[1] = (feedForwardExternalWrench[3] / feedForwardExternalWrench[2]);
 
-  o_omega = std::sqrt((-feedForwardExternalWrench[2]/genRobot->mass()) / dz);
+  double dz_limited = std::max(dz, 0.1); // 倒立振子近似が成り立たないので計算が破綻する. omegaが小さいと計算が不安定になる. 10cm以上とする
+  o_omega = std::sqrt((-feedForwardExternalWrench[2]/genRobot->mass()) / dz_limited);
   o_l = cnoid::Vector3(0.0,0.0,dz);
   o_sbpOffset = genRobot->centerOfMass() - genCog;
   o_genCog = genCog;
@@ -91,7 +84,8 @@ bool ExternalForceHandler::handleFeedForwardExternalForce(const GaitParam& gaitP
 
   feedForwardExternalWrench[2] = std::min(feedForwardExternalWrench[2], 0.5 * mass * gaitParam.g); // 鉛直上向きの外力が自重と比べて大きいと倒立振子近似が成り立たないので計算が破綻する. てきとうに自重の0.5倍まででリミットする
 
-  double omega = std::sqrt((gaitParam.g-feedForwardExternalWrench[2]/mass) / gaitParam.refdz);
+  double dz_limited = std::max(gaitParam.refdz, 0.1); // 倒立振子近似が成り立たないので計算が破綻する. omegaが小さいと計算が不安定になる. 10cm以上とする
+  double omega = std::sqrt((gaitParam.g-feedForwardExternalWrench[2]/mass) / dz_limited);
   cnoid::Vector3 l = cnoid::Vector3::Zero();
   cnoid::Vector3 feedForwardSbpOffset = cnoid::Vector3::Zero();
   l[2] = gaitParam.refdz;
