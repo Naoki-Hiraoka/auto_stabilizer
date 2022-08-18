@@ -169,6 +169,14 @@ module OpenHRP
       /// StopImpedanceControllerのとき以外変更不可
       sequence<sequence<double, 3> > impedance_rot_compensation_limit;
 
+      // CmdVelGenerator
+      ///
+      boolean graspless_manip_mode;
+      /// 要素数0~2. endeffector名
+      sequence<string> graspless_manip_arm;
+      /// 下限0.01[s]
+      sequence<double, 3> graspless_manip_time_const;
+
       // FootStepGenerator
       /// Step time [s]. 下限0.01[s]
       double default_step_time;

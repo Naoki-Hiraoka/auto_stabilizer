@@ -29,7 +29,6 @@ public:
 
   // FootStepGeneratorでしか使わないパラメータ. startAutoBalancer時に初期化が必要
   bool isGoVelocityMode = false; // 進行方向に向けてfootStepNodesList[1] ~ footStepNodesList[goVelocityStepNum]の要素をfootstepNodesList[0]から機械的に計算してどんどん位置修正&末尾appendしていく.
-  cnoid::Vector3 cmdVel = cnoid::Vector3::Zero(); // X[m/s] Y[m/s] theta[rad/s]. Z軸はgenerate frame鉛直
 
   std::vector<std::vector<cnoid::Vector2> > steppable_region; // 要素数任意. generate frame. endCoordsが存在できる領域 TODO
   std::vector<double> steppable_height; // 要素数はsteppable_regionと同じ. generate frame. 各polygonごとのおおよその値. そのpolygonに届くかどうかの判定と、 TODO
@@ -42,7 +41,6 @@ public:
   // startAutoBalancer時に呼ばれる
   void reset(){
     isGoVelocityMode = false;
-    cmdVel = cnoid::Vector3::Zero();
     for(int i=0;i<NUM_LEGS;i++){
       actLegWrenchFilter[i].reset(cnoid::Vector6::Zero());
     }
@@ -121,7 +119,7 @@ public:
 
 protected:
   // footstepNodesList[1:]の着地位置(XYZ,yaw)をcmdVelに基づき更新する
-  void updateGoVelocitySteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >& defaultTranslatePos) const;
+  void updateGoVelocitySteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >& defaultTranslatePos, const cnoid::Vector3& cmdVel) const;
   // footstepNodesList[idx:] idxより先のstepの位置をtransformOrigin frameでtransformだけ動かす
   void transformFutureSteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, int index, const cnoid::Position& transformOrigin/*generate frame*/, const cnoid::Position& transform/*transformOrigin frame*/) const;
   // footstepNodesList[idx:] idxより先のstepの位置をgenerate frameでtransformだけ動かす

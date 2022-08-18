@@ -187,10 +187,10 @@ bool FootStepGenerator::calcFootSteps(const GaitParam& gaitParam, const double& 
   if(this->isGoVelocityMode){
     if(gaitParam.prevSupportPhase[RLEG] != gaitParam.footstepNodesList[0].isSupportPhase[RLEG] ||
        gaitParam.prevSupportPhase[LLEG] != gaitParam.footstepNodesList[0].isSupportPhase[LLEG]){ // footstepの切り替わりのタイミング. this->updateGoVelocityStepsを毎周期呼ぶと、数値誤差でだんだん変にずれてくるので.
-      this->updateGoVelocitySteps(footstepNodesList, gaitParam.defaultTranslatePos);
+      this->updateGoVelocitySteps(footstepNodesList, gaitParam.defaultTranslatePos, gaitParam.cmdVel);
     }
     while(footstepNodesList.size() < this->goVelocityStepNum){
-      this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos, this->cmdVel * this->defaultStepTime);
+      this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos, gaitParam.cmdVel * this->defaultStepTime);
     }
   }
 
@@ -246,13 +246,13 @@ bool FootStepGenerator::advanceFootStepNodesList(const GaitParam& gaitParam, dou
   return true;
 }
 
-void FootStepGenerator::updateGoVelocitySteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >& defaultTranslatePos) const{
+void FootStepGenerator::updateGoVelocitySteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >& defaultTranslatePos, const cnoid::Vector3& cmdVel) const{
   for(int i=1;i<footstepNodesList.size()-1;i++){
     if(((footstepNodesList[i].isSupportPhase[RLEG] && !footstepNodesList[i].isSupportPhase[LLEG]) || (!footstepNodesList[i].isSupportPhase[RLEG] && footstepNodesList[i].isSupportPhase[LLEG])) && // 今が片脚支持期
        (footstepNodesList[i+1].isSupportPhase[RLEG] && footstepNodesList[i+1].isSupportPhase[LLEG])){ // 次が両足支持期
       int swingLeg = footstepNodesList[i].isSupportPhase[RLEG] ? LLEG : RLEG;
       int supportLeg = (swingLeg == RLEG) ? LLEG : RLEG;
-      cnoid::Vector3 offset = this->cmdVel * (footstepNodesList[i].remainTime + footstepNodesList[i+1].remainTime);
+      cnoid::Vector3 offset = cmdVel * (footstepNodesList[i].remainTime + footstepNodesList[i+1].remainTime);
       cnoid::Position transform = cnoid::Position::Identity(); // supportLeg相対(Z軸は鉛直)での次のswingLegの位置
       transform.linear() = cnoid::Matrix3(Eigen::AngleAxisd(mathutil::clamp(offset[2],this->defaultStrideLimitationTheta), cnoid::Vector3::UnitZ()));
       transform.translation() = - defaultTranslatePos[supportLeg].value() + cnoid::Vector3(offset[0], offset[1], 0.0) + transform.linear() * defaultTranslatePos[swingLeg].value();

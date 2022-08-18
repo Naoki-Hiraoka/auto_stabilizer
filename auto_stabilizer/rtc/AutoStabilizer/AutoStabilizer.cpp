@@ -371,7 +371,7 @@ bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr
 }
 
 // static function
-bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobotRaw, cnoid::BodyPtr& refRobot, const cnoid::BodyPtr& actRobotRaw, cnoid::BodyPtr& actRobot, cnoid::BodyPtr& genRobot, cnoid::BodyPtr& actRobotTqc, GaitParam& gaitParam, double dt, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ActToGenFrameConverter& actToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer, const ExternalForceHandler& externalForceHandler, const FullbodyIKSolver& fullbodyIKSolver,const LegManualController& legManualController) {
+bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobotRaw, cnoid::BodyPtr& refRobot, const cnoid::BodyPtr& actRobotRaw, cnoid::BodyPtr& actRobot, cnoid::BodyPtr& genRobot, cnoid::BodyPtr& actRobotTqc, GaitParam& gaitParam, double dt, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ActToGenFrameConverter& actToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer, const ExternalForceHandler& externalForceHandler, const FullbodyIKSolver& fullbodyIKSolver,const LegManualController& legManualController, const CmdVelGenerator& cmdVelGenerator) {
   if(mode.isSyncToABCInit()){ // startAutoBalancer直後の初回. gaitParamのリセット
     refToGenFrameConverter.initGenRobot(refRobotRaw, gaitParam,
                                         genRobot, gaitParam.footMidCoords, gaitParam.genCogVel);
@@ -412,6 +412,10 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
   // Manual Control Modeの足の現在位置をreferenceで上書きする
   legManualController.legManualControl(gaitParam, dt,
                                        gaitParam.genCoords, gaitParam.footstepNodesList, gaitParam.isManualControlMode);
+
+  // CmdVelGenerator
+  cmdVelGenerator.calcCmdVel(gaitParam,
+                             gaitParam.cmdVel);
 
   // AutoBalancer
   footStepGenerator.calcFootSteps(gaitParam, dt, mode.isSTRunning(),
@@ -646,7 +650,7 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
       this->footStepGenerator_.reset();
       this->impedanceController_.reset();
     }
-    AutoStabilizer::execAutoStabilizer(this->mode_, this->refRobotRaw_, this->refRobot_, this->actRobotRaw_, this->actRobot_, this->genRobot_, this->actRobotTqc_, this->gaitParam_, this->dt_, this->footStepGenerator_, this->legCoordsGenerator_, this->refToGenFrameConverter_, this->actToGenFrameConverter_, this->impedanceController_, this->stabilizer_,this->externalForceHandler_, this->fullbodyIKSolver_, this->legManualController_);
+    AutoStabilizer::execAutoStabilizer(this->mode_, this->refRobotRaw_, this->refRobot_, this->actRobotRaw_, this->actRobot_, this->genRobot_, this->actRobotTqc_, this->gaitParam_, this->dt_, this->footStepGenerator_, this->legCoordsGenerator_, this->refToGenFrameConverter_, this->actToGenFrameConverter_, this->impedanceController_, this->stabilizer_,this->externalForceHandler_, this->fullbodyIKSolver_, this->legManualController_, this->cmdVelGenerator_);
   }
 
   AutoStabilizer::writeOutPortData(this->ports_, this->refRobotRaw_, this->genRobot_, this->actRobotTqc_, this->mode_, this->outputOffsetInterpolators_, this->dt_, this->gaitParam_);
@@ -680,10 +684,10 @@ bool AutoStabilizer::goPos(const double& x, const double& y, const double& th){
 bool AutoStabilizer::goVelocity(const double& vx, const double& vy, const double& vth){
   std::lock_guard<std::mutex> guard(this->mutex_);
   if(this->mode_.isABCRunning()){
+    this->cmdVelGenerator_.refCmdVel[0] = vx;
+    this->cmdVelGenerator_.refCmdVel[1] = vy;
+    this->cmdVelGenerator_.refCmdVel[2] = vth / 180.0 * M_PI;
     this->footStepGenerator_.isGoVelocityMode = true;
-    this->footStepGenerator_.cmdVel[0] = vx;
-    this->footStepGenerator_.cmdVel[1] = vy;
-    this->footStepGenerator_.cmdVel[2] = vth / 180.0 * M_PI;
     return true;
   }else{
     return false;
@@ -692,8 +696,8 @@ bool AutoStabilizer::goVelocity(const double& vx, const double& vy, const double
 bool AutoStabilizer::goStop(){
   std::lock_guard<std::mutex> guard(this->mutex_);
   if(this->mode_.isABCRunning()){
+    this->cmdVelGenerator_.refCmdVel.setZero();
     this->footStepGenerator_.isGoVelocityMode = false;
-    this->footStepGenerator_.cmdVel.setZero();
     this->footStepGenerator_.goStop(this->gaitParam_,
                                     this->gaitParam_.footstepNodesList);
     return true;
@@ -965,6 +969,25 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
     }
   }
 
+  this->cmdVelGenerator_.isGraspLessManipMode = i_param.graspless_manip_mode;
+  {
+    std::vector<double> grasplessManipArm;
+    for(int i=0;i<i_param.graspless_manip_arm.length();i++){
+      for(int j=0;j<this->gaitParam_.eeName.size();j++){
+        if(this->gaitParam_.eeName[j] == std::string(i_param.graspless_manip_arm[i])){
+          grasplessManipArm.push_back(j);
+          break;
+        }
+      }
+    }
+    if(grasplessManipArm.size() <= 2) this->cmdVelGenerator_.graspLessManipArm = grasplessManipArm;
+  }
+  if(i_param.graspless_manip_time_const.length() == 3){
+    for(int i=0;i<3;i++){
+      this->cmdVelGenerator_.graspLessManipTimeConst[i] = std::max(i_param.graspless_manip_time_const[i], 0.01);
+    }
+  }
+
   this->footStepGenerator_.defaultStepTime = std::max(i_param.default_step_time, 0.01);
   this->footStepGenerator_.defaultStrideLimitationTheta = std::max(i_param.default_stride_limitation_theta, 0.0);
   if(i_param.default_stride_limitation.length() == NUM_LEGS){
@@ -1188,6 +1211,16 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
       i_param.impedance_pos_compensation_limit[i][j] = this->impedanceController_.compensationLimit[i][j];
       i_param.impedance_rot_compensation_limit[i][j] = this->impedanceController_.compensationLimit[i][3+j];
     }
+  }
+
+  i_param.graspless_manip_mode = this->cmdVelGenerator_.isGraspLessManipMode;
+  i_param.graspless_manip_arm.length(this->cmdVelGenerator_.graspLessManipArm.size());
+  for(int i=0;i<this->cmdVelGenerator_.graspLessManipArm.size();i++){
+    i_param.graspless_manip_arm[i] = this->gaitParam_.eeName[this->cmdVelGenerator_.graspLessManipArm[i]].c_str();
+  }
+  i_param.graspless_manip_time_const.length(3);
+  for(int i=0;i<3;i++){
+    i_param.graspless_manip_time_const[i] = this->cmdVelGenerator_.graspLessManipTimeConst[i];
   }
 
   i_param.default_step_time = this->footStepGenerator_.defaultStepTime;
