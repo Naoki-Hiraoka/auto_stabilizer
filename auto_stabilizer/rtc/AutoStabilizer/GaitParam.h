@@ -57,7 +57,7 @@ public:
 
       footstepNodesList[0]のisSupportPhaseは、変更されない
       footstepNodesList[0]のdstCoordsを変更する場合には、footstepNodesList[0]のremainTimeの小ささに応じて変更量を小さくする. remainTimeがほぼゼロなら変更量もほぼゼロ.
-      footstepNodesList[0]のremainTimeは、footstepNodesList[0]が片足支持期でfootstepNodesList[1]が両足支持期の場合に、突然0になる場合がある(footStepGeneratorのearlyTouchDown)
+      footstepNodesList[0]は、!footstepNodesList[0].isSupportPhase && footstepNodesList[1].isSupportPhaseの足がある場合に、突然footstepNodesList[1]に遷移する場合がある(footStepGeneratorのearlyTouchDown)
       それ以外には、footstepNodesList[0]のremainTimeが突然0になることはない
       footstepNodesList[1]のisSupportPhaseは、footstepNodesListのサイズが1である場合を除いて変更されない.
       両足支持期の次のstepのisSupportPhaseを変えたり、後ろに新たにfootstepNodesを追加する場合、必ず両足支持期のremainTimeをそれなりに長い時間にする(片足に重心やrefZmpを移す補間の時間のため)

@@ -212,6 +212,10 @@ bool FootStepGenerator::calcFootSteps(const GaitParam& gaitParam, const double& 
 
 bool FootStepGenerator::advanceFootStepNodesList(const GaitParam& gaitParam, double dt, bool useActStates,
                                                  std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<cnoid::Position>& o_dstCoordsOrg, std::vector<bool>& o_prevSupportPhase) const{
+  // prevSupportPhaseを記録
+  std::vector<bool> prevSupportPhase(2);
+  for(int i=0;i<NUM_LEGS;i++) prevSupportPhase[i] = gaitParam.footstepNodesList[0].isSupportPhase[i];
+
   std::vector<GaitParam::FootStepNodes> footstepNodesList = gaitParam.footstepNodesList;
   std::vector<cnoid::Position> srcCoords = gaitParam.srcCoords;
   std::vector<cnoid::Position> dstCoordsOrg = gaitParam.dstCoordsOrg;
@@ -220,10 +224,6 @@ bool FootStepGenerator::advanceFootStepNodesList(const GaitParam& gaitParam, dou
     // 早づきしたらremainTimeにかかわらずすぐに次のnodeへ移る(remainTimeをdtにする). この機能が無いと少しでもロボットが傾いて早づきするとジャンプするような挙動になる.
     this->checkEarlyTouchDown(footstepNodesList, gaitParam, dt);
   }
-
-  // prevSupportPhaseを記録
-  std::vector<bool> prevSupportPhase(2);
-  for(int i=0;i<NUM_LEGS;i++) prevSupportPhase[i] = gaitParam.footstepNodesList[0].isSupportPhase[i];
 
   // footstepNodesListを進める
   footstepNodesList[0].remainTime = std::max(0.0, footstepNodesList[0].remainTime - dt);
