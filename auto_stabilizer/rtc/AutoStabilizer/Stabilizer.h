@@ -18,7 +18,7 @@ public:
 
   std::vector<cnoid::Vector6> springCompensationLimit = std::vector<cnoid::Vector6>(NUM_LEGS); // 要素数2. [rleg, lleg]. generate frame. endEffector origin. STが動いている間は変更されない. 0以上
   std::vector<cnoid::Vector6> springCompensationVelocityLimit = std::vector<cnoid::Vector6>(NUM_LEGS); // 要素数2. [rleg, lleg]. generate frame. endEffector origin. 0以上
-  std::vector<cnoid::Vector6> springGain = std::vector<cnoid::Vector6>(NUM_LEGS); // 要素数2. [rleg. lleg].  generate frame. endEffector origin. 0より大きい
+  std::vector<cnoid::Vector6> springGain = std::vector<cnoid::Vector6>(NUM_LEGS); // 要素数2. [rleg. lleg].  generate frame. endEffector origin. 0より大きい. (ない方が性能が良い)
   std::vector<cnoid::Vector6> springTimeConst = std::vector<cnoid::Vector6>(NUM_LEGS); // 要素数2. [rleg. lleg]. generate frame. endEffector origin. 単位は[s]. 0より大きい
 
   bool isTorqueControlMode = false; // falseなら位置制御のみ. この値はisSTRunning時には変更されない. trueにするなら事前にself.rh_svc.setServoTorqueGainPercentage("all",100)を呼んでおくこと. ここは今後の改良に期待. TODO
@@ -39,7 +39,8 @@ public:
 
       springCompensationLimit[i] << 0.05, 0.05, 0.05, 0.523599, 0.523599, 0.523599; // 0.523599rad = 30deg
       springCompensationVelocityLimit[i] << 0.05, 0.05, 0.05, 0.349066, 0.349066, 0.349066; // 0.349066rad/2 = 20deg/s
-      springGain[i] << 5.0, 5.0, 5.0, 5.0, 5.0, 5.0;
+      //springGain[i] << 5.0, 5.0, 5.0, 5.0, 5.0, 5.0;
+      springGain[i] << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
       springTimeConst[i] << 1.0, 1.0, 1.0, 1.0, 1.0, 1.0;
     }
   }
