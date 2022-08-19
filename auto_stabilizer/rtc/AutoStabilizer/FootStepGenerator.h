@@ -99,6 +99,10 @@ public:
   bool goStop(const GaitParam& gaitParam,
                     std::vector<GaitParam::FootStepNodes>& o_footstepNodesList) const;
 
+  // FootStepNodesListをdtすすめる
+  bool procFootStepNodesList(const GaitParam& gaitParam, const double& dt, bool useActState,
+                                std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<cnoid::Position>& o_dstCoordsOrg, std::vector<bool>& o_prevSupportPhase) const;
+
   /*
     footstepNodesList[1]開始時のsupport/swingの状態を上書きによって変更する場合は、footstepNodesList[0]の終了時の状態が両脚支持でかつその期間の時間がdefaultDoubleSupportTimeよりも短いなら延長する
 
@@ -112,13 +116,21 @@ public:
   bool calcFootSteps(const GaitParam& gaitParam, const double& dt, bool useActState,
                      std::vector<GaitParam::FootStepNodes>& o_footstepNodesList) const;
 
-  // footstepNodesListをdtだけ進める
-  bool advanceFootStepNodesList(const GaitParam& gaitParam, double dt, bool useActStates,
-                                std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<cnoid::Position>& o_dstCoordsOrg, std::vector<bool>& o_prevSupportPhase) const;
-
 protected:
+  // 早づきしたらremainTimeをdtに減らしてすぐに次のnodeへ移る. この機能が無いと少しでもロボットが傾いて早づきするとジャンプするような挙動になる.
+  void checkEarlyTouchDown(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const GaitParam& gaitParam, double dt) const;
+  // stableGoStop.
+  void checkStableGoStop(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const GaitParam& gaitParam) const;
+  // footstepNodesListをdtだけ進める
+  bool goNextFootStepNodesList(const GaitParam& gaitParam, double dt,
+                                std::vector<GaitParam::FootStepNodes>& footstepNodesList, std::vector<cnoid::Position>& srcCoords, std::vector<cnoid::Position>& dstCoordsOrg) const;
   // footstepNodesList[1:]の着地位置(XYZ,yaw)をcmdVelに基づき更新する
   void updateGoVelocitySteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >& defaultTranslatePos, const cnoid::Vector3& cmdVel) const;
+  // emergengy step.
+  void checkEmergencyStep(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const GaitParam& gaitParam) const;
+  // 着地位置・タイミング修正
+  void modifyFootSteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const GaitParam& gaitParam) const;
+
   // footstepNodesList[idx:] idxより先のstepの位置をgenerate frameで(左から)transformだけ動かす
   void transformFutureSteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, int index, const cnoid::Position& transform/*generate frame*/) const;
   // footstepNodesList[idx:] idxより先のstepの位置をgenerate frameでtransformだけ動かす
@@ -129,16 +141,7 @@ protected:
   void calcDefaultNextStep(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >& defaultTranslatePos, const cnoid::Vector3& offset = cnoid::Vector3::Zero() /*leg frame*/) const;
   // footstepNodesの次の一歩を作る.
   GaitParam::FootStepNodes calcDefaultSwingStep(const int& swingLeg, const GaitParam::FootStepNodes& footstepNodes, const std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >& defaultTranslatePos, const cnoid::Vector3& offset = cnoid::Vector3::Zero(), bool startWithSingleSupport = false) const;
-  GaitParam::FootStepNodes calcDefaultDoubleSupportStep(const GaitParam::FootStepNodes& footstepNodes) const;
   GaitParam::FootStepNodes calcDefaultDoubleSupportStep(const GaitParam::FootStepNodes& footstepNodes, double doubleSupportTime) const;
-  // 着地位置・タイミング修正
-  void modifyFootSteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const GaitParam& gaitParam) const;
-  // emergengy step.
-  void checkEmergencyStep(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const GaitParam& gaitParam) const;
-  // 早づきしたらremainTimeをdtに減らしてすぐに次のnodeへ移る. この機能が無いと少しでもロボットが傾いて早づきするとジャンプするような挙動になる.
-  void checkEarlyTouchDown(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const GaitParam& gaitParam, double dt) const;
-  // stableGoStop.
-  void checkStableGoStop(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const GaitParam& gaitParam) const;
 };
 
 #endif

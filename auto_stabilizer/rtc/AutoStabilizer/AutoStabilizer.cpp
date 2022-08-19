@@ -395,10 +395,6 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
   actToGenFrameConverter.convertFrame(actRobotRaw, gaitParam, dt,
                                       actRobot, gaitParam.actEEPose, gaitParam.actEEWrench, gaitParam.actCogVel);
 
-  // FootstepNodesListをdtすすめる.
-  footStepGenerator.advanceFootStepNodesList(gaitParam, dt, mode.isSTRunning(),// input
-                                             gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.dstCoordsOrg, gaitParam.prevSupportPhase); //output
-
   // 目標外力に応じてオフセットを計算する
   externalForceHandler.handleExternalForce(gaitParam, genRobot->mass(), actRobot, mode.isSTRunning(), dt,
                                            gaitParam.omega, gaitParam.l, gaitParam.sbpOffset, gaitParam.actCog);
@@ -422,6 +418,8 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
                              gaitParam.cmdVel);
 
   // AutoBalancer
+  footStepGenerator.procFootStepNodesList(gaitParam, dt, mode.isSTRunning(),
+                                          gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.dstCoordsOrg, gaitParam.prevSupportPhase);
   footStepGenerator.calcFootSteps(gaitParam, dt, mode.isSTRunning(),
                                   gaitParam.footstepNodesList);
   legCoordsGenerator.calcLegCoords(gaitParam, dt, mode.isSTRunning(),
