@@ -1034,6 +1034,7 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
   this->legCoordsGenerator_.touchVel = std::max(i_param.swing_trajectory_touch_vel, 0.001);
   this->legCoordsGenerator_.finalDistanceWeight = std::max(i_param.swing_trajectory_final_distance_weight, 0.01);
   if(!this->mode_.isABCRunning() || this->gaitParam_.isStatic()) this->legCoordsGenerator_.goalOffset = std::min(i_param.goal_offset, 0.0);
+  this->legCoordsGenerator_.previewStepNum = std::max(i_param.preview_step_num, 2);
   this->legCoordsGenerator_.footGuidedBalanceTime = std::max(i_param.footguided_balance_time, 0.01);
 
   if(i_param.eefm_body_attitude_control_gain.length() == 2 &&
@@ -1267,6 +1268,7 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
   i_param.swing_trajectory_touch_vel = this->legCoordsGenerator_.touchVel;
   i_param.swing_trajectory_final_distance_weight = this->legCoordsGenerator_.finalDistanceWeight;
   i_param.goal_offset = this->legCoordsGenerator_.goalOffset;
+  i_param.preview_step_num = this->legCoordsGenerator_.previewStepNum;
   i_param.footguided_balance_time = this->legCoordsGenerator_.footGuidedBalanceTime;
 
   i_param.eefm_body_attitude_control_gain.length(2);

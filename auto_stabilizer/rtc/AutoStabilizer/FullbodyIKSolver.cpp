@@ -98,7 +98,7 @@ bool FullbodyIKSolver::solveFullbodyIK(const cnoid::BodyPtr& refRobot, double dt
                                1e-6, // wn
                                0, //debug
                                dt,
-                               1e2 // we. 1e0だとやや不安定. 1e3だと大きすぎる
+                               1e0 // we. 1e0だとやや不安定. 1e3だと大きすぎる
                                );
 
   // limit joint angle by joint limit table

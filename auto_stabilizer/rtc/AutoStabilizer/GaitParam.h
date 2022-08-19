@@ -88,7 +88,7 @@ public:
   std::vector<cnoid::Position> abcEETargetPose; // 要素数と順序はeeNameと同じ.generate frame. abcで計算された目標位置姿勢
 
   // Stabilizer
-  cpp_filters::TwoPointInterpolator<cnoid::Vector3> stOffsetRootRpy = cpp_filters::TwoPointInterpolator<cnoid::Vector3>(cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::HOFFARBIB);; // gaitParam.footMidCoords座標系. stで計算された目標位置姿勢オフセット
+  cpp_filters::TwoPointInterpolator<cnoid::Vector3> stOffsetRootRpy = cpp_filters::TwoPointInterpolator<cnoid::Vector3>(cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::LINEAR);; // gaitParam.footMidCoords座標系. stで計算された目標位置姿勢オフセット
   cnoid::Position stTargetRootPose = cnoid::Position::Identity(); // generate frame
   std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> > stEEOffsetDampingControl; // 要素数と順序はeeNameと同じ.generate frame. endEffector origin. stで計算されるオフセット(Damping Control)
   std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> > stEEOffsetSwingEEModification; // 要素数と順序はeeNameと同じ.generate frame. endEffector origin. stで計算されるオフセット(SwingEEModification)

@@ -12,6 +12,7 @@ public:
   double finalDistanceWeight = 3.0; // 0より大きい. swing期のDOWN_PHASEの速さを、他のPHASEとくらべ何倍遅くするか. 着地時の衝撃をやわらげる
   double goalOffset = -0.05; // [m]. 遊脚軌道生成時に、次に着地する場合、generate frameで鉛直方向に, 目標着地位置に対して加えるオフセット. 0以下. 歩行中は急激に変更されない
 
+  int previewStepNum = 2; // 2以上. 着地位置修正アルゴリズムが1 step capturabilityに基づくものであるため、今の一歩より先のstepを予見して重心軌道を生成してしまうと破綻する. そのため、2がよい.
   double footGuidedBalanceTime = 0.4; // [s]. refZmpTrajの終端時間. 0より大きい. (1.0[s]だと大きすぎて, 両足で立っているときに傾いたまま戻ってこなかったり、少しずつ傾いていくことがある)
 public:
   void initLegCoords(const GaitParam& gaitParam,

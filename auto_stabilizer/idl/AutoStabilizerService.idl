@@ -224,6 +224,8 @@ module OpenHRP
       double swing_trajectory_final_distance_weight;
       /// [N]. 上限0.0. 歩行中は変更不可
       double goal_offset;
+      /// 下限2
+      long preview_step_num;
       /// [s]. 下限0.01[s]
       double footguided_balance_time;
 
