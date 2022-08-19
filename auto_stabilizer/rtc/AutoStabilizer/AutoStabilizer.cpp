@@ -426,36 +426,18 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
   }
 
   // Stabilizer
-  if(mode.isSTRunning()){
-    stabilizer.execStabilizer(refRobot, actRobot, genRobot, gaitParam, dt, genRobot->mass(),
-                              actRobotTqc, gaitParam.stOffsetRootRpy, gaitParam.stEEOffset, gaitParam.stTargetZmp, gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage);
-  }else{
-    gaitParam.stTargetZmp = gaitParam.refZmpTraj[0].getStart();
-    for(int i=0;i<actRobotTqc->numJoints();i++) actRobotTqc->joint(i)->u() = 0.0;
-    if(mode.isSyncToStopSTInit()){ // stopST直後の初回
-      gaitParam.stOffsetRootRpy.setGoal(cnoid::Vector3::Zero(),mode.remainTime());
-      for(int i=0;i<gaitParam.eeName.size();i++){
-        gaitParam.stEEOffset[i].setGoal(cnoid::Vector6::Zero(),mode.remainTime());
-      }
-      for(int i=0;i<genRobot->numJoints();i++){
-        if(gaitParam.stServoPGainPercentage[i].getGoal() != 100.0) gaitParam.stServoPGainPercentage[i].setGoal(100.0, mode.remainTime());
-        if(gaitParam.stServoDGainPercentage[i].getGoal() != 100.0) gaitParam.stServoDGainPercentage[i].setGoal(100.0, mode.remainTime());
-      }
+  if(mode.isSyncToStopSTInit()){ // stopST直後の初回
+    gaitParam.stOffsetRootRpy.setGoal(cnoid::Vector3::Zero(),mode.remainTime());
+    for(int i=0;i<NUM_LEGS;i++){
+      gaitParam.stEEOffset[i].setGoal(cnoid::Vector6::Zero(),mode.remainTime());
+    }
+    for(int i=0;i<genRobot->numJoints();i++){
+      if(gaitParam.stServoPGainPercentage[i].getGoal() != 100.0) gaitParam.stServoPGainPercentage[i].setGoal(100.0, mode.remainTime());
+      if(gaitParam.stServoDGainPercentage[i].getGoal() != 100.0) gaitParam.stServoDGainPercentage[i].setGoal(100.0, mode.remainTime());
     }
   }
-  gaitParam.stOffsetRootRpy.interpolate(dt);
-  gaitParam.stTargetRootPose.translation() = refRobot->rootLink()->p();
-  gaitParam.stTargetRootPose.linear() /*generate frame*/= gaitParam.footMidCoords.value().linear() * cnoid::rotFromRpy(gaitParam.stOffsetRootRpy.value()/*gaitParam.footMidCoords frame*/) * gaitParam.footMidCoords.value().linear().transpose() * refRobot->rootLink()->R()/*generate frame*/;
-  for(int i=0;i<gaitParam.eeName.size();i++){
-    gaitParam.stEEOffset[i].interpolate(dt);
-    cnoid::Vector6 stOffset = gaitParam.stEEOffset[i].value();
-    gaitParam.stEETargetPose[i].translation() = stOffset.head<3>() + gaitParam.abcEETargetPose[i].translation();
-    gaitParam.stEETargetPose[i].linear() = cnoid::AngleAxisd(stOffset.tail<3>().norm(),(stOffset.tail<3>().norm()>0)?stOffset.tail<3>().normalized() : cnoid::Vector3::UnitX()) * gaitParam.abcEETargetPose[i].linear();
-  }
-  for(int i=0;i<genRobot->numJoints();i++){
-    gaitParam.stServoPGainPercentage[i].interpolate(dt);
-    gaitParam.stServoDGainPercentage[i].interpolate(dt);
-  }
+  stabilizer.execStabilizer(refRobot, actRobot, genRobot, gaitParam, dt, genRobot->mass(), mode.isSTRunning(),
+                            actRobotTqc, gaitParam.stOffsetRootRpy, gaitParam.stTargetRootPose, gaitParam.stEEOffset, gaitParam.stEETargetPose, gaitParam.stTargetZmp, gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage);
 
   // FullbodyIKSolver
   fullbodyIKSolver.solveFullbodyIK(refRobot, dt, gaitParam,// input
