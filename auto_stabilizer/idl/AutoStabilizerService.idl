@@ -248,22 +248,6 @@ module OpenHRP
       sequence<double, 2> eefm_pos_compensation_limit;
       /// Sequence of all end-effector rot compensation limit [rad]. stabilierが動いているときは変更不可. 下限0.0
       sequence<double, 2> eefm_rot_compensation_limit;
-      /// Sequence of all swing leg end-effector rotation spring gain (r,p,y). 下限0.01
-      sequence<sequence<double, 3>, 2> eefm_swing_rot_spring_gain;
-      /// Sequence of all swing leg end-effector rotation spring time constant [s] (r,p,y). 下限0.01
-      sequence<sequence<double, 3>, 2 > eefm_swing_rot_time_const;
-      /// Sequence of all swing leg end-effector position spring gain (x,y,z). 下限0.01
-      sequence<sequence<double, 3>, 2 > eefm_swing_pos_spring_gain;
-      /// Sequence of all swing leg end-effector position spring time constant [s] (x,y,z). 下限0.01
-      sequence<sequence<double, 3>, 2 > eefm_swing_pos_time_const;
-      /// Sequence of all end-effector position compensation limit [m]. stabilierが動いているときは変更不可. 下限0.0
-      sequence<double, 2> eefm_swing_pos_spring_compensation_limit;
-      /// Sequence of all end-effector rot compensation limit [rad]. stabilierが動いているときは変更不可. 下限0.0
-      sequence<double, 2> eefm_swing_rot_spring_compensation_limit;
-      /// Sequence of all end-effector position compensation limit [m/s]. 下限0.0
-      sequence<double, 2> eefm_swing_pos_spring_velocity_limit;
-      /// Sequence of all end-effector rot compensation limit [rad/s]. 下限0.0
-      sequence<double, 2> eefm_swing_rot_spring_velocity_limit;
       ///
       boolean is_torque_control_mode;
       /// 下限0.01[s]

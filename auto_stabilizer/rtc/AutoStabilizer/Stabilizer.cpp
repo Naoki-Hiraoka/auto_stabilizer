@@ -5,11 +5,10 @@
 #include <cnoid/src/Body/InverseDynamics.h>
 
 void Stabilizer::initStabilizerOutput(const GaitParam& gaitParam,
-                                      cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/, cnoid::Vector3& o_stTargetZmp, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage) const{
+                                      cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/, cnoid::Vector3& o_stTargetZmp, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage) const{
 
   for(int i=0;i<gaitParam.eeName.size();i++){
     o_stEEOffsetDampingControl[i].reset(cnoid::Vector6::Zero());
-    o_stEEOffsetSwingEEModification[i].reset(cnoid::Vector6::Zero());
   }
   o_stOffsetRootRpy.reset(cnoid::Vector3::Zero());
   o_stTargetZmp = gaitParam.refZmpTraj[0].getStart();
@@ -20,12 +19,14 @@ void Stabilizer::initStabilizerOutput(const GaitParam& gaitParam,
 }
 
 bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobot, const cnoid::BodyPtr actRobot, const cnoid::BodyPtr genRobot, const GaitParam& gaitParam, double dt, double mass,
-                                cnoid::BodyPtr& actRobotTqc, cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/, cnoid::Vector3& o_stTargetZmp, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage) const{
+                                cnoid::BodyPtr& actRobotTqc, cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetDampingControl /*generate frame, endeffector origin*/, cnoid::Vector3& o_stTargetZmp, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage) const{
   // - root attitude control
   // - 現在のactual重心位置から、目標ZMPを計算
   // - 目標ZMPを満たすように目標足裏反力を計算
   // - 目標足裏反力を満たすようにDamping Control.
   // - 目標反力を満たすように重力補償+仮想仕事の原理
+
+  // masterのhrpsysではSwingEEModificationを行っていたが、地面についているときに、time_constでもとの位置に戻るまでの間、足と重心の相対位置が着地位置タイミング修正計算で用いるものとずれることによる着地位置修正パフォーマンスの低下のデメリットの方が大きいので、削除した
 
   // root attitude control
   this->moveBasePosRotForBodyRPYControl(refRobot, actRobot, dt, gaitParam, // input
@@ -44,10 +45,6 @@ bool Stabilizer::execStabilizer(const cnoid::BodyPtr refRobot, const cnoid::Body
   // 目標足裏反力を満たすようにDamping Control
   this->calcDampingControl(dt, gaitParam, tgtEEWrench, // input
                            o_stEEOffsetDampingControl); // output
-
-  // 目標遊脚位置を満たすように、SwingEEModification
-  this->calcSwingEEModification(dt, gaitParam, //input
-                                o_stEEOffsetSwingEEModification); //output
 
   if(this->isTorqueControlMode){
     // 目標反力を満たすように重力補償+仮想仕事の原理
@@ -338,33 +335,6 @@ bool Stabilizer::calcDampingControl(double dt, const GaitParam& gaitParam, const
   }
 
 
-  return true;
-}
-
-bool Stabilizer::calcSwingEEModification(double dt, const GaitParam& gaitParam,
-                                         std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffsetSwingEEModification /*generate frame, endeffector origin*/) const{
-  for(int i=0;i<NUM_LEGS;i++){
-    cnoid::Vector6 offset = o_stEEOffsetSwingEEModification[i].value(); // generate frame. endeffector origin.
-    offset -= offset.cwiseQuotient(this->springTimeConst[i]) * dt;
-    if(!gaitParam.footstepNodesList[0].isSupportPhase[i]){
-      if(gaitParam.isManualControlMode[i].getGoal() == 0.0){ // ManualControlModeであれば行わない
-        cnoid::Vector6 diff; // generage frame. endeffeector origin
-        diff.head<3>() = gaitParam.abcEETargetPose[i].translation() - gaitParam.actEEPose[i].translation();
-        Eigen::AngleAxisd diffR = Eigen::AngleAxisd(gaitParam.abcEETargetPose[i].linear() * gaitParam.actEEPose[i].linear().inverse());
-        diff.tail<3>() = diffR.angle() * diffR.axis();
-        cnoid::Vector6 dp = this->springGain[i].cwiseProduct(diff);
-        dp = mathutil::clampMatrix(dp, this->springCompensationVelocityLimit[i]);
-        offset.head<3>() += dp.head<3>() * dt;
-        Eigen::AngleAxisd offsetRPrev(offset.tail<3>().norm(), (offset.tail<3>().norm()==0)? cnoid::Vector3::UnitX() : offset.tail<3>().normalized());
-        Eigen::AngleAxisd dOffsetR(dp.tail<3>().norm()*dt, (dp.tail<3>().norm()==0)? cnoid::Vector3::UnitX() : dp.tail<3>().normalized());
-        Eigen::AngleAxisd offsetR = Eigen::AngleAxisd(dOffsetR * offsetRPrev);
-        offset.tail<3>() = offsetR.axis() * offsetR.angle();
-
-        offset = mathutil::clampMatrix(offset, this->springCompensationLimit[i]);
-      }
-    }
-    o_stEEOffsetSwingEEModification[i].reset(offset);
-  }
   return true;
 }
 
