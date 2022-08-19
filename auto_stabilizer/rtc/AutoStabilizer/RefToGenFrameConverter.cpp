@@ -2,15 +2,15 @@
 #include "CnoidBodyUtil.h"
 #include "MathUtil.h"
 
-bool RefToGenFrameConverter::initGenRobot(const cnoid::BodyPtr& refRobotRaw, const GaitParam& gaitParam, // input
-                                         cnoid::BodyPtr& genRobot, cpp_filters::TwoPointInterpolatorSE3& o_footMidCoords, cnoid::Vector3& o_genCogVel) const{ // output
-  genRobot->rootLink()->T() = refRobotRaw->rootLink()->T();
-  genRobot->rootLink()->v() = refRobotRaw->rootLink()->v();
-  genRobot->rootLink()->w() = refRobotRaw->rootLink()->w();
+bool RefToGenFrameConverter::initGenRobot(const GaitParam& gaitParam, // input
+                                          cnoid::BodyPtr& genRobot, cpp_filters::TwoPointInterpolatorSE3& o_footMidCoords, cnoid::Vector3& o_genCogVel) const{ // output
+  genRobot->rootLink()->T() = gaitParam.refRobotRaw->rootLink()->T();
+  genRobot->rootLink()->v() = gaitParam.refRobotRaw->rootLink()->v();
+  genRobot->rootLink()->w() = gaitParam.refRobotRaw->rootLink()->w();
   for(int i=0;i<genRobot->numJoints();i++){
-    genRobot->joint(i)->q() = refRobotRaw->joint(i)->q();
-    genRobot->joint(i)->dq() = refRobotRaw->joint(i)->dq();
-    genRobot->joint(i)->u() = refRobotRaw->joint(i)->u();
+    genRobot->joint(i)->q() = gaitParam.refRobotRaw->joint(i)->q();
+    genRobot->joint(i)->dq() = gaitParam.refRobotRaw->joint(i)->dq();
+    genRobot->joint(i)->u() = gaitParam.refRobotRaw->joint(i)->u();
   }
   genRobot->calcForwardKinematics();
   cnoid::Position refFootMidCoords = this->calcRefFootMidCoords(genRobot, gaitParam);
@@ -26,9 +26,9 @@ bool RefToGenFrameConverter::initGenRobot(const cnoid::BodyPtr& refRobotRaw, con
   return true;
 }
 
-bool RefToGenFrameConverter::convertFrame(const cnoid::BodyPtr& refRobotRaw, const GaitParam& gaitParam, double dt,// input
+bool RefToGenFrameConverter::convertFrame(const GaitParam& gaitParam, double dt,// input
                                           cnoid::BodyPtr& refRobot, std::vector<cnoid::Position>& o_refEEPose, std::vector<cnoid::Vector6>& o_refEEWrench, double& o_refdz, cpp_filters::TwoPointInterpolatorSE3& o_footMidCoords) const{ // output
-  cnoidbodyutil::copyRobotState(refRobotRaw, refRobot);
+  cnoidbodyutil::copyRobotState(gaitParam.refRobotRaw, refRobot);
 
   // footMidCoordsを進める
   cpp_filters::TwoPointInterpolatorSE3 footMidCoords = gaitParam.footMidCoords;

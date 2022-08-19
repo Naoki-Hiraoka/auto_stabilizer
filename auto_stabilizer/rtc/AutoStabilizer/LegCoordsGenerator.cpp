@@ -194,7 +194,7 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
   o_swingState = swingState;
 }
 
-void LegCoordsGenerator::calcCOMCoords(const GaitParam& gaitParam, double dt, double mass, cnoid::Vector3& o_genNextCog, cnoid::Vector3& o_genNextCogVel) const{
+void LegCoordsGenerator::calcCOMCoords(const GaitParam& gaitParam, double dt, cnoid::Vector3& o_genNextCog, cnoid::Vector3& o_genNextCogVel) const{
   cnoid::Vector3 genZmp;
   if(gaitParam.footstepNodesList[0].isSupportPhase[RLEG] || gaitParam.footstepNodesList[0].isSupportPhase[LLEG]){
     cnoid::Vector3 genDCM = gaitParam.genCog + gaitParam.genCogVel / gaitParam.omega;
@@ -225,7 +225,7 @@ void LegCoordsGenerator::calcCOMCoords(const GaitParam& gaitParam, double dt, do
     genZmp = gaitParam.genCog;
   }
   cnoid::Vector3 genNextCog,genNextCogVel,genNextForce;
-  footguidedcontroller::updateState(gaitParam.omega,gaitParam.l,gaitParam.genCog,gaitParam.genCogVel,genZmp,mass,dt,
+  footguidedcontroller::updateState(gaitParam.omega,gaitParam.l,gaitParam.genCog,gaitParam.genCogVel,genZmp,gaitParam.genRobot->mass(),dt,
                                     genNextCog, genNextCogVel, genNextForce);
   o_genNextCog = genNextCog;
   o_genNextCogVel = genNextCogVel;

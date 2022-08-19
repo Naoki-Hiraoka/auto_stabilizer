@@ -27,7 +27,7 @@ public:
     for(int i=0;i<genRobot->numJoints();i++) refJointAngleConstraint.push_back(std::make_shared<IK::JointAngleConstraint>());
   }
 
-  bool solveFullbodyIK(const cnoid::BodyPtr& refRobot, double dt, const GaitParam& gaitParam,
+  bool solveFullbodyIK(double dt, const GaitParam& gaitParam,
                        cnoid::BodyPtr& genRobot) const;
 };
 

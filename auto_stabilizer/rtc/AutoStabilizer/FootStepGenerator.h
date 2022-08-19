@@ -60,7 +60,7 @@ public:
   */
 public:
   // startAutoBalancer直後の初回で呼ばれる
-  bool initFootStepNodesList(const cnoid::BodyPtr& genRobot, const GaitParam& gaitParam,
+  bool initFootStepNodesList(const GaitParam& gaitParam,
                              std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<cnoid::Position>& o_dstCoordsOrg, std::vector<bool>& o_prevSupportPhase) const;
 
   class StepNode {

@@ -97,18 +97,18 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
       std::cerr << "\x1b[31m[" << this->m_profile.instance_name << "] " << "failed to load model[" << fileName << "]" << "\x1b[39m" << std::endl;
       return RTC::RTC_ERROR;
     }
-    this->refRobotRaw_ = robot;
-    this->refRobotRaw_->calcForwardKinematics(); this->refRobotRaw_->calcCenterOfMass();
-    this->refRobot_ = robot;
-    this->refRobot_->calcForwardKinematics(); this->refRobot_->calcCenterOfMass();
-    this->actRobotRaw_ = robot->clone();
-    this->actRobotRaw_->calcForwardKinematics(); this->actRobotRaw_->calcCenterOfMass();
-    this->actRobot_ = robot->clone();
-    this->actRobot_->calcForwardKinematics(); this->actRobot_->calcCenterOfMass();
-    this->genRobot_ = robot->clone();
-    this->genRobot_->calcForwardKinematics(); this->genRobot_->calcCenterOfMass();
-    this->actRobotTqc_ = robot->clone();
-    this->actRobotTqc_->calcForwardKinematics(); this->actRobotTqc_->calcCenterOfMass();
+    this->gaitParam_.refRobotRaw = robot;
+    this->gaitParam_.refRobotRaw->calcForwardKinematics(); this->gaitParam_.refRobotRaw->calcCenterOfMass();
+    this->gaitParam_.refRobot = robot;
+    this->gaitParam_.refRobot->calcForwardKinematics(); this->gaitParam_.refRobot->calcCenterOfMass();
+    this->gaitParam_.actRobotRaw = robot->clone();
+    this->gaitParam_.actRobotRaw->calcForwardKinematics(); this->gaitParam_.actRobotRaw->calcCenterOfMass();
+    this->gaitParam_.actRobot = robot->clone();
+    this->gaitParam_.actRobot->calcForwardKinematics(); this->gaitParam_.actRobot->calcCenterOfMass();
+    this->gaitParam_.genRobot = robot->clone();
+    this->gaitParam_.genRobot->calcForwardKinematics(); this->gaitParam_.genRobot->calcCenterOfMass();
+    this->gaitParam_.actRobotTqc = robot->clone();
+    this->gaitParam_.actRobotTqc->calcForwardKinematics(); this->gaitParam_.actRobotTqc->calcCenterOfMass();
   }
 
   {
@@ -138,7 +138,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
       // check validity
       name.erase(std::remove(name.begin(), name.end(), ' '), name.end()); // remove whitespace
       parentLink.erase(std::remove(name.begin(), name.end(), ' '), name.end()); // remove whitespace
-      if(!this->refRobotRaw_->link(parentLink)){
+      if(!this->gaitParam_.refRobotRaw->link(parentLink)){
         std::cerr << "\x1b[31m[" << this->m_profile.instance_name << "] " << " link [" << parentLink << "]" << " is not found for " << name << "\x1b[39m" << std::endl;
         return RTC::RTC_ERROR;
       }
@@ -155,17 +155,17 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
 
   // 0番目が右脚. 1番目が左脚. という仮定がある.
   if(this->gaitParam_.eeName.size() < NUM_LEGS || this->gaitParam_.eeName[RLEG] != "rleg" || this->gaitParam_.eeName[LLEG] != "lleg"){
-    std::cerr << "\x1b[31m[" << this->m_profile.instance_name << "] " << " this->gaitParam.eeName.size() < 2 || this->gaitParams.eeName[0] != \"rleg\" || this->gaitParam.eeName[1] != \"lleg\" not holds" << "\x1b[39m" << std::endl;
+    std::cerr << "\x1b[31m[" << this->m_profile.instance_name << "] " << " this->gaitParam_.eeName.size() < 2 || this->gaitParams.eeName[0] != \"rleg\" || this->gaitParam_.eeName[1] != \"lleg\" not holds" << "\x1b[39m" << std::endl;
     return RTC::RTC_ERROR;
   }
 
   {
     // generate LegParams
     // init-poseのとき両脚が同一平面上で, Y軸方向に横に並んでいるという仮定がある
-    cnoid::Position defautFootMidCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{cnoid::Position(this->refRobot_->link(this->gaitParam_.eeParentLink[RLEG])->T()*this->gaitParam_.eeLocalT[RLEG]),cnoid::Position(this->refRobot_->link(this->gaitParam_.eeParentLink[LLEG])->T()*this->gaitParam_.eeLocalT[LLEG])},
+    cnoid::Position defautFootMidCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{cnoid::Position(this->gaitParam_.refRobot->link(this->gaitParam_.eeParentLink[RLEG])->T()*this->gaitParam_.eeLocalT[RLEG]),cnoid::Position(this->gaitParam_.refRobot->link(this->gaitParam_.eeParentLink[LLEG])->T()*this->gaitParam_.eeLocalT[LLEG])},
                                                             std::vector<double>{1,1});
     for(int i=0; i<NUM_LEGS; i++){
-      cnoid::Position defaultPose = this->refRobot_->link(this->gaitParam_.eeParentLink[i])->T()*this->gaitParam_.eeLocalT[i];
+      cnoid::Position defaultPose = this->gaitParam_.refRobot->link(this->gaitParam_.eeParentLink[i])->T()*this->gaitParam_.eeLocalT[i];
       cnoid::Vector3 defaultTranslatePos = defautFootMidCoords.inverse() * defaultPose.translation();
       defaultTranslatePos[0] = 0.0;
       defaultTranslatePos[2] = 0.0;
@@ -175,18 +175,18 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
 
   {
     // generate JointParams
-    this->gaitParam_.maxTorque.resize(this->genRobot_->numJoints());
-    this->gaitParam_.jointControllable.resize(this->genRobot_->numJoints());
-    for(int i=0;i<this->genRobot_->numJoints();i++){
-      cnoid::LinkPtr joint = this->genRobot_->joint(i);
+    this->gaitParam_.maxTorque.resize(this->gaitParam_.genRobot->numJoints());
+    this->gaitParam_.jointControllable.resize(this->gaitParam_.genRobot->numJoints());
+    for(int i=0;i<this->gaitParam_.genRobot->numJoints();i++){
+      cnoid::LinkPtr joint = this->gaitParam_.genRobot->joint(i);
       double climit = 0.0, gearRatio = 0.0, torqueConst = 0.0;
       joint->info()->read("climit",climit); joint->info()->read("gearRatio",gearRatio); joint->info()->read("torqueConst",torqueConst);
       this->gaitParam_.maxTorque[i] = std::max(climit * gearRatio * torqueConst, 0.0);
       this->gaitParam_.jointControllable[i] = true;
     }
-    this->gaitParam_.jointLimitTables.resize(this->genRobot_->numJoints());
+    this->gaitParam_.jointLimitTables.resize(this->gaitParam_.genRobot->numJoints());
     std::string jointLimitTableStr; this->getProperty("joint_limit_table",jointLimitTableStr);
-    std::vector<std::shared_ptr<joint_limit_table::JointLimitTable> > jointLimitTables = joint_limit_table::readJointLimitTablesFromProperty (this->genRobot_, jointLimitTableStr);
+    std::vector<std::shared_ptr<joint_limit_table::JointLimitTable> > jointLimitTables = joint_limit_table::readJointLimitTablesFromProperty (this->gaitParam_.genRobot, jointLimitTableStr);
     for(size_t i=0;i<jointLimitTables.size();i++){
       // apply margin
       for(size_t j=0;j<jointLimitTables[i]->lLimitTable().size();j++){
@@ -199,8 +199,8 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
     }
 
     // apply margin to jointlimit
-    for(int i=0;i<this->genRobot_->numJoints();i++){
-      cnoid::LinkPtr joint = this->genRobot_->joint(i);
+    for(int i=0;i<this->gaitParam_.genRobot->numJoints();i++){
+      cnoid::LinkPtr joint = this->gaitParam_.genRobot->joint(i);
       if(joint->q_upper() - joint->q_lower() > 0.002){
         joint->setJointRange(joint->q_lower()+0.001,joint->q_upper()-0.001);
       }
@@ -211,17 +211,17 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
     }
 
     // init gaitParam
-    this->gaitParam_.init(this->genRobot_);
+    this->gaitParam_.init(this->gaitParam_.genRobot);
   }
 
   {
     // init ActToGenFrameConverter
     this->actToGenFrameConverter_.eeForceSensor.resize(this->gaitParam_.eeName.size());
-    cnoid::DeviceList<cnoid::ForceSensor> forceSensors(this->refRobotRaw_->devices());
+    cnoid::DeviceList<cnoid::ForceSensor> forceSensors(this->gaitParam_.refRobotRaw->devices());
     for(int i=0;i<this->gaitParam_.eeName.size();i++){
       // 各EndEffectorsから親リンク側に遡っていき、最初に見つかったForceSensorをEndEffectorに対応付ける. 以後、ForceSensorの値を座標変換したものがEndEffectorが受けている力とみなされる. 見つからなければ受けている力は常に0とみなされる
       std::string forceSensor = "";
-      cnoid::LinkPtr link = this->refRobotRaw_->link(this->gaitParam_.eeParentLink[i]);
+      cnoid::LinkPtr link = this->gaitParam_.refRobotRaw->link(this->gaitParam_.eeParentLink[i]);
       bool found = false;
       while (link != nullptr && found == false) {
         for (size_t j = 0; j < forceSensors.size(); j++) {
@@ -242,10 +242,10 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
   }
 
   // init Stabilizer
-  this->stabilizer_.init(this->gaitParam_, this->actRobotTqc_);
+  this->stabilizer_.init(this->gaitParam_, this->gaitParam_.actRobotTqc);
 
   // init FullbodyIKSolver
-  this->fullbodyIKSolver_.init(this->genRobot_, this->gaitParam_);
+  this->fullbodyIKSolver_.init(this->gaitParam_.genRobot, this->gaitParam_);
 
   {
     // add more ports (ロボットモデルやEndEffectorの情報を使って)
@@ -260,7 +260,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
     }
 
     // 各ForceSensorにつき、act<name>InというInportをつくる
-    cnoid::DeviceList<cnoid::ForceSensor> forceSensors(this->actRobotRaw_->devices());
+    cnoid::DeviceList<cnoid::ForceSensor> forceSensors(this->gaitParam_.actRobotRaw->devices());
     this->ports_.m_actWrenchIn_.resize(forceSensors.size());
     this->ports_.m_actWrench_.resize(forceSensors.size());
     for(int i=0;i<forceSensors.size();i++){
@@ -277,7 +277,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
 }
 
 // static function
-bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobotRaw, cnoid::BodyPtr actRobotRaw, GaitParam& gaitParam){
+bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobotRaw, cnoid::BodyPtr actRobotRaw, std::vector<cnoid::Vector6>& refEEWrenchOrigin){
   bool qRef_updated = false;
   if(ports.m_qRefIn_.isNew()){
     ports.m_qRefIn_.read();
@@ -318,7 +318,7 @@ bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr
       ports.m_refWrenchIn_[i]->read();
       if(ports.m_refWrench_[i].data.length() == 6){
         for(int j=0;j<6;j++){
-          if(std::isfinite(ports.m_refWrench_[i].data[j])) gaitParam.refEEWrenchOrigin[i][j] = ports.m_refWrench_[i].data[j];
+          if(std::isfinite(ports.m_refWrench_[i].data[j])) refEEWrenchOrigin[i][j] = ports.m_refWrench_[i].data[j];
         }
       }
     }
@@ -371,15 +371,15 @@ bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr
 }
 
 // static function
-bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode, const cnoid::BodyPtr& refRobotRaw, cnoid::BodyPtr& refRobot, const cnoid::BodyPtr& actRobotRaw, cnoid::BodyPtr& actRobot, cnoid::BodyPtr& genRobot, cnoid::BodyPtr& actRobotTqc, GaitParam& gaitParam, double dt, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ActToGenFrameConverter& actToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer, const ExternalForceHandler& externalForceHandler, const FullbodyIKSolver& fullbodyIKSolver,const LegManualController& legManualController, const CmdVelGenerator& cmdVelGenerator) {
+bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode, GaitParam& gaitParam, double dt, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ActToGenFrameConverter& actToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer, const ExternalForceHandler& externalForceHandler, const FullbodyIKSolver& fullbodyIKSolver,const LegManualController& legManualController, const CmdVelGenerator& cmdVelGenerator) {
   if(mode.isSyncToABCInit()){ // startAutoBalancer直後の初回. gaitParamのリセット
-    refToGenFrameConverter.initGenRobot(refRobotRaw, gaitParam,
-                                        genRobot, gaitParam.footMidCoords, gaitParam.genCogVel);
-    externalForceHandler.initExternalForceHandlerOutput(gaitParam, genRobot,
+    refToGenFrameConverter.initGenRobot(gaitParam,
+                                        gaitParam.genRobot, gaitParam.footMidCoords, gaitParam.genCogVel);
+    externalForceHandler.initExternalForceHandlerOutput(gaitParam,
                                                         gaitParam.omega, gaitParam.l, gaitParam.sbpOffset, gaitParam.genCog);
     impedanceController.initImpedanceOutput(gaitParam,
                                             gaitParam.icEEOffset);
-    footStepGenerator.initFootStepNodesList(genRobot, gaitParam,
+    footStepGenerator.initFootStepNodesList(gaitParam,
                                             gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.dstCoordsOrg, gaitParam.prevSupportPhase);
     legCoordsGenerator.initLegCoords(gaitParam,
                                      gaitParam.refZmpTraj, gaitParam.genCoords);
@@ -388,15 +388,15 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
   }
 
   // FootOrigin座標系を用いてrefRobotRawをgenerate frameに投影しrefRobotとする
-  refToGenFrameConverter.convertFrame(refRobotRaw, gaitParam, dt,
-                                      refRobot, gaitParam.refEEPose, gaitParam.refEEWrench, gaitParam.refdz, gaitParam.footMidCoords);
+  refToGenFrameConverter.convertFrame(gaitParam, dt,
+                                      gaitParam.refRobot, gaitParam.refEEPose, gaitParam.refEEWrench, gaitParam.refdz, gaitParam.footMidCoords);
 
   // FootOrigin座標系を用いてactRobotRawをgenerate frameに投影しactRobotとする
-  actToGenFrameConverter.convertFrame(actRobotRaw, gaitParam, dt,
-                                      actRobot, gaitParam.actEEPose, gaitParam.actEEWrench, gaitParam.actCogVel);
+  actToGenFrameConverter.convertFrame(gaitParam, dt,
+                                      gaitParam.actRobot, gaitParam.actEEPose, gaitParam.actEEWrench, gaitParam.actCogVel);
 
   // 目標外力に応じてオフセットを計算する
-  externalForceHandler.handleExternalForce(gaitParam, genRobot->mass(), actRobot, mode.isSTRunning(), dt,
+  externalForceHandler.handleExternalForce(gaitParam, mode.isSTRunning(), dt,
                                            gaitParam.omega, gaitParam.l, gaitParam.sbpOffset, gaitParam.actCog);
 
   // Impedance Controller
@@ -418,7 +418,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
                                   gaitParam.footstepNodesList);
   legCoordsGenerator.calcLegCoords(gaitParam, dt, mode.isSTRunning(),
                                    gaitParam.refZmpTraj, gaitParam.genCoords, gaitParam.footstepNodesList[0].swingState);
-  legCoordsGenerator.calcCOMCoords(gaitParam, dt, genRobot->mass(),
+  legCoordsGenerator.calcCOMCoords(gaitParam, dt,
                                    gaitParam.genCog, gaitParam.genCogVel);
   for(int i=0;i<gaitParam.eeName.size();i++){
     if(i<NUM_LEGS) gaitParam.abcEETargetPose[i] = gaitParam.genCoords[i].value();
@@ -431,58 +431,49 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
     for(int i=0;i<NUM_LEGS;i++){
       gaitParam.stEEOffset[i].setGoal(cnoid::Vector6::Zero(),mode.remainTime());
     }
-    for(int i=0;i<genRobot->numJoints();i++){
+    for(int i=0;i<gaitParam.genRobot->numJoints();i++){
       if(gaitParam.stServoPGainPercentage[i].getGoal() != 100.0) gaitParam.stServoPGainPercentage[i].setGoal(100.0, mode.remainTime());
       if(gaitParam.stServoDGainPercentage[i].getGoal() != 100.0) gaitParam.stServoDGainPercentage[i].setGoal(100.0, mode.remainTime());
     }
   }
-  stabilizer.execStabilizer(refRobot, actRobot, genRobot, gaitParam, dt, genRobot->mass(), mode.isSTRunning(),
-                            actRobotTqc, gaitParam.stOffsetRootRpy, gaitParam.stTargetRootPose, gaitParam.stEEOffset, gaitParam.stEETargetPose, gaitParam.stTargetZmp, gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage);
+  stabilizer.execStabilizer(gaitParam, dt, mode.isSTRunning(),
+                            gaitParam.actRobotTqc, gaitParam.stOffsetRootRpy, gaitParam.stTargetRootPose, gaitParam.stEEOffset, gaitParam.stEETargetPose, gaitParam.stTargetZmp, gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage);
 
   // FullbodyIKSolver
-  fullbodyIKSolver.solveFullbodyIK(refRobot, dt, gaitParam,// input
-                                   genRobot); // output
+  fullbodyIKSolver.solveFullbodyIK(dt, gaitParam,// input
+                                   gaitParam.genRobot); // output
 
   return true;
 }
 
 // static function
-bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const cnoid::BodyPtr& refRobotRaw, const cnoid::BodyPtr& genRobot, const cnoid::BodyPtr& actRobotTqc, const AutoStabilizer::ControlMode& mode, AutoStabilizer::OutputOffsetInterpolators& outputOffsetInterpolators, double dt, const GaitParam& gaitParam){
-  if(outputOffsetInterpolators.qInterpolator.size() == 0){ // 初回のみ
-    for(int i=0;i<genRobot->numJoints();i++){
-      outputOffsetInterpolators.qInterpolator.emplace_back(0.0,0.0,0.0,cpp_filters::HOFFARBIB);
-      outputOffsetInterpolators.genTauInterpolator.emplace_back(0.0,0.0,0.0,cpp_filters::HOFFARBIB);
-    }
-  }
-
+bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoStabilizer::ControlMode& mode, cpp_filters::TwoPointInterpolator<double>& idleToAbcTransitionInterpolator, double dt, const GaitParam& gaitParam){
   if(mode.isSyncToABC()){
     if(mode.isSyncToABCInit()){
-      outputOffsetInterpolators.transitionInterpolator.reset(0.0);
+      idleToAbcTransitionInterpolator.reset(0.0);
     }
-    outputOffsetInterpolators.transitionInterpolator.setGoal(1.0,mode.remainTime());
-    outputOffsetInterpolators.transitionInterpolator.interpolate(dt);
+    idleToAbcTransitionInterpolator.setGoal(1.0,mode.remainTime());
+    idleToAbcTransitionInterpolator.interpolate(dt);
+  }else if(mode.isSyncToIdle()){
+    if(mode.isSyncToIdleInit()){
+      idleToAbcTransitionInterpolator.reset(1.0);
+    }
+    idleToAbcTransitionInterpolator.setGoal(0.0,mode.remainTime());
+    idleToAbcTransitionInterpolator.interpolate(dt);
   }
 
   {
     // q
     ports.m_q_.tm = ports.m_qRef_.tm;
-    ports.m_q_.data.length(genRobot->numJoints());
-    for(int i=0;i<genRobot->numJoints();i++){
+    ports.m_q_.data.length(gaitParam.genRobot->numJoints());
+    for(int i=0;i<gaitParam.genRobot->numJoints();i++){
       if(mode.now() == AutoStabilizer::ControlMode::MODE_IDLE || !gaitParam.jointControllable[i]){
-        ports.m_q_.data[i] = refRobotRaw->joint(i)->q();
-      }else if(mode.isSyncToABC()){
-        double ratio = outputOffsetInterpolators.transitionInterpolator.value();
-        ports.m_q_.data[i] = refRobotRaw->joint(i)->q() * (1.0 - ratio) + genRobot->joint(i)->q() * ratio;
-      }else if(mode.isSyncToIdle()){
-        if(mode.isSyncToIdleInit()){
-          outputOffsetInterpolators.qInterpolator[i].reset(ports.m_q_.data[i]-refRobotRaw->joint(i)->q());
-        }
-        outputOffsetInterpolators.qInterpolator[i].setGoal(0.0,mode.remainTime());
-        double x,v,a;
-        outputOffsetInterpolators.qInterpolator[i].get(x,v,a,dt);
-        ports.m_q_.data[i] = refRobotRaw->joint(i)->q() + x;
+        ports.m_q_.data[i] = gaitParam.refRobotRaw->joint(i)->q();
+      }else if(mode.isSyncToABC() || mode.isSyncToIdle()){
+        double ratio = idleToAbcTransitionInterpolator.value();
+        ports.m_q_.data[i] = gaitParam.refRobotRaw->joint(i)->q() * (1.0 - ratio) + gaitParam.genRobot->joint(i)->q() * ratio;
       }else{
-        ports.m_q_.data[i] = genRobot->joint(i)->q();
+        ports.m_q_.data[i] = gaitParam.genRobot->joint(i)->q();
       }
     }
     ports.m_qOut_.write();
@@ -491,23 +482,15 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const cnoid:
   {
     // tau
     ports.m_genTau_.tm = ports.m_qRef_.tm;
-    ports.m_genTau_.data.length(actRobotTqc->numJoints());
-    for(int i=0;i<actRobotTqc->numJoints();i++){
+    ports.m_genTau_.data.length(gaitParam.actRobotTqc->numJoints());
+    for(int i=0;i<gaitParam.actRobotTqc->numJoints();i++){
       if(mode.now() == AutoStabilizer::ControlMode::MODE_IDLE || !gaitParam.jointControllable[i]){
-        ports.m_genTau_.data[i] = refRobotRaw->joint(i)->u();
-      }else if(mode.isSyncToABC()){
-        double ratio = outputOffsetInterpolators.transitionInterpolator.value();
-        ports.m_genTau_.data[i] = refRobotRaw->joint(i)->u() * (1.0 - ratio) + actRobotTqc->joint(i)->u() * ratio;
-      }else if(mode.isSyncToIdle()){
-        if(mode.isSyncToIdleInit()){
-          outputOffsetInterpolators.genTauInterpolator[i].reset(ports.m_genTau_.data[i]-refRobotRaw->joint(i)->u());
-        }
-        outputOffsetInterpolators.genTauInterpolator[i].setGoal(0.0,mode.remainTime());
-        double x,v,a;
-        outputOffsetInterpolators.genTauInterpolator[i].get(x,v,a,dt);
-        ports.m_genTau_.data[i] = refRobotRaw->joint(i)->u() + x;
+        ports.m_genTau_.data[i] = gaitParam.refRobotRaw->joint(i)->u();
+      }else if(mode.isSyncToABC() || mode.isSyncToIdle()){
+        double ratio = idleToAbcTransitionInterpolator.value();
+        ports.m_genTau_.data[i] = gaitParam.refRobotRaw->joint(i)->u() * (1.0 - ratio) + gaitParam.actRobotTqc->joint(i)->u() * ratio;
       }else{
-        ports.m_genTau_.data[i] = actRobotTqc->joint(i)->u();
+        ports.m_genTau_.data[i] = gaitParam.actRobotTqc->joint(i)->u();
       }
     }
     ports.m_genTauOut_.write();
@@ -517,24 +500,13 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const cnoid:
     // basePose
     cnoid::Position basePose;
     if(mode.now() == AutoStabilizer::ControlMode::MODE_IDLE){
-      basePose = refRobotRaw->rootLink()->T();
-    }else if(mode.isSyncToABC()){
-      double ratio = outputOffsetInterpolators.transitionInterpolator.value();
-      basePose = mathutil::calcMidCoords(std::vector<cnoid::Position>{refRobotRaw->rootLink()->T(), genRobot->rootLink()->T()},
+      basePose = gaitParam.refRobotRaw->rootLink()->T();
+    }else if(mode.isSyncToABC() || mode.isSyncToIdle()){
+      double ratio = idleToAbcTransitionInterpolator.value();
+      basePose = mathutil::calcMidCoords(std::vector<cnoid::Position>{gaitParam.refRobotRaw->rootLink()->T(), gaitParam.genRobot->rootLink()->T()},
                                          std::vector<double>{1.0 - ratio, ratio});
-    }else if(mode.isSyncToIdle()){
-      if(mode.isSyncToIdleInit()){
-        cnoid::Position prevPose;
-        prevPose.translation()= cnoid::Vector3(ports.m_genBasePose_.data.position.x,ports.m_genBasePose_.data.position.x,ports.m_genBasePose_.data.position.x);
-        prevPose.linear() = cnoid::rotFromRpy(ports.m_genBasePose_.data.orientation.r, ports.m_genBasePose_.data.orientation.p, ports.m_genBasePose_.data.orientation.y);
-        outputOffsetInterpolators.genBasePoseInterpolator.reset(prevPose * refRobotRaw->rootLink()->T().inverse());
-      }
-      outputOffsetInterpolators.genBasePoseInterpolator.setGoal(cnoid::Position::Identity(),mode.remainTime());
-      outputOffsetInterpolators.genBasePoseInterpolator.interpolate(dt);
-      cnoid::Position offsetPose = outputOffsetInterpolators.genBasePoseInterpolator.value();
-      basePose = offsetPose * refRobotRaw->rootLink()->T();
     }else{
-      basePose = genRobot->rootLink()->T();
+      basePose = gaitParam.genRobot->rootLink()->T();
     }
     cnoid::Vector3 basePos = basePose.translation();
     cnoid::Matrix3 baseR = basePose.linear();
@@ -576,7 +548,7 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const cnoid:
   // Gains
   if(!CORBA::is_nil(ports.m_robotHardwareService0_._ptr()) && //コンシューマにプロバイダのオブジェクト参照がセットされていない(接続されていない)状態
      !ports.m_robotHardwareService0_->_non_existent()){ //プロバイダのオブジェクト参照は割り当てられているが、相手のオブジェクトが非活性化 (RTC は Inactive 状態) になっている状態
-    for(int i=0;i<genRobot->numJoints();i++){
+    for(int i=0;i<gaitParam.genRobot->numJoints();i++){
       if(mode.now() == AutoStabilizer::ControlMode::MODE_IDLE || !gaitParam.jointControllable[i]){
         // pass
       }else if(mode.isSyncToABC()){
@@ -586,10 +558,10 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const cnoid:
       }else{
         // Stabilizerが動いている間にonDeactivated()->onActivated()が呼ばれると、ゲインがもとに戻らない. onDeactivated()->onActivated()が呼ばれるのはサーボオン直前で、通常、サーボオン時にゲインを指令するので、問題ない.
         if(gaitParam.stServoPGainPercentage[i].remain_time() > 0.0 && gaitParam.stServoPGainPercentage[i].current_time() <= dt) { // 補間が始まった初回
-          ports.m_robotHardwareService0_->setServoPGainPercentageWithTime(actRobotTqc->joint(i)->name().c_str(),gaitParam.stServoPGainPercentage[i].getGoal(),gaitParam.stServoPGainPercentage[i].goal_time());
+          ports.m_robotHardwareService0_->setServoPGainPercentageWithTime(gaitParam.actRobotTqc->joint(i)->name().c_str(),gaitParam.stServoPGainPercentage[i].getGoal(),gaitParam.stServoPGainPercentage[i].goal_time());
         }
         if(gaitParam.stServoDGainPercentage[i].remain_time() > 0.0 && gaitParam.stServoDGainPercentage[i].current_time() <= dt) { // 補間が始まった初回
-          ports.m_robotHardwareService0_->setServoDGainPercentageWithTime(actRobotTqc->joint(i)->name().c_str(),gaitParam.stServoDGainPercentage[i].getGoal(),gaitParam.stServoDGainPercentage[i].goal_time());
+          ports.m_robotHardwareService0_->setServoDGainPercentageWithTime(gaitParam.actRobotTqc->joint(i)->name().c_str(),gaitParam.stServoDGainPercentage[i].getGoal(),gaitParam.stServoDGainPercentage[i].goal_time());
         }
       }
     }
@@ -604,7 +576,7 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
   std::string instance_name = std::string(this->m_profile.instance_name);
   this->loop_++;
 
-  if(!AutoStabilizer::readInPortData(this->ports_, this->refRobotRaw_, this->actRobotRaw_, this->gaitParam_)) return RTC::RTC_OK;  // qRef が届かなければ何もしない
+  if(!AutoStabilizer::readInPortData(this->ports_, this->gaitParam_.refRobotRaw, this->gaitParam_.actRobotRaw, this->gaitParam_.refEEWrenchOrigin)) return RTC::RTC_OK;  // qRef が届かなければ何もしない
 
   this->mode_.update(this->dt_);
   this->gaitParam_.update(this->dt_);
@@ -619,10 +591,10 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
       this->footStepGenerator_.reset();
       this->impedanceController_.reset();
     }
-    AutoStabilizer::execAutoStabilizer(this->mode_, this->refRobotRaw_, this->refRobot_, this->actRobotRaw_, this->actRobot_, this->genRobot_, this->actRobotTqc_, this->gaitParam_, this->dt_, this->footStepGenerator_, this->legCoordsGenerator_, this->refToGenFrameConverter_, this->actToGenFrameConverter_, this->impedanceController_, this->stabilizer_,this->externalForceHandler_, this->fullbodyIKSolver_, this->legManualController_, this->cmdVelGenerator_);
+    AutoStabilizer::execAutoStabilizer(this->mode_, this->gaitParam_, this->dt_, this->footStepGenerator_, this->legCoordsGenerator_, this->refToGenFrameConverter_, this->actToGenFrameConverter_, this->impedanceController_, this->stabilizer_,this->externalForceHandler_, this->fullbodyIKSolver_, this->legManualController_, this->cmdVelGenerator_);
   }
 
-  AutoStabilizer::writeOutPortData(this->ports_, this->refRobotRaw_, this->genRobot_, this->actRobotTqc_, this->mode_, this->outputOffsetInterpolators_, this->dt_, this->gaitParam_);
+  AutoStabilizer::writeOutPortData(this->ports_, this->mode_, this->idleToAbcTransitionInterpolator_, this->dt_, this->gaitParam_);
 
   return RTC::RTC_OK;
 }
@@ -826,7 +798,7 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
   if(this->mode_.now() == ControlMode::MODE_IDLE){
     for(int i=0;i<this->gaitParam_.jointControllable.size();i++) this->gaitParam_.jointControllable[i] = false;
     for(int i=0;i<i_param.controllable_joints.length();i++){
-      cnoid::LinkPtr joint = this->genRobot_->link(std::string(i_param.controllable_joints[i]));
+      cnoid::LinkPtr joint = this->gaitParam_.genRobot->link(std::string(i_param.controllable_joints[i]));
       if(joint) this->gaitParam_.jointControllable[joint->jointId()] = true;
     }
   }
@@ -1077,7 +1049,7 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
   std::lock_guard<std::mutex> guard(this->mutex_);
 
   std::vector<std::string> controllable_joints;
-  for(int i=0;i<this->gaitParam_.jointControllable.size();i++) if(this->gaitParam_.jointControllable[i]) controllable_joints.push_back(this->genRobot_->joint(i)->name());
+  for(int i=0;i<this->gaitParam_.jointControllable.size();i++) if(this->gaitParam_.jointControllable[i]) controllable_joints.push_back(this->gaitParam_.genRobot->joint(i)->name());
   i_param.controllable_joints.length(controllable_joints.size());
   for(int i=0;i<controllable_joints.size();i++) i_param.controllable_joints[i] = controllable_joints[i].c_str();
   i_param.abc_start_transition_time = this->mode_.abc_start_transition_time;

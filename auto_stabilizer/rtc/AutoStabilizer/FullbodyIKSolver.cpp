@@ -1,11 +1,11 @@
 #include "FullbodyIKSolver.h"
 #include <fullbody_inverse_kinematics_solver/FullbodyInverseKinematicsSolverFast.h>
 
-bool FullbodyIKSolver::solveFullbodyIK(const cnoid::BodyPtr& refRobot, double dt, const GaitParam& gaitParam,
+bool FullbodyIKSolver::solveFullbodyIK(double dt, const GaitParam& gaitParam,
                                        cnoid::BodyPtr& genRobot) const{
   // !jointControllableの関節は指令値をそのまま入れる
   for(size_t i=0;i<genRobot->numJoints();i++){
-    if(!gaitParam.jointControllable[i]) genRobot->joint(i)->q() = refRobot->joint(i)->q();
+    if(!gaitParam.jointControllable[i]) genRobot->joint(i)->q() = gaitParam.refRobot->joint(i)->q();
   }
 
   if(this->jlim_avoid_weight.size() != 6+genRobot->numJoints()) this->jlim_avoid_weight = cnoid::VectorX::Zero(6+genRobot->numJoints());
@@ -79,7 +79,7 @@ bool FullbodyIKSolver::solveFullbodyIK(const cnoid::BodyPtr& refRobot, double dt
       this->refJointAngleConstraint[i]->joint() = genRobot->joint(i);
       this->refJointAngleConstraint[i]->maxError() = 10.0 * dt; // 高優先度のmaxError以下にしないと優先度逆転するおそれ
       this->refJointAngleConstraint[i]->weight() = 1e-1; // 小さい値すぎると、qp終了判定のtoleranceによって無視されてしまう
-      this->refJointAngleConstraint[i]->targetq() = refRobot->joint(i)->q();
+      this->refJointAngleConstraint[i]->targetq() = gaitParam.refRobot->joint(i)->q();
       this->refJointAngleConstraint[i]->precision() = 0.0; // 強制的にIKをmax loopまで回す
       ikConstraint.push_back(this->refJointAngleConstraint[i]);
     }
@@ -109,11 +109,11 @@ bool FullbodyIKSolver::solveFullbodyIK(const cnoid::BodyPtr& refRobot, double dt
   //     ここまでは、各タスクが滑らかに変化するように作ればよく、実用上のほとんどのケースでは各タスクは滑らかに変化するので、問題ない.
   //     ところが、joint_limit_tableを用いてjoint->q_upper()とjoint->q_lower()を更新すると、limit側が勝手に動くので、タスクに関係なく、limitからの距離が近づいたり離れたりする. すると、ロボットが振動的になってしまうことがある.
   //     不等式制約が扱えるQPベースのIKなら、この問題は発生しない.
-  for(int i=0;i<refRobot->numJoints();i++){
+  for(int i=0;i<gaitParam.refRobot->numJoints();i++){
     if(!gaitParam.jointControllable[i]) continue;
     cnoid::LinkPtr joint = genRobot->joint(i);
-    double u = refRobot->joint(i)->q_upper();
-    double l = refRobot->joint(i)->q_lower();
+    double u = gaitParam.refRobot->joint(i)->q_upper();
+    double l = gaitParam.refRobot->joint(i)->q_lower();
     for(int j=0;j<gaitParam.jointLimitTables[i].size();j++){
       u = std::min(u,gaitParam.jointLimitTables[i][j]->getUlimit());
       l = std::max(l,gaitParam.jointLimitTables[i][j]->getLlimit());
