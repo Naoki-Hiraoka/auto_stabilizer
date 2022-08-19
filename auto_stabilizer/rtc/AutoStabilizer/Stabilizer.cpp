@@ -319,7 +319,7 @@ bool Stabilizer::calcDampingControl(double dt, const GaitParam& gaitParam, const
       }
 
       double dampingGain = this->dampingGain[i][j];
-      if(gaitParam.isStatic()) dampingGain *= 4.0; // 理由は不明だが、旧auto_stabilizerがこういう仕様になっていたので
+      //if(gaitParam.isStatic()) dampingGain *= 4.0; // 理由は不明だが、旧auto_stabilizerでは静止状態では4倍固くしていた. 斜面で立ち止まるときに、立ち止まった後で足が水平に戻ろうとする力が4倍大きくなるので、立ち止まることが難しくなってしまうと思う...
       dOffsetLocal[j] = (wrenchErrorLocal[j] / dampingGain - offsetPrevLocal[j] / this->dampingTimeConst[i][j]) * dt;
     }
 

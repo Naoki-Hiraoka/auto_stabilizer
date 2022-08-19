@@ -68,7 +68,6 @@ public:
 
     // 遊脚軌道用パラメータ
     std::vector<std::vector<double> > stepHeight = std::vector<std::vector<double> >(NUM_LEGS,std::vector<double>(2,0)); // 要素数2. rleg: 0. lleg: 1. swing期には、srcCoordsの高さ+[0]とdstCoordsの高さ+[1]の高い方に上げるような軌道を生成する
-    std::vector<double> goalOffset = std::vector<double>(NUM_LEGS, 0.0); // [m]. 遊脚軌道生成時に、generate frameで鉛直方向に, 目標着地位置に対して加えるオフセット. FootStepGeneratorのcheckEarlyTouchDownと組み合わせて使う
 
     // 遊脚軌道用状態変数. (footstepNodesList[0]の値のみ意味がある. GaitParamのメンバ変数にしても良いが、footstepNodesListが次の要素に進んだときに毎回初期化するのが面倒だったので、FootStepNodesのメンバ変数にしている)
     enum SwingState_enum{LIFT_PHASE, SWING_PHASE, DOWN_PHASE};

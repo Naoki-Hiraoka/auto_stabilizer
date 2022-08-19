@@ -174,6 +174,8 @@ bool FootStepGenerator::goStop(const GaitParam& gaitParam,
     this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos);
   }
 
+  footstepNodesList.back().remainTime = std::max(footstepNodesList.back().remainTime, this->defaultStepTime); // 末尾の両足支持期を延長. これがないと重心が目標位置に収束する前に返ってしまい, emergencyStepが無限に誘発する
+
   o_footstepNodesList = footstepNodesList;
   return true;
 
@@ -202,40 +204,83 @@ bool FootStepGenerator::calcFootSteps(const GaitParam& gaitParam, const double& 
     if(this->isModifyFootSteps){
       this->modifyFootSteps(footstepNodesList, gaitParam);
     }
-
-    // 早づきしたらremainTimeをdtに減らしてすぐに次のnodeへ移る. この機能が無いと少しでもロボットが傾いて早づきするとジャンプするような挙動になる. 遅づきに備えるために、着地位置を下方にオフセットさせる
-    //   remainTimeをdtに減らしてすぐに次のnodeへ移ろうとしているときに着地位置修正が入ると不安定になるので、modifyFootStepsよりも後にやる必要がある.
-    this->checkEarlyTouchDown(footstepNodesList, gaitParam, dt);
-
-    if(this->isModifyFootSteps && this->isStableGoStopMode){
-      if(footstepNodesList[0].remainTime <= dt) { // footstepの切り替わりのタイミング. 着地位置修正量を毎周期チェックすると、歩行の最中に一時的に修正が大きくなった場合に反応してしまう. checkEarlyTouchDownがremainTimeを突然dtに減らすことがあるので、checkEarlyTouchDownよりも後にやる必要がある
-        this->checkStableGoStop(footstepNodesList, gaitParam);
-      }
-    }
   }
 
   o_footstepNodesList = footstepNodesList;
   return true;
 }
 
-bool FootStepGenerator::advanceFootStepNodesList(const GaitParam& gaitParam, double dt,
+bool FootStepGenerator::advanceFootStepNodesList(const GaitParam& gaitParam, double dt, bool useActStates,
                                                  std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<cnoid::Position>& o_dstCoordsOrg, std::vector<bool>& o_prevSupportPhase) const{
+  std::vector<GaitParam::FootStepNodes> footstepNodesList = gaitParam.footstepNodesList;
+  std::vector<cnoid::Position> srcCoords = gaitParam.srcCoords;
+  std::vector<cnoid::Position> dstCoordsOrg = gaitParam.dstCoordsOrg;
+
+  if(useActStates){
+    // 早づきしたらremainTimeにかかわらずすぐに次のnodeへ移る(remainTimeをdtにする). この機能が無いと少しでもロボットが傾いて早づきするとジャンプするような挙動になる.
+    this->checkEarlyTouchDown(footstepNodesList, gaitParam, dt);
+  }
+
   // prevSupportPhaseを記録
   std::vector<bool> prevSupportPhase(2);
   for(int i=0;i<NUM_LEGS;i++) prevSupportPhase[i] = gaitParam.footstepNodesList[0].isSupportPhase[i];
 
   // footstepNodesListを進める
-  std::vector<GaitParam::FootStepNodes> footstepNodesList = gaitParam.footstepNodesList;
-  std::vector<cnoid::Position> srcCoords = gaitParam.srcCoords;
-  std::vector<cnoid::Position> dstCoordsOrg = gaitParam.dstCoordsOrg;
   footstepNodesList[0].remainTime = std::max(0.0, footstepNodesList[0].remainTime - dt);
   footstepNodesList[0].elapsedTime += dt;
-  if(footstepNodesList[0].remainTime <= 0.0 && footstepNodesList.size() > 1){
+  if(footstepNodesList[0].remainTime <= 0.0 && footstepNodesList.size() > 1){ // 次のfootstepNodesListのindexに移る.
+
+    // 着地位置修正を行っていたら、footstepNodesListがemergencyStepNumのサイズになるまで歩くnodeが末尾に入る.
+    if(this->isModifyFootSteps && this->isStableGoStopMode && useActStates){
+      this->checkStableGoStop(footstepNodesList, gaitParam);
+    }
+
+    // 今のgenCoordsとdstCoordsが異なるなら、将来のstepの位置姿勢をそれに合わせてずらす. (特にgoalOffsetがある場合にはこの処理が必要)
+    //   footstepNodesList[1:]で一回でも遊脚になった以降は、位置とYawをずらす. footstepNodesList[1:]で最初に遊脚になる脚があるならその反対の脚の偏差にあわせてずらす. そうでないなら両脚の中心(+-defaultTranslatePos)の偏差にあわせてずらす
+    //   footstepNodesList[1]が支持脚なら、遊脚になるまで、位置姿勢をその足の今の偏差にあわせてずらす.
+    for(int i=1;i<footstepNodesList.size();i++){
+      if(footstepNodesList[i].isSupportPhase[RLEG] && !footstepNodesList[i].isSupportPhase[LLEG]){ // LLEGが次に最初に遊脚になる
+        cnoid::Position origin = mathutil::orientCoordToAxis(footstepNodesList[i-1].dstCoords[RLEG], cnoid::Vector3::UnitZ()); // generate frame. 一つ前のRLEGの位置を基準にずらす
+        cnoid::Position offsetedPos = mathutil::orientCoordToAxis(gaitParam.genCoords[RLEG].value() * footstepNodesList[0].dstCoords[RLEG].inverse() * footstepNodesList[i-1].dstCoords[RLEG], cnoid::Vector3::UnitZ()); // generate frame. 一つ前のRLEGはこの位置にずれている
+        cnoid::Position transform = offsetedPos * origin.inverse(); // generate frame
+        this->transformFutureSteps(footstepNodesList, i, transform); // footstepNodesList[1:]で一回でも遊脚になった以降の脚の、位置とYawをずらす
+        break;
+      }else if(footstepNodesList[i].isSupportPhase[LLEG] && !footstepNodesList[i].isSupportPhase[RLEG]){ // RLEGが次に最初に遊脚になる
+        cnoid::Position origin = mathutil::orientCoordToAxis(footstepNodesList[i-1].dstCoords[LLEG], cnoid::Vector3::UnitZ()); // generate frame. 一つ前のLLEGの位置を基準にずらす
+        cnoid::Position offsetedPos = mathutil::orientCoordToAxis(gaitParam.genCoords[LLEG].value() * footstepNodesList[0].dstCoords[LLEG].inverse() * footstepNodesList[i-1].dstCoords[LLEG], cnoid::Vector3::UnitZ()); // generate frame. 一つ前のLLEGはこの位置にずれている
+        cnoid::Position transform = offsetedPos * origin.inverse(); // generate frame
+        this->transformFutureSteps(footstepNodesList, i, transform); // footstepNodesList[1:]で一回でも遊脚になった以降の脚の、位置とYawをずらす
+        break;
+      }else if(!footstepNodesList[i].isSupportPhase[LLEG] && !footstepNodesList[i].isSupportPhase[RLEG]){ // RLEGとLLEG同時に次に最初に遊脚になる
+        cnoid::Position rleg = footstepNodesList[i-1].dstCoords[RLEG]; // generate frame
+        rleg.translation() -= rleg.linear() * gaitParam.defaultTranslatePos[RLEG].value();
+        cnoid::Position lleg = footstepNodesList[i-1].dstCoords[LLEG];
+        lleg.translation() -= lleg.linear() * gaitParam.defaultTranslatePos[LLEG].value();
+        cnoid::Position origin = mathutil::orientCoordToAxis(mathutil::calcMidCoords({rleg, lleg}, {1.0, 1.0}), cnoid::Vector3::UnitZ()); // 一つ前の両脚の中心の位置を基準にずらす
+        cnoid::Position offseted_rleg = gaitParam.genCoords[RLEG].value() * footstepNodesList[0].dstCoords[RLEG].inverse() * footstepNodesList[i-1].dstCoords[RLEG]; // generate frame
+        offseted_rleg.translation() -= rleg.linear() * gaitParam.defaultTranslatePos[RLEG].value();
+        cnoid::Position offseted_lleg = gaitParam.genCoords[LLEG].value() * footstepNodesList[0].dstCoords[LLEG].inverse() * footstepNodesList[i-1].dstCoords[LLEG];
+        offseted_lleg.translation() -= lleg.linear() * gaitParam.defaultTranslatePos[LLEG].value();
+        cnoid::Position offsetedPos = mathutil::orientCoordToAxis(mathutil::calcMidCoords({offseted_rleg, offseted_lleg}, {1.0, 1.0}), cnoid::Vector3::UnitZ());
+        cnoid::Position transform = offsetedPos * origin.inverse(); // generate frame
+        this->transformFutureSteps(footstepNodesList, i, transform); // footstepNodesList[1:]で一回でも遊脚になった以降の脚の、位置とYawをずらす
+        break;
+      }
+    }
+    for(int i=0;i<NUM_LEGS;i++){
+      if(footstepNodesList[1].isSupportPhase[i]){
+        cnoid::Position transform = gaitParam.genCoords[i].value() * footstepNodesList[0].dstCoords[i].inverse(); // generate frame
+        this->transformCurrentSupportSteps(i, footstepNodesList, 1, transform); // 遊脚になるまで、位置姿勢をその足の今の偏差にあわせてずらす.
+      }
+    }
+
+    // footstepNodesListをpop front
     footstepNodesList.erase(footstepNodesList.begin()); // vectorではなくlistにするべき?
     for(int i=0;i<NUM_LEGS;i++) {
       srcCoords[i] = gaitParam.genCoords[i].value();
       dstCoordsOrg[i] = footstepNodesList[0].dstCoords[i];
     }
+
   }
 
   o_prevSupportPhase = prevSupportPhase;
@@ -261,19 +306,18 @@ void FootStepGenerator::updateGoVelocitySteps(std::vector<GaitParam::FootStepNod
       cnoid::Position dstCoords = prevOrigin * transform;
 
       cnoid::Position origin = mathutil::orientCoordToAxis(footstepNodesList[i].dstCoords[swingLeg], cnoid::Vector3::UnitZ());
-      cnoid::Position displacement = origin.inverse() * dstCoords;
-      this->transformFutureSteps(footstepNodesList, i, origin, displacement);
+      cnoid::Position trans = dstCoords * origin.inverse();
+      this->transformFutureSteps(footstepNodesList, i, trans);
     }
   }
 }
 
-void FootStepGenerator::transformFutureSteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, int index, const cnoid::Position& transformOrigin/*generate frame*/, const cnoid::Position& transform/*transform Origin frame*/) const{
-  cnoid::Position trans = transformOrigin * transform * transformOrigin.inverse();
+void FootStepGenerator::transformFutureSteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, int index, const cnoid::Position& transform/*generate frame*/) const{
   for(int l=0;l<NUM_LEGS;l++){
     bool swinged = false;
     for(int i=index;i<footstepNodesList.size();i++){
       if(!footstepNodesList[i].isSupportPhase[l]) swinged = true;
-      if(swinged) footstepNodesList[i].dstCoords[l] = trans * footstepNodesList[i].dstCoords[l];
+      if(swinged) footstepNodesList[i].dstCoords[l] = transform * footstepNodesList[i].dstCoords[l];
     }
   }
 }
@@ -289,7 +333,7 @@ void FootStepGenerator::transformFutureSteps(std::vector<GaitParam::FootStepNode
 }
 
 // indexのsupportLegが次にswingするまでの間の位置を、generate frameでtransformだけ動かす
-void FootStepGenerator::transformCurrentSupportSteps(int leg, std::vector<GaitParam::FootStepNodes>& footstepNodesList, const cnoid::Position& transform/*generate frame*/, int index) const{
+void FootStepGenerator::transformCurrentSupportSteps(int leg, std::vector<GaitParam::FootStepNodes>& footstepNodesList, int index, const cnoid::Position& transform/*generate frame*/) const{
   assert(0<=leg && leg < NUM_LEGS);
   for(int i=index;i<footstepNodesList.size();i++){
     if(!footstepNodesList[i].isSupportPhase[leg]) return;
@@ -606,40 +650,17 @@ void FootStepGenerator::checkEarlyTouchDown(std::vector<GaitParam::FootStepNodes
     actLegWrenchFilter[i].passFilter(gaitParam.actEEWrench[i], dt);
   }
 
-  // 現在片足支持期で、次が両足支持期であるときのみ、行う
-  if(!(footstepNodesList.size() > 1 &&
-       (footstepNodesList[1].isSupportPhase[RLEG] && footstepNodesList[1].isSupportPhase[LLEG]) &&
-       ((footstepNodesList[0].isSupportPhase[RLEG] && !footstepNodesList[0].isSupportPhase[LLEG]) || (!footstepNodesList[0].isSupportPhase[RLEG] && footstepNodesList[0].isSupportPhase[LLEG]))))
-     return;
-
-  int swingLeg = footstepNodesList[0].isSupportPhase[RLEG] ? LLEG : RLEG;
-  int supportLeg = (swingLeg == RLEG) ? LLEG : RLEG;
-
-  // DOWN_PHASEのときのみ行う
-  if(footstepNodesList[0].swingState[swingLeg] != GaitParam::FootStepNodes::DOWN_PHASE) return;
-
-  if(actLegWrenchFilter[swingLeg].value()[2] > this->contactDetectionThreshold /*generate frame. ロボットが受ける力*/ ||
-     footstepNodesList[0].remainTime <= dt // 地面につかないままswingphase終了
-     ){
-    {
-      cnoid::Position origin = mathutil::orientCoordToAxis(footstepNodesList[0].dstCoords[swingLeg], cnoid::Vector3::UnitZ()); // generate frame
-      cnoid::Position transform = origin.inverse() * mathutil::orientCoordToAxis(gaitParam.genCoords[swingLeg].value(), cnoid::Vector3::UnitZ()); // footstepNodesList[0].dstCoords[swingLeg] frame
-      this->transformFutureSteps(footstepNodesList, 0, origin, transform); // 遊脚を今の位置姿勢(Z軸は鉛直)でとめ、連動して将来の着地位置も変える
-    }
-    {
-      cnoid::Position diff = gaitParam.genCoords[swingLeg].value() * footstepNodesList[0].dstCoords[swingLeg].inverse();
-      footstepNodesList[0].dstCoords[swingLeg] = gaitParam.genCoords[swingLeg].value(); // 遊脚を今の傾きでとめる
-      this->transformCurrentSupportSteps(swingLeg, footstepNodesList, diff, 1); // 遊脚の次の支持脚期間を傾きを今の傾きにする
-    }
-    {
-      cnoid::Position diff = gaitParam.genCoords[supportLeg].value() * footstepNodesList[0].dstCoords[supportLeg].inverse();
-      this->transformCurrentSupportSteps(supportLeg, footstepNodesList, diff, 0); // 支持脚を今の位置姿勢で止める
-    }
+  // 現在swing期で次support期のLegがあって、
+  // そのLegがDOWN_PHASEかつ力センサの値が閾値以上になった場合に、すぐに次のnodeに移る
+  if(footstepNodesList.size() > 1 &&
+     ((!footstepNodesList[0].isSupportPhase[RLEG] && footstepNodesList[1].isSupportPhase[RLEG] && //現在swing期で次support期
+       footstepNodesList[0].swingState[RLEG] == GaitParam::FootStepNodes::DOWN_PHASE && // DOWN_PHASE
+       actLegWrenchFilter[RLEG].value()[2] > this->contactDetectionThreshold /*generate frame. ロボットが受ける力*/) // 力センサの値が閾値以上
+      ||
+      (!footstepNodesList[0].isSupportPhase[LLEG] && footstepNodesList[1].isSupportPhase[LLEG] && //現在swing期で次support期
+       footstepNodesList[0].swingState[LLEG] == GaitParam::FootStepNodes::DOWN_PHASE && // DOWN_PHASE
+       actLegWrenchFilter[LLEG].value()[2] > this->contactDetectionThreshold /*generate frame. ロボットが受ける力*/))){ // 力センサの値が閾値以上
     footstepNodesList[0].remainTime = dt;
-    footstepNodesList[0].goalOffset[swingLeg] = 0.0;
-
-  }else{
-    footstepNodesList[0].goalOffset[swingLeg] = this->goalOffset;
   }
 }
 
@@ -679,9 +700,7 @@ void FootStepGenerator::checkEmergencyStep(std::vector<GaitParam::FootStepNodes>
 
 // Stable Go Stop
 void FootStepGenerator::checkStableGoStop(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const GaitParam& gaitParam) const{
-  // 現在非静止状態で、着地位置修正を行ったなら、footstepNodesListがemergencyStepNumのサイズになるまで歩くnodeが末尾に入る.
-  if(footstepNodesList.size() == 1 && footstepNodesList[0].remainTime == 0) return; // static 状態なら何もしない
-
+  // 着地位置修正を行ったなら、footstepNodesListがemergencyStepNumのサイズになるまで歩くnodeが末尾に入る.
   for(int i=0;i<NUM_LEGS; i++){
     if((footstepNodesList[0].dstCoords[i].translation().head<2>() - gaitParam.dstCoordsOrg[i].translation().head<2>()).norm() > 0.01){ // 1cm以上着地位置修正を行ったなら
       while(footstepNodesList.size() < this->emergencyStepNum){

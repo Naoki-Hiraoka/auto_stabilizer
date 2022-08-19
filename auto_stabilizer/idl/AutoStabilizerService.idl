@@ -206,8 +206,6 @@ module OpenHRP
       sequence<sequence<sequence<double, 2> >, 2> overwritable_stride_limitation;
       /// [N]
       double contact_detection_threshould;
-      /// [N]. 上限0.0. 歩行中は変更不可
-      double goal_offset;
       /// whether step when emergency
       boolean is_emergency_step_mode;
       /// whether gostop after becoming stable
@@ -224,6 +222,8 @@ module OpenHRP
       double swing_trajectory_touch_vel;
       /// Weight parameter for distance of final path of delay_hoffarbib_trajectory_generator. 下限0.01
       double swing_trajectory_final_distance_weight;
+      /// [N]. 上限0.0. 歩行中は変更不可
+      double goal_offset;
       /// [s]. 下限0.01[s]
       double footguided_balance_time;
 

@@ -21,7 +21,6 @@ public:
   std::vector<std::vector<cnoid::Vector3> > safeLegHull = std::vector<std::vector<cnoid::Vector3> >(2, std::vector<cnoid::Vector3>{cnoid::Vector3(0.075,0.055,0.0),cnoid::Vector3(-0.075,0.055,0.0),cnoid::Vector3(-0.075,-0.055,0.0),cnoid::Vector3(0.075,-0.055,0.0)}); // 要素数2. rleg: 0. lleg: 1. leg frame.  凸形状で,上から見て半時計回り. Z成分はあったほうが計算上扱いやすいからありにしているが、0でなければならない. 大きさはgaitParam.legHull以下
   std::vector<std::vector<cnoid::Vector3> > overwritableStrideLimitationHull = std::vector<std::vector<cnoid::Vector3> >{std::vector<cnoid::Vector3>{cnoid::Vector3(0.3,-0.18,0),cnoid::Vector3(-0.3,-0.18,0),cnoid::Vector3(-0.3,-0.30,0),cnoid::Vector3(-0.15,-0.45,0),cnoid::Vector3(0.15,-0.45,0),cnoid::Vector3(0.3,-0.30,0)},std::vector<cnoid::Vector3>{cnoid::Vector3(0.3,0.30,0),cnoid::Vector3(0.15,0.45,0),cnoid::Vector3(-0.15,0.45,0),cnoid::Vector3(-0.3,0.30,0),cnoid::Vector3(-0.3,0.18,0),cnoid::Vector3(0.3,0.18,0)}}; // 要素数2. 0: rleg用, 1: lleg用. 着地位置修正時に自動生成されるfootstepの上下限の凸包. 反対の脚のEndEffector frame(Z軸は鉛直)で表現した着地可能領域(自己干渉やIKの考慮が含まれる). あったほうが扱いやすいのでZ成分があるが、Z成分は0でないといけない. 凸形状で,上から見て半時計回り. thetaとは独立に評価されるので、defaultStrideLimitationThetaだけ傾いていても大丈夫なようにせよ. 斜め方向の角を削るなどして、IKが解けるようにせよ. 歩行中は急激に変更されない
   double contactDetectionThreshold = 50.0; // [N]. generate frameで遊脚が着地時に鉛直方向にこの大きさ以上の力を受けたら接地とみなして、EarlyTouchDown処理を行う
-  double goalOffset = -0.05; // [m]. 遊脚軌道生成時に、generate frameで鉛直方向に, 目標着地位置に対して加えるオフセット. FootStepGeneratorのcheckEarlyTouchDownと組み合わせて使う. 0以下. 歩行中は急激に変更されない
   bool isEmergencyStepMode = true; // 現在静止状態で、CapturePointがsafeLegHullの外にあるまたは目標ZMPからemergencyStepCpCheckMargin以上離れているなら、footstepNodesListがemergencyStepNumのサイズになるまで歩くnodeが末尾に入る. (modifyFootSteps=trueのときのみ有効)
   double emergencyStepCpCheckMargin = 0.05; // [m]. EmergencyStepの閾値. 0以上
   bool isStableGoStopMode = true; // 現在非静止状態で、着地位置修正を行ったなら、footstepNodesListがemergencyStepNumのサイズになるまで歩くnodeが末尾に入る. (modifyFootSteps=trueのときのみ有効)
@@ -114,18 +113,18 @@ public:
                      std::vector<GaitParam::FootStepNodes>& o_footstepNodesList) const;
 
   // footstepNodesListをdtだけ進める
-  bool advanceFootStepNodesList(const GaitParam& gaitParam, double dt,
+  bool advanceFootStepNodesList(const GaitParam& gaitParam, double dt, bool useActStates,
                                 std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<cnoid::Position>& o_dstCoordsOrg, std::vector<bool>& o_prevSupportPhase) const;
 
 protected:
   // footstepNodesList[1:]の着地位置(XYZ,yaw)をcmdVelに基づき更新する
   void updateGoVelocitySteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >& defaultTranslatePos, const cnoid::Vector3& cmdVel) const;
-  // footstepNodesList[idx:] idxより先のstepの位置をtransformOrigin frameでtransformだけ動かす
-  void transformFutureSteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, int index, const cnoid::Position& transformOrigin/*generate frame*/, const cnoid::Position& transform/*transformOrigin frame*/) const;
+  // footstepNodesList[idx:] idxより先のstepの位置をgenerate frameで(左から)transformだけ動かす
+  void transformFutureSteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, int index, const cnoid::Position& transform/*generate frame*/) const;
   // footstepNodesList[idx:] idxより先のstepの位置をgenerate frameでtransformだけ動かす
   void transformFutureSteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, int index, const cnoid::Vector3& transform/*generate frame*/) const;
-  // indexのsupportLegが次にswingするまでの間の位置を、generate frameでtransformだけ動かす
-  void transformCurrentSupportSteps(int leg, std::vector<GaitParam::FootStepNodes>& footstepNodesList, const cnoid::Position& transform/*generate frame*/, int index) const;
+  // indexのsupportLegが次にswingするまでの間の位置を、generate frameで(左から)transformだけ動かす
+  void transformCurrentSupportSteps(int leg, std::vector<GaitParam::FootStepNodes>& footstepNodesList, int index, const cnoid::Position& transform/*generate frame*/) const;
   // footstepNodesの次の一歩を作る. RLEGとLLEGどちらをswingすべきかも決める
   void calcDefaultNextStep(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >& defaultTranslatePos, const cnoid::Vector3& offset = cnoid::Vector3::Zero() /*leg frame*/) const;
   // footstepNodesの次の一歩を作る.
@@ -134,10 +133,10 @@ protected:
   GaitParam::FootStepNodes calcDefaultDoubleSupportStep(const GaitParam::FootStepNodes& footstepNodes, double doubleSupportTime) const;
   // 着地位置・タイミング修正
   void modifyFootSteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const GaitParam& gaitParam) const;
-  // 早づきしたらremainTimeをdtに減らしてすぐに次のnodeへ移る. この機能が無いと少しでもロボットが傾いて早づきするとジャンプするような挙動になる. 遅づきに備えるために、着地位置を下方にオフセットさせる
-  void checkEarlyTouchDown(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const GaitParam& gaitParam, double dt) const;
   // emergengy step.
   void checkEmergencyStep(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const GaitParam& gaitParam) const;
+  // 早づきしたらremainTimeをdtに減らしてすぐに次のnodeへ移る. この機能が無いと少しでもロボットが傾いて早づきするとジャンプするような挙動になる.
+  void checkEarlyTouchDown(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const GaitParam& gaitParam, double dt) const;
   // stableGoStop.
   void checkStableGoStop(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const GaitParam& gaitParam) const;
 };

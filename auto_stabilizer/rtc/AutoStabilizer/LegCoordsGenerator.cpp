@@ -114,10 +114,12 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
       cnoid::Position srcCoords = gaitParam.srcCoords[i];
       cnoid::Position dstCoords = gaitParam.footstepNodesList[0].dstCoords[i];
       cnoid::Position dstCoordsWithOffset = gaitParam.footstepNodesList[0].dstCoords[i];
-      dstCoordsWithOffset.translation()[2] += gaitParam.footstepNodesList[0].goalOffset[i];
+      double offset = 0.0;
+      if(gaitParam.footstepNodesList.size() > 1 && gaitParam.footstepNodesList[1].isSupportPhase[i]) offset = this->goalOffset;
+      dstCoordsWithOffset.translation()[2] += offset;
       cnoid::Position antecedentCoords = genCoords[i].getGoal(); // 今のantecedent軌道の位置
       double touchDownTime = (antecedentCoords.translation()[2] - dstCoordsWithOffset.translation()[2]) / this->touchVel; // 地面につくのに要する時間
-      double goalOffsetTime = std::abs(gaitParam.footstepNodesList[0].goalOffset[i]) / this->touchVel; // dstCoordsWithOffsetにつくgoalOffsetTime前に傾きはdstCoordsの姿勢になる. そうしないと、goalOffset<0のときに、目標の傾き(特にyaw旋回)に至るまえに着地してしまう. overwritebleMinTime > goalOffsetTime + delayTimeOffsetにすること
+      double goalOffsetTime = std::abs(offset) / this->touchVel; // dstCoordsWithOffsetにつくgoalOffsetTime前に傾きはdstCoordsの姿勢になる. そうしないと、goalOffset<0のときに、目標の傾き(特にyaw旋回)に至るまえに着地してしまう. overwritebleMinTime > goalOffsetTime + delayTimeOffsetにすること
 
       // phase transition
       if(swingState[i] == GaitParam::FootStepNodes::LIFT_PHASE){
@@ -167,7 +169,7 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
           goal = dstCoordsWithOffset.translation();
           goal[2] = height;
         }
-        double dstCoordsRatio = 1.0 - std::abs((gaitParam.footstepNodesList[0].goalOffset[i] * this->finalDistanceWeight) / totalLength); // もとのdstCoords (offsetなし)に至るタイミング
+        double dstCoordsRatio = 1.0 - std::abs((offset * this->finalDistanceWeight) / totalLength); // もとのdstCoords (offsetなし)に至るタイミング
         cnoid::Position nextCoords;
         nextCoords.translation() = goal;
         nextCoords.linear() = mathutil::calcMidRot(std::vector<cnoid::Matrix3>{antecedentCoords.linear(),dstCoordsWithOffset.linear()},

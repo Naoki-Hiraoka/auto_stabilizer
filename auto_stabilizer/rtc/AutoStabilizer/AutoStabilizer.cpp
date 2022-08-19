@@ -395,6 +395,10 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
   actToGenFrameConverter.convertFrame(actRobotRaw, gaitParam, dt,
                                       actRobot, gaitParam.actEEPose, gaitParam.actEEWrench, gaitParam.actCogVel);
 
+  // FootstepNodesListをdtすすめる.
+  footStepGenerator.advanceFootStepNodesList(gaitParam, dt, mode.isSTRunning(),// input
+                                             gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.dstCoordsOrg, gaitParam.prevSupportPhase); //output
+
   // 目標外力に応じてオフセットを計算する
   externalForceHandler.handleExternalForce(gaitParam, genRobot->mass(), actRobot, mode.isSTRunning(), dt,
                                            gaitParam.omega, gaitParam.l, gaitParam.sbpOffset, gaitParam.actCog);
@@ -469,10 +473,6 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
   // FullbodyIKSolver
   fullbodyIKSolver.solveFullbodyIK(refRobot, dt, gaitParam,// input
                                    genRobot); // output
-
-  // advence dt
-  footStepGenerator.advanceFootStepNodesList(gaitParam, dt, // input
-                                             gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.dstCoordsOrg, gaitParam.prevSupportPhase); //output
 
   return true;
 }
@@ -1025,7 +1025,6 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
     }
   }
   this->footStepGenerator_.contactDetectionThreshold = i_param.contact_detection_threshould;
-  if(!this->mode_.isABCRunning() || this->gaitParam_.isStatic()) this->footStepGenerator_.goalOffset = std::min(i_param.goal_offset, 0.0);
   this->footStepGenerator_.isEmergencyStepMode = i_param.is_emergency_step_mode;
   this->footStepGenerator_.isStableGoStopMode = i_param.is_stable_go_stop_mode;
   this->footStepGenerator_.emergencyStepNum = std::max(i_param.emergency_step_num, 1);
@@ -1034,6 +1033,7 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
   this->legCoordsGenerator_.delayTimeOffset = std::max(i_param.swing_trajectory_delay_time_offset, 0.0);
   this->legCoordsGenerator_.touchVel = std::max(i_param.swing_trajectory_touch_vel, 0.001);
   this->legCoordsGenerator_.finalDistanceWeight = std::max(i_param.swing_trajectory_final_distance_weight, 0.01);
+  if(!this->mode_.isABCRunning() || this->gaitParam_.isStatic()) this->legCoordsGenerator_.goalOffset = std::min(i_param.goal_offset, 0.0);
   this->legCoordsGenerator_.footGuidedBalanceTime = std::max(i_param.footguided_balance_time, 0.01);
 
   if(i_param.eefm_body_attitude_control_gain.length() == 2 &&
@@ -1133,7 +1133,7 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
 
   return true;
 }
-bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::AutoStabilizerParam& i_param){
+bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::AutoStabilizerParam& i_param) {
   std::lock_guard<std::mutex> guard(this->mutex_);
 
   std::vector<std::string> controllable_joints;
@@ -1258,7 +1258,6 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
     }
   }
   i_param.contact_detection_threshould = this->footStepGenerator_.contactDetectionThreshold;
-  i_param.goal_offset = this->footStepGenerator_.goalOffset;
   i_param.is_emergency_step_mode = this->footStepGenerator_.isEmergencyStepMode;
   i_param.is_stable_go_stop_mode = this->footStepGenerator_.isStableGoStopMode;
   i_param.emergency_step_num = this->footStepGenerator_.emergencyStepNum;
@@ -1267,6 +1266,7 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
   i_param.swing_trajectory_delay_time_offset = this->legCoordsGenerator_.delayTimeOffset;
   i_param.swing_trajectory_touch_vel = this->legCoordsGenerator_.touchVel;
   i_param.swing_trajectory_final_distance_weight = this->legCoordsGenerator_.finalDistanceWeight;
+  i_param.goal_offset = this->legCoordsGenerator_.goalOffset;
   i_param.footguided_balance_time = this->legCoordsGenerator_.footGuidedBalanceTime;
 
   i_param.eefm_body_attitude_control_gain.length(2);
