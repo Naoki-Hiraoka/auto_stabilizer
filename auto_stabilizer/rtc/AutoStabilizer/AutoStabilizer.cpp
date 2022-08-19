@@ -384,7 +384,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
     legCoordsGenerator.initLegCoords(gaitParam,
                                      gaitParam.refZmpTraj, gaitParam.genCoords);
     stabilizer.initStabilizerOutput(gaitParam,
-                                    gaitParam.stOffsetRootRpy, gaitParam.stEEOffsetDampingControl, gaitParam.stTargetZmp, gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage);
+                                    gaitParam.stOffsetRootRpy, gaitParam.stEEOffset, gaitParam.stTargetZmp, gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage);
   }
 
   // FootOrigin座標系を用いてrefRobotRawをgenerate frameに投影しrefRobotとする
@@ -401,13 +401,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
 
   // Impedance Controller
   impedanceController.calcImpedanceControl(dt, gaitParam,
-                                           gaitParam.icEEOffset);
-  for(int i=0;i<gaitParam.eeName.size();i++){
-    gaitParam.icEEOffset[i].interpolate(dt);
-    cnoid::Vector6 icOffset = gaitParam.icEEOffset[i].value();
-    gaitParam.icEETargetPose[i].translation() = icOffset.head<3>() + gaitParam.refEEPose[i].translation();
-    gaitParam.icEETargetPose[i].linear() = cnoid::AngleAxisd(icOffset.tail<3>().norm(),(icOffset.tail<3>().norm()>0)?icOffset.tail<3>().normalized() : cnoid::Vector3::UnitX()) * gaitParam.refEEPose[i].linear();
-  }
+                                           gaitParam.icEEOffset, gaitParam.icEETargetPose);
 
   // Manual Control Modeの足の現在位置をreferenceで上書きする
   legManualController.legManualControl(gaitParam, dt,
@@ -434,14 +428,14 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
   // Stabilizer
   if(mode.isSTRunning()){
     stabilizer.execStabilizer(refRobot, actRobot, genRobot, gaitParam, dt, genRobot->mass(),
-                              actRobotTqc, gaitParam.stOffsetRootRpy, gaitParam.stEEOffsetDampingControl, gaitParam.stTargetZmp, gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage);
+                              actRobotTqc, gaitParam.stOffsetRootRpy, gaitParam.stEEOffset, gaitParam.stTargetZmp, gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage);
   }else{
     gaitParam.stTargetZmp = gaitParam.refZmpTraj[0].getStart();
     for(int i=0;i<actRobotTqc->numJoints();i++) actRobotTqc->joint(i)->u() = 0.0;
     if(mode.isSyncToStopSTInit()){ // stopST直後の初回
       gaitParam.stOffsetRootRpy.setGoal(cnoid::Vector3::Zero(),mode.remainTime());
       for(int i=0;i<gaitParam.eeName.size();i++){
-        gaitParam.stEEOffsetDampingControl[i].setGoal(cnoid::Vector6::Zero(),mode.remainTime());
+        gaitParam.stEEOffset[i].setGoal(cnoid::Vector6::Zero(),mode.remainTime());
       }
       for(int i=0;i<genRobot->numJoints();i++){
         if(gaitParam.stServoPGainPercentage[i].getGoal() != 100.0) gaitParam.stServoPGainPercentage[i].setGoal(100.0, mode.remainTime());
@@ -453,10 +447,10 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
   gaitParam.stTargetRootPose.translation() = refRobot->rootLink()->p();
   gaitParam.stTargetRootPose.linear() /*generate frame*/= gaitParam.footMidCoords.value().linear() * cnoid::rotFromRpy(gaitParam.stOffsetRootRpy.value()/*gaitParam.footMidCoords frame*/) * gaitParam.footMidCoords.value().linear().transpose() * refRobot->rootLink()->R()/*generate frame*/;
   for(int i=0;i<gaitParam.eeName.size();i++){
-    gaitParam.stEEOffsetDampingControl[i].interpolate(dt);
-    cnoid::Vector6 stOffsetDampingControl = gaitParam.stEEOffsetDampingControl[i].value();
-    gaitParam.stEETargetPose[i].translation() = stOffsetDampingControl.head<3>() + gaitParam.abcEETargetPose[i].translation();
-    gaitParam.stEETargetPose[i].linear() = cnoid::AngleAxisd(stOffsetDampingControl.tail<3>().norm(),(stOffsetDampingControl.tail<3>().norm()>0)?stOffsetDampingControl.tail<3>().normalized() : cnoid::Vector3::UnitX()) * gaitParam.abcEETargetPose[i].linear();
+    gaitParam.stEEOffset[i].interpolate(dt);
+    cnoid::Vector6 stOffset = gaitParam.stEEOffset[i].value();
+    gaitParam.stEETargetPose[i].translation() = stOffset.head<3>() + gaitParam.abcEETargetPose[i].translation();
+    gaitParam.stEETargetPose[i].linear() = cnoid::AngleAxisd(stOffset.tail<3>().norm(),(stOffset.tail<3>().norm()>0)?stOffset.tail<3>().normalized() : cnoid::Vector3::UnitX()) * gaitParam.abcEETargetPose[i].linear();
   }
   for(int i=0;i<genRobot->numJoints();i++){
     gaitParam.stServoPGainPercentage[i].interpolate(dt);
