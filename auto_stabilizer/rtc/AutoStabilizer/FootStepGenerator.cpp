@@ -183,11 +183,13 @@ bool FootStepGenerator::goStop(const GaitParam& gaitParam,
 
 // FootStepNodesListをdtすすめる
 bool FootStepGenerator::procFootStepNodesList(const GaitParam& gaitParam, const double& dt, bool useActState,
-                                              std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<cnoid::Position>& o_dstCoordsOrg, std::vector<bool>& o_prevSupportPhase) const{
+                                              std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<cnoid::Position>& o_dstCoordsOrg, std::vector<GaitParam::SwingState_enum>& o_swingState, double& o_elapsedTime, std::vector<bool>& o_prevSupportPhase) const{
   std::vector<GaitParam::FootStepNodes> footstepNodesList = gaitParam.footstepNodesList;
   std::vector<bool> prevSupportPhase = gaitParam.prevSupportPhase;
+  double elapsedTime = gaitParam.elapsedTime;
   std::vector<cnoid::Position> srcCoords = gaitParam.srcCoords;
   std::vector<cnoid::Position> dstCoordsOrg = gaitParam.dstCoordsOrg;
+  std::vector<GaitParam::SwingState_enum> swingState = gaitParam.swingState;
 
   if(useActState){
     // 早づきしたらremainTimeにかかわらずすぐに次のnodeへ移る(remainTimeをdtにする). この機能が無いと少しでもロボットが傾いて早づきするとジャンプするような挙動になる.
@@ -196,7 +198,7 @@ bool FootStepGenerator::procFootStepNodesList(const GaitParam& gaitParam, const 
 
   // footstepNodesListを進める
   footstepNodesList[0].remainTime = std::max(0.0, footstepNodesList[0].remainTime - dt);
-  footstepNodesList[0].elapsedTime += dt;
+  elapsedTime += dt;
   for(int i=0;i<NUM_LEGS;i++) prevSupportPhase[i] = footstepNodesList[0].isSupportPhase[i];
 
   if(footstepNodesList[0].remainTime <= 0.0 && footstepNodesList.size() > 1){ // 次のfootstepNodesListのindexに移る.
@@ -207,13 +209,15 @@ bool FootStepGenerator::procFootStepNodesList(const GaitParam& gaitParam, const 
 
     // footstepNodesList[1]へ進む
     this->goNextFootStepNodesList(gaitParam, dt,
-                                  footstepNodesList, srcCoords, dstCoordsOrg);
+                                  footstepNodesList, srcCoords, dstCoordsOrg, swingState, elapsedTime);
   }
 
   o_footstepNodesList = footstepNodesList;
   o_prevSupportPhase = prevSupportPhase;
+  o_elapsedTime = elapsedTime;
   o_srcCoords = srcCoords;
   o_dstCoordsOrg = dstCoordsOrg;
+  o_swingState = swingState;
 
   return true;
 }
@@ -249,7 +253,7 @@ bool FootStepGenerator::calcFootSteps(const GaitParam& gaitParam, const double& 
 }
 
 bool FootStepGenerator::goNextFootStepNodesList(const GaitParam& gaitParam, double dt,
-                                                std::vector<GaitParam::FootStepNodes>& footstepNodesList, std::vector<cnoid::Position>& srcCoords, std::vector<cnoid::Position>& dstCoordsOrg) const{
+                                                std::vector<GaitParam::FootStepNodes>& footstepNodesList, std::vector<cnoid::Position>& srcCoords, std::vector<cnoid::Position>& dstCoordsOrg, std::vector<GaitParam::SwingState_enum>& swingState, double& elapsedTime) const{
   // 今のgenCoordsとdstCoordsが異なるなら、将来のstepの位置姿勢をそれに合わせてずらす. (特にgoalOffsetがある場合にはこの処理が必要)
   //   footstepNodesList[1:]で一回でも遊脚になった以降は、位置とYawをずらす. footstepNodesList[1:]で最初に遊脚になる脚があるならその反対の脚の偏差にあわせてずらす. そうでないなら両脚の中心(+-defaultTranslatePos)の偏差にあわせてずらす
   //   footstepNodesList[1]が支持脚なら、遊脚になるまで、位置姿勢をその足の今の偏差にあわせてずらす.
@@ -294,7 +298,9 @@ bool FootStepGenerator::goNextFootStepNodesList(const GaitParam& gaitParam, doub
   for(int i=0;i<NUM_LEGS;i++) {
     srcCoords[i] = gaitParam.genCoords[i].value();
     dstCoordsOrg[i] = footstepNodesList[0].dstCoords[i];
+    swingState[i] = GaitParam::LIFT_PHASE;
   }
+  elapsedTime = 0.0;
 
   return true;
 }
@@ -480,9 +486,9 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
     std::vector<double> samplingTimes;
     samplingTimes.push_back(footstepNodesList[0].remainTime);
     int sample = 10;
-    double minTime = std::max(this->overwritableMinTime, this->overwritableMinStepTime - footstepNodesList[0].elapsedTime); // 次indexまでの残り時間がthis->overwritableMinTimeを下回るようには着地時間修正を行わない. 現index開始時からの経過時間がthis->overwritableStepMinTimeを下回るようには着地時間修正を行わない.
+    double minTime = std::max(this->overwritableMinTime, this->overwritableMinStepTime - gaitParam.elapsedTime); // 次indexまでの残り時間がthis->overwritableMinTimeを下回るようには着地時間修正を行わない. 現index開始時からの経過時間がthis->overwritableStepMinTimeを下回るようには着地時間修正を行わない.
     minTime = std::min(minTime, footstepNodesList[0].remainTime); // もともと下回っている場合には、その値を下回るようには着地時刻修正を行わない.
-    double maxTime = std::max(this->overwritableMaxStepTime - footstepNodesList[0].elapsedTime, minTime); // 現index開始時からの経過時間がthis->overwritableStepMaxTimeを上回るようには着地時間修正を行わない.
+    double maxTime = std::max(this->overwritableMaxStepTime - gaitParam.elapsedTime, minTime); // 現index開始時からの経過時間がthis->overwritableStepMaxTimeを上回るようには着地時間修正を行わない.
     maxTime = std::max(maxTime, footstepNodesList[0].remainTime); // もともと上回っている場合には、その値を上回るようには着地時刻修正を行わない.
     for(int i=0;i<=sample;i++) {
       double t = minTime + (maxTime - minTime) / sample * i;
@@ -658,11 +664,11 @@ void FootStepGenerator::checkEarlyTouchDown(std::vector<GaitParam::FootStepNodes
   // そのLegがDOWN_PHASEかつ力センサの値が閾値以上になった場合に、すぐに次のnodeに移る
   if(footstepNodesList.size() > 1 &&
      ((!footstepNodesList[0].isSupportPhase[RLEG] && footstepNodesList[1].isSupportPhase[RLEG] && //現在swing期で次support期
-       footstepNodesList[0].swingState[RLEG] == GaitParam::FootStepNodes::DOWN_PHASE && // DOWN_PHASE
+       gaitParam.swingState[RLEG] == GaitParam::DOWN_PHASE && // DOWN_PHASE
        actLegWrenchFilter[RLEG].value()[2] > this->contactDetectionThreshold /*generate frame. ロボットが受ける力*/) // 力センサの値が閾値以上
       ||
       (!footstepNodesList[0].isSupportPhase[LLEG] && footstepNodesList[1].isSupportPhase[LLEG] && //現在swing期で次support期
-       footstepNodesList[0].swingState[LLEG] == GaitParam::FootStepNodes::DOWN_PHASE && // DOWN_PHASE
+       gaitParam.swingState[LLEG] == GaitParam::DOWN_PHASE && // DOWN_PHASE
        actLegWrenchFilter[LLEG].value()[2] > this->contactDetectionThreshold /*generate frame. ロボットが受ける力*/))){ // 力センサの値が閾値以上
     footstepNodesList[0].remainTime = dt;
   }
