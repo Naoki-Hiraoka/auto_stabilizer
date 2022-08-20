@@ -4,6 +4,7 @@
 #include <sys/time.h>
 #include <cnoid/EigenTypes>
 #include <vector>
+#include <limits>
 #include <cpp_filters/TwoPointInterpolator.h>
 #include <cpp_filters/FirstOrderLowPassFilter.h>
 #include <joint_limit_table/JointLimitTable.h>
@@ -13,7 +14,7 @@ enum leg_enum{RLEG=0, LLEG=1, NUM_LEGS=2};
 
 class GaitParam {
 public:
-  // constant
+  // constant parameter
   std::vector<std::string> eeName; // constant. 要素数2以上. 0番目がrleg, 1番目がllegという名前である必要がある
   std::vector<std::string> eeParentLink; // constant. 要素数と順序はeeNameと同じ. 必ずrobot->link(parentLink)がnullptrではないことを約束する. そのため、毎回robot->link(parentLink)がnullptrかをチェックしなくても良い
   std::vector<cnoid::Position> eeLocalT; // constant. 要素数と順序はeeNameと同じ. Parent Link Frame
@@ -22,6 +23,22 @@ public:
   std::vector<std::vector<std::shared_ptr<joint_limit_table::JointLimitTable> > > jointLimitTables; // constant. 要素数と順序はnumJoints()と同じ. for genRobot.
 
   const double g = 9.80665; // 重力加速度
+
+public:
+  // parameter
+  std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> > copOffset = std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >{cpp_filters::TwoPointInterpolator<cnoid::Vector3>(cnoid::Vector3(0.0,0.02,0.0),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::HOFFARBIB),cpp_filters::TwoPointInterpolator<cnoid::Vector3>(cnoid::Vector3(0.0,-0.02,0.0),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::HOFFARBIB)}; // 要素数2. rleg: 0. lleg: 1. leg frame. 足裏COPの目標位置. 幾何的な位置はcopOffset.value()無しで考えるが、目標COPを考えるときはcopOffset.value()を考慮する. クロスできたりジャンプできたりする脚でないと左右方向(外側向き)の着地位置修正は難しいので、その方向に転びそうになることが極力ないように内側にcopをオフセットさせておくとよい. 滑らかに変化する
+  std::vector<std::vector<cnoid::Vector3> > legHull = std::vector<std::vector<cnoid::Vector3> >(2, std::vector<cnoid::Vector3>{cnoid::Vector3(0.115,0.065,0.0),cnoid::Vector3(-0.105,0.065,0.0),cnoid::Vector3(-0.105,-0.065,0.0),cnoid::Vector3(0.115,-0.065,0.0)}); // 要素数2. rleg: 0. lleg: 1. leg frame.  凸形状で,上から見て半時計回り. Z成分はあったほうが計算上扱いやすいからありにしているが、0でなければならない
+  std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> > defaultTranslatePos = std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >(2,cpp_filters::TwoPointInterpolator<cnoid::Vector3>(cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::HOFFARBIB)); // goPos, goVelocity, その場足踏みをするときの右脚と左脚の中心からの相対位置. あるいは、reference frameとgenerate frameの対応付けに用いられる. (Z軸は鉛直). Z成分はあったほうが計算上扱いやすいからありにしているが、0でなければならない. RefToGenFrameConverterが「左右」という概念を使うので、X成分も0でなければならない. 滑らかに変化する
+  std::vector<cpp_filters::TwoPointInterpolator<double> > isManualControlMode = std::vector<cpp_filters::TwoPointInterpolator<double> >(2, cpp_filters::TwoPointInterpolator<double>(0.0, 0.0, 0.0, cpp_filters::LINEAR)); // 要素数2. 0: rleg. 1: lleg. 0~1. 連続的に変化する. 1ならicEETargetPoseに従い、refEEWrenchに応じて重心をオフセットする. 0ならImpedanceControlをせず、refEEWrenchを無視し、DampingControlを行わない. 静止状態で無い場合や、支持脚の場合は、勝手に0になる. 両足が同時に1になることはない. 1にするなら、RefToGenFrameConverter.refFootOriginWeightを0にしたほうが良い. 1の状態でStartAutoStabilizerすると、遊脚で始まる
+
+  std::vector<bool> jointControllable; // 要素数と順序はnumJoints()と同じ. falseの場合、qやtauはrefの値をそのまま出力する(writeOutputPort時にref値で上書き). IKでは動かさない(ref値をそのまま). トルク計算では目標トルクを通常通り計算する. このパラメータはMODE_IDLEのときにしか変更されない
+
+public:
+  // from reference port
+  cnoid::BodyPtr refRobotRaw; // reference. reference world frame
+  std::vector<cnoid::Vector6> refEEWrenchOrigin; // 要素数と順序はeeNameと同じ.FootOrigin frame. EndEffector origin. ロボットが受ける力
+  cnoid::BodyPtr actRobotRaw; // actual. actual imu world frame
+
 public:
   // AutoStabilizerの中で計算更新される.
 
@@ -101,20 +118,6 @@ public:
 
   // FullbodyIKSolver
   cnoid::BodyPtr genRobot; // output. 関節位置制御用
-public:
-  // param
-  std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> > copOffset = std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >{cpp_filters::TwoPointInterpolator<cnoid::Vector3>(cnoid::Vector3(0.0,0.02,0.0),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::HOFFARBIB),cpp_filters::TwoPointInterpolator<cnoid::Vector3>(cnoid::Vector3(0.0,-0.02,0.0),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::HOFFARBIB)}; // 要素数2. rleg: 0. lleg: 1. leg frame. 足裏COPの目標位置. 幾何的な位置はcopOffset.value()無しで考えるが、目標COPを考えるときはcopOffset.value()を考慮する. クロスできたりジャンプできたりする脚でないと左右方向(外側向き)の着地位置修正は難しいので、その方向に転びそうになることが極力ないように内側にcopをオフセットさせておくとよい. 滑らかに変化する
-  std::vector<std::vector<cnoid::Vector3> > legHull = std::vector<std::vector<cnoid::Vector3> >(2, std::vector<cnoid::Vector3>{cnoid::Vector3(0.115,0.065,0.0),cnoid::Vector3(-0.105,0.065,0.0),cnoid::Vector3(-0.105,-0.065,0.0),cnoid::Vector3(0.115,-0.065,0.0)}); // 要素数2. rleg: 0. lleg: 1. leg frame.  凸形状で,上から見て半時計回り. Z成分はあったほうが計算上扱いやすいからありにしているが、0でなければならない
-  std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> > defaultTranslatePos = std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >(2,cpp_filters::TwoPointInterpolator<cnoid::Vector3>(cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::HOFFARBIB)); // goPos, goVelocity, その場足踏みをするときの右脚と左脚の中心からの相対位置. あるいは、reference frameとgenerate frameの対応付けに用いられる. (Z軸は鉛直). Z成分はあったほうが計算上扱いやすいからありにしているが、0でなければならない. RefToGenFrameConverterが「左右」という概念を使うので、X成分も0でなければならない. 滑らかに変化する
-  std::vector<cpp_filters::TwoPointInterpolator<double> > isManualControlMode = std::vector<cpp_filters::TwoPointInterpolator<double> >(2, cpp_filters::TwoPointInterpolator<double>(0.0, 0.0, 0.0, cpp_filters::LINEAR)); // 要素数2. 0: rleg. 1: lleg. 0~1. 連続的に変化する. 1ならicEETargetPoseに従い、refEEWrenchに応じて重心をオフセットする. 0ならImpedanceControlをせず、refEEWrenchを無視し、DampingControlを行わない. 静止状態で無い場合や、支持脚の場合は、勝手に0になる. 両足が同時に1になることはない. 1にするなら、RefToGenFrameConverter.refFootOriginWeightを0にしたほうが良い. 1の状態でStartAutoStabilizerすると、遊脚で始まる
-
-  std::vector<bool> jointControllable; // 要素数と順序はnumJoints()と同じ. falseの場合、qやtauはrefの値をそのまま出力する(writeOutputPort時にref値で上書き). IKでは動かさない(ref値をそのまま). トルク計算では目標トルクを通常通り計算する. このパラメータはMODE_IDLEのときにしか変更されない
-
-public:
-  // from reference port
-  cnoid::BodyPtr refRobotRaw; // reference. reference world frame
-  std::vector<cnoid::Vector6> refEEWrenchOrigin; // 要素数と順序はeeNameと同じ.FootOrigin frame. EndEffector origin. ロボットが受ける力
-  cnoid::BodyPtr actRobotRaw; // actual. actual imu world frame
 
 public:
   bool isStatic() const{ // 現在static状態かどうか
@@ -122,26 +125,24 @@ public:
   }
 
 public:
-  // startAutoStabilizer時に呼ばれる
-  void reset(){
-    for(int i=0;i<NUM_LEGS;i++){
-      copOffset[i].reset(copOffset[i].getGoal());
-      defaultTranslatePos[i].reset(defaultTranslatePos[i].getGoal());
-      isManualControlMode[i].reset(isManualControlMode[i].getGoal());
-    }
-  }
-
-  // 内部の補間器をdtだけ進める
-  void update(double dt){
-    for(int i=0;i<NUM_LEGS;i++){
-      copOffset[i].interpolate(dt);
-      defaultTranslatePos[i].interpolate(dt);
-    }
-  }
-
-  void init(const cnoid::BodyPtr& genRobot){
-    stServoPGainPercentage.resize(genRobot->numJoints(), cpp_filters::TwoPointInterpolator<double>(100.0, 0.0, 0.0, cpp_filters::LINEAR));
-    stServoDGainPercentage.resize(genRobot->numJoints(), cpp_filters::TwoPointInterpolator<double>(100.0, 0.0, 0.0, cpp_filters::LINEAR));
+  void init(const cnoid::BodyPtr& robot){
+    maxTorque.resize(robot->numJoints(), std::numeric_limits<double>::max());
+    jointLimitTables.resize(robot->numJoints());
+    jointControllable.resize(robot->numJoints(), true);
+    refRobotRaw = robot->clone();
+    refRobotRaw->calcForwardKinematics(); refRobotRaw->calcCenterOfMass();
+    actRobotRaw = robot->clone();
+    actRobotRaw->calcForwardKinematics(); actRobotRaw->calcCenterOfMass();
+    refRobot = robot->clone();
+    refRobot->calcForwardKinematics(); refRobot->calcCenterOfMass();
+    actRobot = robot->clone();
+    actRobot->calcForwardKinematics(); actRobot->calcCenterOfMass();
+    stServoPGainPercentage.resize(robot->numJoints(), cpp_filters::TwoPointInterpolator<double>(100.0, 0.0, 0.0, cpp_filters::LINEAR));
+    stServoDGainPercentage.resize(robot->numJoints(), cpp_filters::TwoPointInterpolator<double>(100.0, 0.0, 0.0, cpp_filters::LINEAR));
+    actRobotTqc = robot->clone();
+    actRobotTqc->calcForwardKinematics(); actRobotTqc->calcCenterOfMass();
+    genRobot = robot->clone();
+    genRobot->calcForwardKinematics(); genRobot->calcCenterOfMass();
   }
 
   void push_backEE(const std::string& name_, const std::string& parentLink_, const cnoid::Position& localT_){
@@ -159,6 +160,24 @@ public:
     stEETargetPose.push_back(cnoid::Position::Identity());
   }
 
+  // startAutoStabilizer時に呼ばれる
+  void reset(){
+    for(int i=0;i<NUM_LEGS;i++){
+      copOffset[i].reset(copOffset[i].getGoal());
+      defaultTranslatePos[i].reset(defaultTranslatePos[i].getGoal());
+      isManualControlMode[i].reset(isManualControlMode[i].getGoal());
+    }
+  }
+
+  // 毎周期呼ばれる. 内部の補間器をdtだけ進める
+  void update(double dt){
+    for(int i=0;i<NUM_LEGS;i++){
+      copOffset[i].interpolate(dt);
+      defaultTranslatePos[i].interpolate(dt);
+      isManualControlMode[i].interpolate(dt);
+    }
+  }
+
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
@@ -172,6 +191,7 @@ public:
   }
 };
 
+// for debug
 inline std::ostream &operator<<(std::ostream &os, const GaitParam& gaitParam) {
   os << "current" << std::endl;
   os << " RLEG: " << std::endl;

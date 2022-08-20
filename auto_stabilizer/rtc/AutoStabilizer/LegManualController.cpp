@@ -7,11 +7,7 @@ bool LegManualController::legManualControl(const GaitParam& gaitParam, double dt
     if(!gaitParam.isStatic() || gaitParam.footstepNodesList[0].isSupportPhase[i]){ // 静止状態で無い場合や、支持脚の場合は、勝手にManualControlはオフになる
       if(o_isManualControlMode[i].getGoal() != 0.0) o_isManualControlMode[i].setGoal(0.0, 2.0); // 2.0[s]で遷移
     }else{
-      o_isManualControlMode[i].interpolate(dt);
-
-      if(o_isManualControlMode[i].getGoal() == 0.0){ // Manual Control Off
-        // pass
-      }else{ // Manual Control on
+      if(o_isManualControlMode[i].getGoal() == 1.0){ // Manual Control on
         cnoid::Position nextCoords;
         if(o_isManualControlMode[i].isEmpty()){
           nextCoords = gaitParam.icEETargetPose[i];

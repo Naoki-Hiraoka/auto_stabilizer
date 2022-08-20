@@ -97,19 +97,41 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
       std::cerr << "\x1b[31m[" << this->m_profile.instance_name << "] " << "failed to load model[" << fileName << "]" << "\x1b[39m" << std::endl;
       return RTC::RTC_ERROR;
     }
-    this->gaitParam_.refRobotRaw = robot;
-    this->gaitParam_.refRobotRaw->calcForwardKinematics(); this->gaitParam_.refRobotRaw->calcCenterOfMass();
-    this->gaitParam_.refRobot = robot;
-    this->gaitParam_.refRobot->calcForwardKinematics(); this->gaitParam_.refRobot->calcCenterOfMass();
-    this->gaitParam_.actRobotRaw = robot->clone();
-    this->gaitParam_.actRobotRaw->calcForwardKinematics(); this->gaitParam_.actRobotRaw->calcCenterOfMass();
-    this->gaitParam_.actRobot = robot->clone();
-    this->gaitParam_.actRobot->calcForwardKinematics(); this->gaitParam_.actRobot->calcCenterOfMass();
-    this->gaitParam_.genRobot = robot->clone();
-    this->gaitParam_.genRobot->calcForwardKinematics(); this->gaitParam_.genRobot->calcCenterOfMass();
-    this->gaitParam_.actRobotTqc = robot->clone();
-    this->gaitParam_.actRobotTqc->calcForwardKinematics(); this->gaitParam_.actRobotTqc->calcCenterOfMass();
+    this->gaitParam_.init(robot);
+
+    // generate JointParams
+    for(int i=0;i<this->gaitParam_.genRobot->numJoints();i++){
+      cnoid::LinkPtr joint = this->gaitParam_.genRobot->joint(i);
+      double climit = 0.0, gearRatio = 0.0, torqueConst = 0.0;
+      joint->info()->read("climit",climit); joint->info()->read("gearRatio",gearRatio); joint->info()->read("torqueConst",torqueConst);
+      this->gaitParam_.maxTorque[i] = std::max(climit * gearRatio * torqueConst, 0.0);
+    }
+    std::string jointLimitTableStr; this->getProperty("joint_limit_table",jointLimitTableStr);
+    std::vector<std::shared_ptr<joint_limit_table::JointLimitTable> > jointLimitTables = joint_limit_table::readJointLimitTablesFromProperty (this->gaitParam_.genRobot, jointLimitTableStr);
+    for(size_t i=0;i<jointLimitTables.size();i++){
+      // apply margin
+      for(size_t j=0;j<jointLimitTables[i]->lLimitTable().size();j++){
+        if(jointLimitTables[i]->uLimitTable()[j] - jointLimitTables[i]->lLimitTable()[j] > 0.002){
+          jointLimitTables[i]->uLimitTable()[j] -= 0.001;
+          jointLimitTables[i]->lLimitTable()[j] += 0.001;
+        }
+      }
+      this->gaitParam_.jointLimitTables[jointLimitTables[i]->getSelfJoint()->jointId()].push_back(jointLimitTables[i]);
+    }
+
+    // apply margin to jointlimit
+    for(int i=0;i<this->gaitParam_.genRobot->numJoints();i++){
+      cnoid::LinkPtr joint = this->gaitParam_.genRobot->joint(i);
+      if(joint->q_upper() - joint->q_lower() > 0.002){
+        joint->setJointRange(joint->q_lower()+0.001,joint->q_upper()-0.001);
+      }
+      // JointVelocityについて. 1.0だと安全.4.0は脚.10.0はlapid manipulation らしい. limitを小さくしすぎた状態で、速い指令を送ると、狭いlimitの中で高優先度タスクを頑張って満たそうとすることで、低優先度タスクを満たす余裕がなくエラーが大きくなってしまうことに注意.
+      if(joint->dq_upper() - joint->dq_lower() > 0.02){
+        joint->setJointVelocityRange(joint->dq_lower()+0.01,joint->dq_upper()-0.01);
+      }
+    }
   }
+
 
   {
     // load end_effector
@@ -151,12 +173,12 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
 
       this->gaitParam_.push_backEE(name, parentLink, localT);
     }
-  }
 
-  // 0番目が右脚. 1番目が左脚. という仮定がある.
-  if(this->gaitParam_.eeName.size() < NUM_LEGS || this->gaitParam_.eeName[RLEG] != "rleg" || this->gaitParam_.eeName[LLEG] != "lleg"){
-    std::cerr << "\x1b[31m[" << this->m_profile.instance_name << "] " << " this->gaitParam_.eeName.size() < 2 || this->gaitParams.eeName[0] != \"rleg\" || this->gaitParam_.eeName[1] != \"lleg\" not holds" << "\x1b[39m" << std::endl;
-    return RTC::RTC_ERROR;
+    // 0番目が右脚. 1番目が左脚. という仮定がある.
+    if(this->gaitParam_.eeName.size() < NUM_LEGS || this->gaitParam_.eeName[RLEG] != "rleg" || this->gaitParam_.eeName[LLEG] != "lleg"){
+      std::cerr << "\x1b[31m[" << this->m_profile.instance_name << "] " << " this->gaitParam_.eeName.size() < 2 || this->gaitParams.eeName[0] != \"rleg\" || this->gaitParam_.eeName[1] != \"lleg\" not holds" << "\x1b[39m" << std::endl;
+      return RTC::RTC_ERROR;
+    }
   }
 
   {
@@ -174,44 +196,26 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
   }
 
   {
-    // generate JointParams
-    this->gaitParam_.maxTorque.resize(this->gaitParam_.genRobot->numJoints());
-    this->gaitParam_.jointControllable.resize(this->gaitParam_.genRobot->numJoints());
-    for(int i=0;i<this->gaitParam_.genRobot->numJoints();i++){
-      cnoid::LinkPtr joint = this->gaitParam_.genRobot->joint(i);
-      double climit = 0.0, gearRatio = 0.0, torqueConst = 0.0;
-      joint->info()->read("climit",climit); joint->info()->read("gearRatio",gearRatio); joint->info()->read("torqueConst",torqueConst);
-      this->gaitParam_.maxTorque[i] = std::max(climit * gearRatio * torqueConst, 0.0);
-      this->gaitParam_.jointControllable[i] = true;
-    }
-    this->gaitParam_.jointLimitTables.resize(this->gaitParam_.genRobot->numJoints());
-    std::string jointLimitTableStr; this->getProperty("joint_limit_table",jointLimitTableStr);
-    std::vector<std::shared_ptr<joint_limit_table::JointLimitTable> > jointLimitTables = joint_limit_table::readJointLimitTablesFromProperty (this->gaitParam_.genRobot, jointLimitTableStr);
-    for(size_t i=0;i<jointLimitTables.size();i++){
-      // apply margin
-      for(size_t j=0;j<jointLimitTables[i]->lLimitTable().size();j++){
-        if(jointLimitTables[i]->uLimitTable()[j] - jointLimitTables[i]->lLimitTable()[j] > 0.002){
-          jointLimitTables[i]->uLimitTable()[j] -= 0.001;
-          jointLimitTables[i]->lLimitTable()[j] += 0.001;
-        }
-      }
-      this->gaitParam_.jointLimitTables[jointLimitTables[i]->getSelfJoint()->jointId()].push_back(jointLimitTables[i]);
+    // add more ports (ロボットモデルやEndEffectorの情報を使って)
+
+    // 各EndEffectorにつき、ref<name>WrenchInというInPortをつくる
+    this->ports_.m_refWrenchIn_.resize(this->gaitParam_.eeName.size());
+    this->ports_.m_refWrench_.resize(this->gaitParam_.eeName.size());
+    for(int i=0;i<this->gaitParam_.eeName.size();i++){
+      std::string name = "ref"+this->gaitParam_.eeName[i]+"WrenchIn";
+      this->ports_.m_refWrenchIn_[i] = std::make_unique<RTC::InPort<RTC::TimedDoubleSeq> >(name.c_str(), this->ports_.m_refWrench_[i]);
+      this->addInPort(name.c_str(), *(this->ports_.m_refWrenchIn_[i]));
     }
 
-    // apply margin to jointlimit
-    for(int i=0;i<this->gaitParam_.genRobot->numJoints();i++){
-      cnoid::LinkPtr joint = this->gaitParam_.genRobot->joint(i);
-      if(joint->q_upper() - joint->q_lower() > 0.002){
-        joint->setJointRange(joint->q_lower()+0.001,joint->q_upper()-0.001);
-      }
-      // JointVelocityについて. 1.0だと安全.4.0は脚.10.0はlapid manipulation らしい. limitを小さくしすぎた状態で、速い指令を送ると、狭いlimitの中で高優先度タスクを頑張って満たそうとすることで、低優先度タスクを満たす余裕がなくエラーが大きくなってしまうことに注意.
-      if(joint->dq_upper() - joint->dq_lower() > 0.02){
-        joint->setJointVelocityRange(joint->dq_lower()+0.01,joint->dq_upper()-0.01);
-      }
+    // 各ForceSensorにつき、act<name>InというInportをつくる
+    cnoid::DeviceList<cnoid::ForceSensor> forceSensors(this->gaitParam_.actRobotRaw->devices());
+    this->ports_.m_actWrenchIn_.resize(forceSensors.size());
+    this->ports_.m_actWrench_.resize(forceSensors.size());
+    for(int i=0;i<forceSensors.size();i++){
+      std::string name = "act"+forceSensors[i]->name()+"In";
+      this->ports_.m_actWrenchIn_[i] = std::make_unique<RTC::InPort<RTC::TimedDoubleSeq> >(name.c_str(), this->ports_.m_actWrench_[i]);
+      this->addInPort(name.c_str(), *(this->ports_.m_actWrenchIn_[i]));
     }
-
-    // init gaitParam
-    this->gaitParam_.init(this->gaitParam_.genRobot);
   }
 
   {
@@ -237,38 +241,13 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
   }
 
   // init ImpedanceController
-  for(int i=0;i<this->gaitParam_.eeName.size();i++){
-    this->impedanceController_.push_back();
-  }
+  for(int i=0;i<this->gaitParam_.eeName.size();i++) this->impedanceController_.push_backEE();
 
   // init Stabilizer
   this->stabilizer_.init(this->gaitParam_, this->gaitParam_.actRobotTqc);
 
   // init FullbodyIKSolver
   this->fullbodyIKSolver_.init(this->gaitParam_.genRobot, this->gaitParam_);
-
-  {
-    // add more ports (ロボットモデルやEndEffectorの情報を使って)
-
-    // 各EndEffectorにつき、ref<name>WrenchInというInPortをつくる
-    this->ports_.m_refWrenchIn_.resize(this->gaitParam_.eeName.size());
-    this->ports_.m_refWrench_.resize(this->gaitParam_.eeName.size());
-    for(int i=0;i<this->gaitParam_.eeName.size();i++){
-      std::string name = "ref"+this->gaitParam_.eeName[i]+"WrenchIn";
-      this->ports_.m_refWrenchIn_[i] = std::make_unique<RTC::InPort<RTC::TimedDoubleSeq> >(name.c_str(), this->ports_.m_refWrench_[i]);
-      this->addInPort(name.c_str(), *(this->ports_.m_refWrenchIn_[i]));
-    }
-
-    // 各ForceSensorにつき、act<name>InというInportをつくる
-    cnoid::DeviceList<cnoid::ForceSensor> forceSensors(this->gaitParam_.actRobotRaw->devices());
-    this->ports_.m_actWrenchIn_.resize(forceSensors.size());
-    this->ports_.m_actWrench_.resize(forceSensors.size());
-    for(int i=0;i<forceSensors.size();i++){
-      std::string name = "act"+forceSensors[i]->name()+"In";
-      this->ports_.m_actWrenchIn_[i] = std::make_unique<RTC::InPort<RTC::TimedDoubleSeq> >(name.c_str(), this->ports_.m_actWrench_[i]);
-      this->addInPort(name.c_str(), *(this->ports_.m_actWrenchIn_[i]));
-    }
-  }
 
   // initialize parameters
   this->loop_ = 0;
