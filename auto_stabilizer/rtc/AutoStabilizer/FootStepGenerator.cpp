@@ -109,12 +109,11 @@ bool FootStepGenerator::goPos(const GaitParam& gaitParam, double x/*m*/, double 
 
   cnoid::Position currentPose;
   {
-    cnoid::Position rleg = footstepNodesList.back().dstCoords[RLEG];
+    cnoid::Position rleg = mathutil::orientCoordToAxis(footstepNodesList.back().dstCoords[RLEG], cnoid::Vector3::UnitZ());
     rleg.translation() -= rleg.linear() * gaitParam.defaultTranslatePos[RLEG].value();
-    cnoid::Position lleg = footstepNodesList.back().dstCoords[LLEG];
+    cnoid::Position lleg = mathutil::orientCoordToAxis(footstepNodesList.back().dstCoords[LLEG], cnoid::Vector3::UnitZ());
     lleg.translation() -= lleg.linear() * gaitParam.defaultTranslatePos[LLEG].value();
     currentPose = mathutil::calcMidCoords(std::vector<cnoid::Position>{rleg, lleg}, std::vector<double>{footstepNodesList.back().isSupportPhase[RLEG] ? 1.0 : 0.0, footstepNodesList.back().isSupportPhase[LLEG] ? 1.0 : 0.0});
-    currentPose = mathutil::orientCoordToAxis(currentPose, cnoid::Vector3::UnitZ());
   }
   cnoid::Position trans;
   trans.translation() = cnoid::Vector3(x, y, 0.0);
@@ -132,12 +131,11 @@ bool FootStepGenerator::goPos(const GaitParam& gaitParam, double x/*m*/, double 
     this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos, diff);
     steps++;
     {
-      cnoid::Position rleg = footstepNodesList.back().dstCoords[RLEG];
+      cnoid::Position rleg = mathutil::orientCoordToAxis(footstepNodesList.back().dstCoords[RLEG], cnoid::Vector3::UnitZ());
       rleg.translation() -= rleg.linear() * gaitParam.defaultTranslatePos[RLEG].value();
-      cnoid::Position lleg = footstepNodesList.back().dstCoords[LLEG];
+      cnoid::Position lleg = mathutil::orientCoordToAxis(footstepNodesList.back().dstCoords[LLEG], cnoid::Vector3::UnitZ());
       lleg.translation() -= lleg.linear() * gaitParam.defaultTranslatePos[LLEG].value();
       currentPose = mathutil::calcMidCoords(std::vector<cnoid::Position>{rleg, lleg}, std::vector<double>{footstepNodesList[footstepNodesList.size()-2].isSupportPhase[LLEG] ? 1.0 : 0.0, footstepNodesList[footstepNodesList.size()-2].isSupportPhase[RLEG] ? 1.0 : 0.0}); // 前回swingした足の位置を見る
-      currentPose = mathutil::orientCoordToAxis(currentPose, cnoid::Vector3::UnitZ());
     }
   }
 

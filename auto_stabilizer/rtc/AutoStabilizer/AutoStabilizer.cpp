@@ -1224,6 +1224,33 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
 bool AutoStabilizer::getFootStepState(OpenHRP::AutoStabilizerService::FootStepState& i_param) {
   std::lock_guard<std::mutex> guard(this->mutex_);
 
+  i_param.leg_coords.length(NUM_LEGS);
+  i_param.support_leg.length(NUM_LEGS);
+  i_param.leg_src_coords.length(NUM_LEGS);
+  i_param.leg_dst_coords.length(NUM_LEGS);
+  for(int i=0;i<NUM_LEGS;i++){
+    i_param.leg_coords[i].leg = this->gaitParam_.eeName[i].c_str();
+    AutoStabilizer::copyEigenCoords2FootStep(this->gaitParam_.genCoords[i].value(), i_param.leg_coords[i]);
+    i_param.support_leg[i] = this->gaitParam_.footstepNodesList[0].isSupportPhase[i];
+    i_param.leg_src_coords[i].leg = this->gaitParam_.eeName[i].c_str();
+    AutoStabilizer::copyEigenCoords2FootStep(this->gaitParam_.srcCoords[i], i_param.leg_src_coords[i]);
+    i_param.leg_dst_coords[i].leg = this->gaitParam_.eeName[i].c_str();
+    AutoStabilizer::copyEigenCoords2FootStep(this->gaitParam_.footstepNodesList[0].dstCoords[i], i_param.leg_dst_coords[i]);
+  }
+  // 現在支持脚、または現在遊脚で次支持脚になる脚の、dstCoordsの中間. 水平
+  std::vector<double> weights(NUM_LEGS, 0.0);
+  for(int i=0;i<NUM_LEGS; i++){
+    if(this->gaitParam_.footstepNodesList[0].isSupportPhase[i] ||
+       (this->gaitParam_.footstepNodesList.size() > 1 && this->gaitParam_.footstepNodesList[1].isSupportPhase[i]))
+      weights[i] = 1.0;
+  }
+  if(weights[RLEG] == 0.0 && weights[LLEG] == 0.0) {
+    weights[RLEG] = 1.0; weights[LLEG] = 1.0;
+  }
+  if(weights[RLEG] == 1.0 && weights[LLEG] == 1.0) i_param.dst_foot_midcoords.leg = "both";
+  else if(weights[RLEG] == 1.0) i_param.dst_foot_midcoords.leg = "rleg";
+  else if(weights[LLEG] == 1.0) i_param.dst_foot_midcoords.leg = "lleg";
+  AutoStabilizer::copyEigenCoords2FootStep(mathutil::orientCoordToAxis(mathutil::calcMidCoords(this->gaitParam_.footstepNodesList[0].dstCoords, weights), cnoid::Vector3::UnitZ()), i_param.dst_foot_midcoords);
   return true;
 }
 
@@ -1239,6 +1266,14 @@ bool AutoStabilizer::getProperty(const std::string& key, std::string& ret) {
   return true;
 }
 
+// static function
+void AutoStabilizer::copyEigenCoords2FootStep(const cnoid::Position& in_fs, OpenHRP::AutoStabilizerService::Footstep& out_fs){
+  out_fs.pos.length(3);
+  for(int j=0;j<3;j++) out_fs.pos[j] = in_fs.translation()[j];
+  out_fs.rot.length(4);
+  Eigen::Quaterniond quat(in_fs.linear());
+  out_fs.rot[0] = quat.w(); out_fs.rot[1] = quat.x(); out_fs.rot[2] = quat.y(); out_fs.rot[3] = quat.z();
+}
 
 extern "C"{
     void AutoStabilizerInit(RTC::Manager* manager) {

@@ -74,20 +74,6 @@ module OpenHRP
     };
 
     /**
-     * @struct FootstepState
-     * @brief Foot step state.
-     */
-    struct FootStepState
-    {
-      sequence<Footstep, 2> leg_coords;
-      sequence<boolean, 2> support_phase;
-      sequence<Footstep, 2> leg_src_coords;
-      sequence<Footstep, 2> leg_dst_coords;
-      // 現在片脚支持期なら遊脚のdstCoords - defaultTranslatePos. そうでないなら両足のdstCoords - defaultTramslatePosの中間
-      Footstep dst_foot_midcoords;
-    };
-
-    /**
      * @enum EmergencyCheckMode
      * @brief Mode of emergency checking
      */
@@ -374,6 +360,20 @@ module OpenHRP
      * @return true if set successfully, false otherwise
      */
     boolean getAutoStabilizerParam(out AutoStabilizerParam i_param);
+
+    /**
+     * @struct FootstepState
+     * @brief Foot step state.
+     */
+    struct FootStepState
+    {
+      sequence<Footstep, 2> leg_coords;
+      sequence<boolean, 2> support_leg;
+      sequence<Footstep, 2> leg_src_coords;
+      sequence<Footstep, 2> leg_dst_coords;
+      // 現在支持脚、または現在遊脚で次支持脚になる脚の、dstCoordsの中間. 水平
+      Footstep dst_foot_midcoords;
+    };
 
     boolean getFootStepState(out FootStepState i_param);
 
