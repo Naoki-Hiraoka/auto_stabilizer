@@ -9,7 +9,7 @@ rtmlaunch auto_stabilizer_choreonoid_sample jaxon_jvrc_choreonoid.launch
 ```lisp
 roseus
 (load "package://hrpsys_choreonoid_tutorials/euslisp/jaxon_jvrc-interface.l")
-(load "package://auto_stabilizer_choreonoid_sample/euslisp/auto-stabilizer-interface.l")
+(load "package://auto_stabilizer/euslisp/auto-stabilizer-interface.l")
 (jaxon_jvrc-init)
 (setq *robot* *jaxon_jvrc*)
 ;;(send *ri* :start-auto-balancer)
