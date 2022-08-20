@@ -452,6 +452,9 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
        ((footstepNodesList[0].isSupportPhase[RLEG] && !footstepNodesList[0].isSupportPhase[LLEG]) || (!footstepNodesList[0].isSupportPhase[RLEG] && footstepNodesList[0].isSupportPhase[LLEG]))))
      return;
 
+  // 残り時間がoverwritableRemainTimeを下回っている場合、着地位置時間修正を行わない.
+  if(footstepNodesList[0].remainTime < this->overwritableRemainTime) return;
+
   // one step capturabilityに基づき、footstepNodesList[0]のremainTimeとdstCoordsを修正する.
   int swingLeg = footstepNodesList[0].isSupportPhase[RLEG] ? LLEG : RLEG;
   int supportLeg = (swingLeg == RLEG) ? LLEG : RLEG;

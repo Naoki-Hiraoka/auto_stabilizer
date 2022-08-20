@@ -14,9 +14,10 @@ public:
   double defaultStepHeight = 0.07; // [m]. 0以上
   unsigned int goVelocityStepNum = 6; // 1以上
   bool isModifyFootSteps = true; // 着地位置時間修正を行うかどうか
-  double overwritableMinTime = 0.3; // 0より大きい. 次indexまでの残り時間がこの値を下回るようには着地時間修正を行わない. もともと下回っている場合には、その値を下回るようには着地時刻修正を行わない. これが無いと脚を空中から下ろす時間が足りなくて急激に動く
-  double overwritableMinStepTime = 0.6; // 0より大きい. 現index開始時からの経過時間がこの値を下回るようには着地時間修正を行わない. もともと下回っている場合には、その値を下回るようには着地時刻修正を行わない. これが無いと脚を地面から上げて下ろす時間が足りなくて急激に動く
-  double overwritableMaxStepTime = 1.5; // overwritableMinStepTimeより大きい. 現index開始時からの経過時間がこの値を上回るようには着地時間修正を行わない. もともと上回っている場合には、その値を上回るようには着地時刻修正を行わない. これが無いと、DCMが片足のcopとほぼ一致しているときに、ずっと脚を浮かせたまま止まってしまう.
+  double overwritableRemainTime = 0.136; // 0以上. 次indexまでの残り時間がこの値を下回っている場合、着地位置時間修正を行わない.
+  double overwritableMinTime = 0.3; // 0より大きい. 次indexまでの残り時間がこの値を下回るようには着地時間修正を行わない. もともと下回っている場合には、その値を下回るようには着地時間修正を行わない. これが無いと脚を空中から下ろす時間が足りなくて急激に動く
+  double overwritableMinStepTime = 0.6; // 0より大きい. 現index開始時からの経過時間がこの値を下回るようには着地時間修正を行わない. もともと下回っている場合には、その値を下回るようには着地時間修正を行わない. これが無いと脚を地面から上げて下ろす時間が足りなくて急激に動く
+  double overwritableMaxStepTime = 1.5; // overwritableMinStepTimeより大きい. 現index開始時からの経過時間がこの値を上回るようには着地時間修正を行わない. もともと上回っている場合には、その値を上回るようには着地時間修正を行わない. これが無いと、DCMが片足のcopとほぼ一致しているときに、ずっと脚を浮かせたまま止まってしまう.
   double overwritableMaxSwingVelocity = 1.0; //0より大きい [m/s]. 今の遊脚の位置のXYから着地位置のXYまで移動するための速度がこの値を上回るようには着地位置時間修正を行わない
   std::vector<std::vector<cnoid::Vector3> > safeLegHull = std::vector<std::vector<cnoid::Vector3> >(2, std::vector<cnoid::Vector3>{cnoid::Vector3(0.075,0.055,0.0),cnoid::Vector3(-0.075,0.055,0.0),cnoid::Vector3(-0.075,-0.055,0.0),cnoid::Vector3(0.075,-0.055,0.0)}); // 要素数2. rleg: 0. lleg: 1. leg frame.  凸形状で,上から見て半時計回り. Z成分はあったほうが計算上扱いやすいからありにしているが、0でなければならない. 大きさはgaitParam.legHull以下
   std::vector<std::vector<cnoid::Vector3> > overwritableStrideLimitationHull = std::vector<std::vector<cnoid::Vector3> >{std::vector<cnoid::Vector3>{cnoid::Vector3(0.3,-0.18,0),cnoid::Vector3(-0.3,-0.18,0),cnoid::Vector3(-0.3,-0.30,0),cnoid::Vector3(-0.15,-0.45,0),cnoid::Vector3(0.15,-0.45,0),cnoid::Vector3(0.3,-0.30,0)},std::vector<cnoid::Vector3>{cnoid::Vector3(0.3,0.30,0),cnoid::Vector3(0.15,0.45,0),cnoid::Vector3(-0.15,0.45,0),cnoid::Vector3(-0.3,0.30,0),cnoid::Vector3(-0.3,0.18,0),cnoid::Vector3(0.3,0.18,0)}}; // 要素数2. 0: rleg用, 1: lleg用. 着地位置修正時に自動生成されるfootstepの上下限の凸包. 反対の脚のEndEffector frame(Z軸は鉛直)で表現した着地可能領域(自己干渉やIKの考慮が含まれる). あったほうが扱いやすいのでZ成分があるが、Z成分は0でないといけない. 凸形状で,上から見て半時計回り. thetaとは独立に評価されるので、defaultStrideLimitationThetaだけ傾いていても大丈夫なようにせよ. 斜め方向の角を削るなどして、IKが解けるようにせよ. 歩行中は急激に変更されない
