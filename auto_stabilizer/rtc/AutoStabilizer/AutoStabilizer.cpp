@@ -1221,6 +1221,12 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
   return true;
 }
 
+bool AutoStabilizer::getFootStepState(OpenHRP::AutoStabilizerService::FootStepState& i_param) {
+  std::lock_guard<std::mutex> guard(this->mutex_);
+
+  return true;
+}
+
 bool AutoStabilizer::getProperty(const std::string& key, std::string& ret) {
   if (this->getProperties().hasKey(key.c_str())) {
     ret = std::string(this->getProperties()[key.c_str()]);

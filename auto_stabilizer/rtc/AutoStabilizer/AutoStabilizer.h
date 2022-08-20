@@ -58,6 +58,7 @@ public:
   bool stopAutoBalancer();
   bool setAutoStabilizerParam(const OpenHRP::AutoStabilizerService::AutoStabilizerParam& i_param);
   bool getAutoStabilizerParam(OpenHRP::AutoStabilizerService::AutoStabilizerParam& i_param);
+  bool getFootStepState(OpenHRP::AutoStabilizerService::FootStepState& i_param);
   bool releaseEmergencyStop();
   bool startStabilizer(void);
   bool stopStabilizer(void);

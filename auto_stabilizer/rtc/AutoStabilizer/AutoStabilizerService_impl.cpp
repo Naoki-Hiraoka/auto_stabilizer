@@ -75,6 +75,12 @@ CORBA::Boolean AutoStabilizerService_impl::getAutoStabilizerParam(OpenHRP::AutoS
   return this->comp_->getAutoStabilizerParam(*i_param);
 };
 
+CORBA::Boolean AutoStabilizerService_impl::getFootStepState(OpenHRP::AutoStabilizerService::FootStepState_out i_param)
+{
+  i_param = new OpenHRP::AutoStabilizerService::FootStepState();
+  return this->comp_->getFootStepState(*i_param);
+};
+
 CORBA::Boolean AutoStabilizerService_impl::releaseEmergencyStop()
 {
     return this->comp_->releaseEmergencyStop();

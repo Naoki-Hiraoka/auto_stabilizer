@@ -74,20 +74,16 @@ module OpenHRP
     };
 
     /**
-     * @struct FootstepParam
-     * @brief Foot step parameters.
+     * @struct FootstepState
+     * @brief Foot step state.
      */
-    struct FootstepParam
+    struct FootStepState
     {
-      /// Support foot coords
-      Footstep support_leg_coords;
-      /// Swing foot coords, which is interpolation betwee swing_leg_src_coords and swing_leg_dst_coords
-      Footstep swing_leg_coords;
-      /// Source coords for swing foot
-      Footstep swing_leg_src_coords;
-      /// Destination coords for swing foot
-      Footstep swing_leg_dst_coords;
-      /// Destination foot midcoords
+      sequence<Footstep, 2> leg_coords;
+      sequence<boolean, 2> support_phase;
+      sequence<Footstep, 2> leg_src_coords;
+      sequence<Footstep, 2> leg_dst_coords;
+      // 現在片脚支持期なら遊脚のdstCoords - defaultTranslatePos. そうでないなら両足のdstCoords - defaultTramslatePosの中間
       Footstep dst_foot_midcoords;
     };
 
@@ -378,6 +374,8 @@ module OpenHRP
      * @return true if set successfully, false otherwise
      */
     boolean getAutoStabilizerParam(out AutoStabilizerParam i_param);
+
+    boolean getFootStepState(out FootStepState i_param);
 
   };
 };
