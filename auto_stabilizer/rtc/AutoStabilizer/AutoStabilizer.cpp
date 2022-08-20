@@ -1218,7 +1218,6 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
     }
   }
 
-  // i_param.leg_names // refFootOriginWeightとautoControlRatioが必要 TODO
   return true;
 }
 
