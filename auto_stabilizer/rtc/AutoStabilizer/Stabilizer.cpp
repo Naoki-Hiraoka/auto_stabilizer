@@ -428,6 +428,10 @@ bool Stabilizer::calcTorque(double dt, const GaitParam& gaitParam, const std::ve
       }
     }
   }
+  for(int i=0;i<gaitParam.genRobot->numJoints();i++){
+    o_stServoPGainPercentage[i].interpolate(dt);
+    o_stServoDGainPercentage[i].interpolate(dt);
+  }
 
   return true;
 }
