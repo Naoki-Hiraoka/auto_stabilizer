@@ -11,17 +11,16 @@ cmake_policy(SET CMP0046 OLD)
 find_package(catkin REQUIRED COMPONENTS
   rtmbuild2
   roscpp
-  hrpsys_ros_bridge
   )
 
 # catkin_python_setup()
 # initialize rtmbuild (generate_messages is called)
-rtmbuild2_init(hrpsys_ros_bridge rtmbuild2)
+rtmbuild2_init(rtmbuild2)
 
 catkin_package(
 #  INCLUDE_DIRS include
   LIBRARIES AutoStabilizerServiceSkel AutoStabilizerServiceStub
-  CATKIN_DEPENDS hrpsys_ros_bridge rtmbuild2
+  CATKIN_DEPENDS rtmbuild2
 #  DEPENDS system_lib
 )
 

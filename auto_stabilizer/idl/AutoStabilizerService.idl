@@ -1,7 +1,6 @@
 #ifndef AutoStabilizerService_idl
 #define AutoStabilizerService_idl
 
-#include "hrpsys_ros_bridge/idl/RobotHardwareService.idl"
 module OpenHRP
 {
 
