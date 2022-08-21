@@ -188,7 +188,7 @@ module OpenHRP
       /// convex hull. [m]. 歩行中は変更不可
       sequence<sequence<sequence<double, 2> >, 2> overwritable_stride_limitation;
       /// [N]
-      double contact_detection_threshould;
+      double contact_detection_threshold;
       /// whether step when emergency
       boolean is_emergency_step_mode;
       /// whether gostop after becoming stable

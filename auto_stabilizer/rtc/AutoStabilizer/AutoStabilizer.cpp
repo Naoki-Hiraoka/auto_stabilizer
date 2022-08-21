@@ -945,7 +945,7 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
       }
     }
   }
-  this->footStepGenerator_.contactDetectionThreshold = i_param.contact_detection_threshould;
+  this->footStepGenerator_.contactDetectionThreshold = i_param.contact_detection_threshold;
   this->footStepGenerator_.isEmergencyStepMode = i_param.is_emergency_step_mode;
   this->footStepGenerator_.isStableGoStopMode = i_param.is_stable_go_stop_mode;
   this->footStepGenerator_.emergencyStepNum = std::max(i_param.emergency_step_num, 1);
@@ -1150,7 +1150,7 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
       for(int k=0;k<2;k++) i_param.overwritable_stride_limitation[i][j][k] = this->footStepGenerator_.overwritableStrideLimitationHull[i][j][k];
     }
   }
-  i_param.contact_detection_threshould = this->footStepGenerator_.contactDetectionThreshold;
+  i_param.contact_detection_threshold = this->footStepGenerator_.contactDetectionThreshold;
   i_param.is_emergency_step_mode = this->footStepGenerator_.isEmergencyStepMode;
   i_param.is_stable_go_stop_mode = this->footStepGenerator_.isStableGoStopMode;
   i_param.emergency_step_num = this->footStepGenerator_.emergencyStepNum;
