@@ -55,7 +55,7 @@ bool RefToGenFrameConverter::convertFrame(const GaitParam& gaitParam, double dt,
     lleg.translation() += lleg.linear() * gaitParam.copOffset[LLEG].value();
     cnoid::Position midCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{rleg, lleg}, std::vector<double>{1.0, 1.0});
     rleg = mathutil::orientCoordToAxis(rleg, cnoid::Vector3::UnitZ());
-    lleg = mathutil::orientCoordToAxis(rleg, cnoid::Vector3::UnitZ());
+    lleg = mathutil::orientCoordToAxis(lleg, cnoid::Vector3::UnitZ());
     midCoords = mathutil::orientCoordToAxis(midCoords, cnoid::Vector3::UnitZ());
     rleg.translation() -= rleg.linear() * gaitParam.defaultTranslatePos[RLEG].value();
     lleg.translation() -= lleg.linear() * gaitParam.defaultTranslatePos[LLEG].value();
