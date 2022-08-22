@@ -39,9 +39,11 @@ AutoStabilizer::Ports::Ports() :
   m_genBasePosOut_("genBasePosOut", m_genBasePos_),
   m_genBaseRpyOut_("genBaseRpyOut", m_genBaseRpy_),
   m_genCogOut_("genCogOut", m_genCog_),
+  m_genDcmOut_("genDcmOut", m_genDcm_),
   m_genZmpOut_("genZmpOut", m_genZmp_),
   m_tgtZmpOut_("tgtZmpOut", m_tgtZmp_),
   m_actCogOut_("actCogOut", m_actCog_),
+  m_actDcmOut_("actDcmOut", m_actDcm_),
 
   m_AutoStabilizerServicePort_("AutoStabilizerService"),
 
@@ -72,9 +74,11 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
   this->addOutPort("genBasePosOut", this->ports_.m_genBasePosOut_);
   this->addOutPort("genBaseRpyOut", this->ports_.m_genBaseRpyOut_);
   this->addOutPort("genCogOut", this->ports_.m_genCogOut_);
+  this->addOutPort("genDcmOut", this->ports_.m_genDcmOut_);
   this->addOutPort("genZmpOut", this->ports_.m_genZmpOut_);
   this->addOutPort("tgtZmpOut", this->ports_.m_tgtZmpOut_);
   this->addOutPort("actCogOut", this->ports_.m_actCogOut_);
+  this->addOutPort("actDcmOut", this->ports_.m_actDcmOut_);
   this->ports_.m_AutoStabilizerServicePort_.registerProvider("service0", "AutoStabilizerService", this->ports_.m_service0_);
   this->addPort(this->ports_.m_AutoStabilizerServicePort_);
   this->ports_.m_RobotHardwareServicePort_.registerConsumer("service0", "RobotHardwareService", this->ports_.m_robotHardwareService0_);
@@ -580,6 +584,12 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
     ports.m_genCog_.data.y = gaitParam.genCog[1];
     ports.m_genCog_.data.z = gaitParam.genCog[2];
     ports.m_genCogOut_.write();
+    cnoid::Vector3 genDcm = gaitParam.genCog + gaitParam.genCogVel / gaitParam.omega;
+    ports.m_genDcm_.tm = ports.m_qRef_.tm;
+    ports.m_genDcm_.data.x = genDcm[0];
+    ports.m_genDcm_.data.y = genDcm[1];
+    ports.m_genDcm_.data.z = genDcm[2];
+    ports.m_genDcmOut_.write();
     ports.m_genZmp_.tm = ports.m_qRef_.tm;
     ports.m_genZmp_.data.x = gaitParam.refZmpTraj[0].getStart()[0];
     ports.m_genZmp_.data.y = gaitParam.refZmpTraj[0].getStart()[1];
@@ -595,6 +605,12 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
     ports.m_actCog_.data.y = gaitParam.actCog[1];
     ports.m_actCog_.data.z = gaitParam.actCog[2];
     ports.m_actCogOut_.write();
+    cnoid::Vector3 actDcm = gaitParam.actCog + gaitParam.actCogVel.value() / gaitParam.omega;
+    ports.m_actDcm_.tm = ports.m_qRef_.tm;
+    ports.m_actDcm_.data.x = actDcm[0];
+    ports.m_actDcm_.data.y = actDcm[1];
+    ports.m_actDcm_.data.z = actDcm[2];
+    ports.m_actDcmOut_.write();
     for(int i=0;i<gaitParam.eeName.size();i++){
       ports.m_actEEWrench_[i].tm = ports.m_qRef_.tm;
       ports.m_actEEWrench_[i].data.length(6);

@@ -119,10 +119,14 @@ protected:
     RTC::OutPort<RTC::TimedPoint3D> m_genCogOut_; // for log
     RTC::TimedPoint3D m_genZmp_; // Generate World frame
     RTC::OutPort<RTC::TimedPoint3D> m_genZmpOut_; // for log
+    RTC::TimedPoint3D m_genDcm_; // Generate World frame
+    RTC::OutPort<RTC::TimedPoint3D> m_genDcmOut_; // for log
     RTC::TimedPoint3D m_tgtZmp_; // Generate World frame
     RTC::OutPort<RTC::TimedPoint3D> m_tgtZmpOut_; // for log
     RTC::TimedPoint3D m_actCog_; // Generate World frame
     RTC::OutPort<RTC::TimedPoint3D> m_actCogOut_; // for log
+    RTC::TimedPoint3D m_actDcm_; // Generate World frame
+    RTC::OutPort<RTC::TimedPoint3D> m_actDcmOut_; // for log
     std::vector<RTC::TimedDoubleSeq> m_tgtEEWrench_; // Generate World frame. EndEffector origin. 要素数及び順番はendEffectors_と同じ
     std::vector<std::unique_ptr<RTC::OutPort<RTC::TimedDoubleSeq> > > m_tgtEEWrenchOut_;
     std::vector<RTC::TimedDoubleSeq> m_actEEWrench_; // Generate World frame. EndEffector origin. 要素数及び順番はendEffectors_と同じ
