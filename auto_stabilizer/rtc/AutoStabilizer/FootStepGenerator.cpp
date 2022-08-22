@@ -87,9 +87,9 @@ bool FootStepGenerator::setFootSteps(const GaitParam& gaitParam, const std::vect
     if(!footsteps[i].swingEnd) footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), footsteps[i].stepTime * this->defaultDoubleSupportRatio));
   }
 
-  if(footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG]){
-    footstepNodesList.back().remainTime = std::max(footstepNodesList.back().remainTime, this->defaultStepTime); // 末尾の両足支持期を延長. これがないと重心が目標位置に収束する前に返ってしまい, emergencyStepが無限に誘発する
-  }
+  // if(footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG]){
+  //   footstepNodesList.back().remainTime = std::max(footstepNodesList.back().remainTime, this->defaultStepTime); // 末尾の両足支持期を延長. これがないと重心が目標位置に収束する前に返ってしまい, emergencyStepが無限に誘発する? -> footGudedBalanceTimeを0.4程度に小さくするとよい
+  // }
 
   o_footstepNodesList = footstepNodesList;
   return true;
@@ -153,7 +153,7 @@ bool FootStepGenerator::goPos(const GaitParam& gaitParam, double x/*m*/, double 
     this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos);
   }
 
-  footstepNodesList.back().remainTime = std::max(footstepNodesList.back().remainTime, this->defaultStepTime); // 末尾の両足支持期を延長. これがないと重心が目標位置に収束する前に返ってしまい, emergencyStepが無限に誘発する
+  // footstepNodesList.back().remainTime = std::max(footstepNodesList.back().remainTime, this->defaultStepTime); // 末尾の両足支持期を延長. これがないと重心が目標位置に収束する前に返ってしまい, emergencyStepが無限に誘発する -> footGudedBalanceTimeを0.4程度に小さくするとよい
 
   o_footstepNodesList = footstepNodesList;
   return true;
@@ -176,7 +176,7 @@ bool FootStepGenerator::goStop(const GaitParam& gaitParam,
     this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos);
   }
 
-  footstepNodesList.back().remainTime = std::max(footstepNodesList.back().remainTime, this->defaultStepTime); // 末尾の両足支持期を延長. これがないと重心が目標位置に収束する前に返ってしまい, emergencyStepが無限に誘発する
+  // footstepNodesList.back().remainTime = std::max(footstepNodesList.back().remainTime, this->defaultStepTime); // 末尾の両足支持期を延長. これがないと重心が目標位置に収束する前に返ってしまい, emergencyStepが無限に誘発する -> footGudedBalanceTimeを0.4程度に小さくするとよい
 
   o_footstepNodesList = footstepNodesList;
   return true;
@@ -235,6 +235,13 @@ bool FootStepGenerator::calcFootSteps(const GaitParam& gaitParam, const double& 
       this->updateGoVelocitySteps(footstepNodesList, gaitParam.defaultTranslatePos, gaitParam.cmdVel);
     }
     while(footstepNodesList.size() < this->goVelocityStepNum){
+      if(footstepNodesList.size() == 1 &&
+         footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG]){ // 両足支持期を延長
+        // 現在の時刻から突然refZmpTrajが変化すると、大きなZMP入力変化が必要になる. いまの位置でrefZmpTrajをthis->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio)の間とめて、次にthis->defaultStepTime * this->defaultDoubleSupportRatioの間で次の支持脚側に動かす
+        footstepNodesList.back().remainTime = this->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio);
+        footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * this->defaultDoubleSupportRatio));
+      }
+
       this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos, gaitParam.cmdVel * this->defaultStepTime);
     }
   }
