@@ -80,6 +80,29 @@ class JAXON_RED_HrpsysConfigurator(ChoreonoidHrpsysConfigurator):
         lhand_group = ['lhand', ['LARM_F_JOINT0', 'LARM_F_JOINT1']]
         self.Groups = [rarm_group, larm_group, rleg_group, lleg_group, head_group, torso_group, rhand_group, lhand_group]
 
+    def setupLogger(self):
+        if self.ast:
+            self.log_svc.add("TimedDoubleSeq","ast_q")
+            rtm.connectPorts(rtm.findRTC("ast").port("q"),rtm.findRTC("log").port("ast_q"))
+            self.log_svc.add("TimedPoint3D","ast_genCogOut")
+            rtm.connectPorts(rtm.findRTC("ast").port("genCogOut"),rtm.findRTC("log").port("ast_genCogOut"))
+            self.log_svc.add("TimedPoint3D","ast_genDcmOut")
+            rtm.connectPorts(rtm.findRTC("ast").port("genDcmOut"),rtm.findRTC("log").port("ast_genDcmOut"))
+            self.log_svc.add("TimedPoint3D","ast_genZmpOut")
+            rtm.connectPorts(rtm.findRTC("ast").port("genZmpOut"),rtm.findRTC("log").port("ast_genZmpOut"))
+            self.log_svc.add("TimedPoint3D","ast_tgtZmpOut")
+            rtm.connectPorts(rtm.findRTC("ast").port("tgtZmpOut"),rtm.findRTC("log").port("ast_tgtZmpOut"))
+            self.log_svc.add("TimedPoint3D","ast_actCogOut")
+            rtm.connectPorts(rtm.findRTC("ast").port("actCogOut"),rtm.findRTC("log").port("ast_actCogOut"))
+            self.log_svc.add("TimedPoint3D","ast_actDcmOut")
+            rtm.connectPorts(rtm.findRTC("ast").port("actDcmOut"),rtm.findRTC("log").port("ast_actDcmOut"))
+            for ee in ["rleg", "lleg", "rarm", "larm"]:
+                self.log_svc.add("TimedDoubleSeq","ast_tgt" + ee + "WrenchOut")
+                rtm.connectPorts(rtm.findRTC("ast").port("tgt" + ee + "WrenchOut"),rtm.findRTC("log").port("ast_tgt" + ee + "WrenchOut"))
+                self.log_svc.add("TimedDoubleSeq","ast_act" + ee + "WrenchOut")
+                rtm.connectPorts(rtm.findRTC("ast").port("act" + ee + "WrenchOut"),rtm.findRTC("log").port("ast_act" + ee + "WrenchOut"))
+        super(JAXON_RED_HrpsysConfigurator, self).setupLogger()
+
     def startABSTIMP (self):
         ### not used on hrpsys
         if self.el:
