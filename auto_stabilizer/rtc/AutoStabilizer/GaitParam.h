@@ -110,6 +110,7 @@ public:
   std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> > stEEOffset = std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >(2, cpp_filters::TwoPointInterpolator<cnoid::Vector6>(cnoid::Vector6::Zero(),cnoid::Vector6::Zero(),cnoid::Vector6::Zero(), cpp_filters::HOFFARBIB)); // 要素数2. rleg: 1. lleg: 1. generate frame. endEffector origin. stで計算されるオフセット(Damping Control)
   std::vector<cnoid::Position> stEETargetPose; // 要素数と順序はeeNameと同じ.generate frame. stで計算された目標位置姿勢. stEETargetPose = stEEOffset + abcEETargetPose
   cnoid::Vector3 stTargetZmp; // generate frame. stで計算された目標ZMP
+  std::vector<cnoid::Vector6> stEETargetWrench; // 要素数と順序はeeNameと同じ.generate frame. EndEffector origin. ロボットが受ける力
   std::vector<cpp_filters::TwoPointInterpolator<double> > stServoPGainPercentage; // 要素数と順序はrobot->numJoints()と同じ. 0~100. 現状, setGoal(*,dt)以下の時間でgoal指定するとwriteOutPortDataが破綻する
   std::vector<cpp_filters::TwoPointInterpolator<double> > stServoDGainPercentage; // 要素数と順序はrobot->numJoints()と同じ. 0~100. 現状, setGoal(*,dt)以下の時間でgoal指定するとwriteOutPortDataが破綻する
   cnoid::BodyPtr actRobotTqc; // output. 関節トルク制御用. (actRobotと同じだが、uの値として指令関節トルクが入っている)
@@ -156,6 +157,7 @@ public:
     icEETargetPose.push_back(cnoid::Position::Identity());
     abcEETargetPose.push_back(cnoid::Position::Identity());
     stEETargetPose.push_back(cnoid::Position::Identity());
+    stEETargetWrench.push_back(cnoid::Vector6::Zero());
   }
 
   // startAutoStabilizer時に呼ばれる

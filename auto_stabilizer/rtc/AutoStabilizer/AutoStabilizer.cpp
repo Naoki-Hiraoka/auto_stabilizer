@@ -38,6 +38,10 @@ AutoStabilizer::Ports::Ports() :
 
   m_genBasePosOut_("genBasePosOut", m_genBasePos_),
   m_genBaseRpyOut_("genBaseRpyOut", m_genBaseRpy_),
+  m_genCogOut_("genCogOut", m_genCog_),
+  m_genZmpOut_("genZmpOut", m_genZmp_),
+  m_tgtZmpOut_("tgtZmpOut", m_tgtZmp_),
+  m_actCogOut_("actCogOut", m_actCog_),
 
   m_AutoStabilizerServicePort_("AutoStabilizerService"),
 
@@ -67,6 +71,10 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
   this->addOutPort("genBaseTformOut", this->ports_.m_genBaseTformOut_);
   this->addOutPort("genBasePosOut", this->ports_.m_genBasePosOut_);
   this->addOutPort("genBaseRpyOut", this->ports_.m_genBaseRpyOut_);
+  this->addOutPort("genCogOut", this->ports_.m_genCogOut_);
+  this->addOutPort("genZmpOut", this->ports_.m_genZmpOut_);
+  this->addOutPort("tgtZmpOut", this->ports_.m_tgtZmpOut_);
+  this->addOutPort("actCogOut", this->ports_.m_actCogOut_);
   this->ports_.m_AutoStabilizerServicePort_.registerProvider("service0", "AutoStabilizerService", this->ports_.m_service0_);
   this->addPort(this->ports_.m_AutoStabilizerServicePort_);
   this->ports_.m_RobotHardwareServicePort_.registerConsumer("service0", "RobotHardwareService", this->ports_.m_robotHardwareService0_);
@@ -216,6 +224,25 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
       this->ports_.m_actWrenchIn_[i] = std::make_unique<RTC::InPort<RTC::TimedDoubleSeq> >(name.c_str(), this->ports_.m_actWrench_[i]);
       this->addInPort(name.c_str(), *(this->ports_.m_actWrenchIn_[i]));
     }
+
+    // 各EndEffectorにつき、tgt<name>WrenchOutというOutPortをつくる
+    this->ports_.m_tgtEEWrenchOut_.resize(this->gaitParam_.eeName.size());
+    this->ports_.m_tgtEEWrench_.resize(this->gaitParam_.eeName.size());
+    for(int i=0;i<this->gaitParam_.eeName.size();i++){
+      std::string name = "tgt"+this->gaitParam_.eeName[i]+"WrenchOut";
+      this->ports_.m_tgtEEWrenchOut_[i] = std::make_unique<RTC::OutPort<RTC::TimedDoubleSeq> >(name.c_str(), this->ports_.m_tgtEEWrench_[i]);
+      this->addOutPort(name.c_str(), *(this->ports_.m_tgtEEWrenchOut_[i]));
+    }
+
+    // 各EndEffectorにつき、act<name>WrenchOutというOutPortをつくる
+    this->ports_.m_actEEWrenchOut_.resize(this->gaitParam_.eeName.size());
+    this->ports_.m_actEEWrench_.resize(this->gaitParam_.eeName.size());
+    for(int i=0;i<this->gaitParam_.eeName.size();i++){
+      std::string name = "act"+this->gaitParam_.eeName[i]+"WrenchOut";
+      this->ports_.m_actEEWrenchOut_[i] = std::make_unique<RTC::OutPort<RTC::TimedDoubleSeq> >(name.c_str(), this->ports_.m_actEEWrench_[i]);
+      this->addOutPort(name.c_str(), *(this->ports_.m_actEEWrenchOut_[i]));
+    }
+
   }
 
   {
@@ -416,7 +443,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
     }
   }
   stabilizer.execStabilizer(gaitParam, dt, mode.isSTRunning(),
-                            gaitParam.actRobotTqc, gaitParam.stOffsetRootRpy, gaitParam.stTargetRootPose, gaitParam.stEEOffset, gaitParam.stEETargetPose, gaitParam.stTargetZmp, gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage);
+                            gaitParam.actRobotTqc, gaitParam.stOffsetRootRpy, gaitParam.stTargetRootPose, gaitParam.stEEOffset, gaitParam.stEETargetPose, gaitParam.stTargetZmp, gaitParam.stEETargetWrench, gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage);
 
   // FullbodyIKSolver
   fullbodyIKSolver.solveFullbodyIK(dt, gaitParam,// input
@@ -546,6 +573,42 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
     }
   }
 
+  {
+    // only for logger (IDLE時の出力や、モード遷移時の連続性はてきとうで良い)
+    ports.m_genCog_.tm = ports.m_qRef_.tm;
+    ports.m_genCog_.data.x = gaitParam.genCog[0];
+    ports.m_genCog_.data.y = gaitParam.genCog[1];
+    ports.m_genCog_.data.z = gaitParam.genCog[2];
+    ports.m_genCogOut_.write();
+    ports.m_genZmp_.tm = ports.m_qRef_.tm;
+    ports.m_genZmp_.data.x = gaitParam.refZmpTraj[0].getStart()[0];
+    ports.m_genZmp_.data.y = gaitParam.refZmpTraj[0].getStart()[1];
+    ports.m_genZmp_.data.z = gaitParam.refZmpTraj[0].getStart()[2];
+    ports.m_genZmpOut_.write();
+    ports.m_tgtZmp_.tm = ports.m_qRef_.tm;
+    ports.m_tgtZmp_.data.x = gaitParam.stTargetZmp[0];
+    ports.m_tgtZmp_.data.y = gaitParam.stTargetZmp[1];
+    ports.m_tgtZmp_.data.z = gaitParam.stTargetZmp[2];
+    ports.m_tgtZmpOut_.write();
+    ports.m_actCog_.tm = ports.m_qRef_.tm;
+    ports.m_actCog_.data.x = gaitParam.actCog[0];
+    ports.m_actCog_.data.y = gaitParam.actCog[1];
+    ports.m_actCog_.data.z = gaitParam.actCog[2];
+    ports.m_actCogOut_.write();
+    for(int i=0;i<gaitParam.eeName.size();i++){
+      ports.m_actEEWrench_[i].tm = ports.m_qRef_.tm;
+      ports.m_actEEWrench_[i].data.length(6);
+      for(int j=0;j<6;j++) ports.m_actEEWrench_[i].data[j] = gaitParam.actEEWrench[i][j];
+      ports.m_actEEWrenchOut_[i]->write();
+    }
+    for(int i=0;i<gaitParam.eeName.size();i++){
+      ports.m_tgtEEWrench_[i].tm = ports.m_qRef_.tm;
+      ports.m_tgtEEWrench_[i].data.length(6);
+      for(int j=0;j<6;j++) ports.m_tgtEEWrench_[i].data[j] = gaitParam.stEETargetWrench[i][j];
+      ports.m_tgtEEWrenchOut_[i]->write();
+    }
+  }
+
   return true;
 }
 
@@ -582,6 +645,7 @@ RTC::ReturnCode_t AutoStabilizer::onActivated(RTC::UniqueId ec_id){
   std::lock_guard<std::mutex> guard(this->mutex_);
   std::cerr << "[" << m_profile.instance_name << "] "<< "onActivated(" << ec_id << ")" << std::endl;
   this->mode_.reset();
+  this->idleToAbcTransitionInterpolator_.reset(0.0);
   return RTC::RTC_OK;
 }
 RTC::ReturnCode_t AutoStabilizer::onDeactivated(RTC::UniqueId ec_id){

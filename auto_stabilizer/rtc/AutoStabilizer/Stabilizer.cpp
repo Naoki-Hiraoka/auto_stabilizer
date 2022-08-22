@@ -19,7 +19,7 @@ void Stabilizer::initStabilizerOutput(const GaitParam& gaitParam,
 }
 
 bool Stabilizer::execStabilizer(const GaitParam& gaitParam, double dt, bool useActState,
-                                cnoid::BodyPtr& actRobotTqc, cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, cnoid::Position& o_stTargetRootPose, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffset /*generate frame, endeffector origin*/, std::vector<cnoid::Position>& o_stEETargetPose, cnoid::Vector3& o_stTargetZmp, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage) const{
+                                cnoid::BodyPtr& actRobotTqc, cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, cnoid::Position& o_stTargetRootPose, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffset /*generate frame, endeffector origin*/, std::vector<cnoid::Position>& o_stEETargetPose, cnoid::Vector3& o_stTargetZmp, std::vector<cnoid::Vector6>& o_stEETargetWrench, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage) const{
   // - root attitude control
   // - 現在のactual重心位置から、目標ZMPを計算
   // - 目標ZMPを満たすように目標足裏反力を計算
@@ -38,17 +38,16 @@ bool Stabilizer::execStabilizer(const GaitParam& gaitParam, double dt, bool useA
                 o_stTargetZmp, tgtForce); // output
 
   // 目標ZMPを満たすように目標EndEffector反力を計算
-  std::vector<cnoid::Vector6> tgtEEWrench; // 要素数EndEffector数. generate frame. EndEffector origin
   this->calcWrench(gaitParam, o_stTargetZmp, tgtForce, useActState,// input
-                   tgtEEWrench); // output
+                   o_stEETargetWrench); // output
 
   // 目標足裏反力を満たすようにDamping Control
-  this->calcDampingControl(dt, gaitParam, tgtEEWrench, useActState, // input
+  this->calcDampingControl(dt, gaitParam, o_stEETargetWrench, useActState, // input
                            o_stEEOffset, o_stEETargetPose); // output
 
   if(this->isTorqueControlMode && useActState){
     // 目標反力を満たすように重力補償+仮想仕事の原理
-    this->calcTorque(dt, gaitParam, tgtEEWrench, // input
+    this->calcTorque(dt, gaitParam, o_stEETargetWrench, // input
                      actRobotTqc, o_stServoPGainPercentage, o_stServoDGainPercentage); // output
   }else{
     for(int i=0;i<actRobotTqc->numJoints();i++) actRobotTqc->joint(i)->u() = 0.0;
