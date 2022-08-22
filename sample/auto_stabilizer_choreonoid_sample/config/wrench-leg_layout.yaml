@@ -1,0 +1,37 @@
+main:
+# leg main
+  force z (leg):
+    legends:
+      - { key: ast_tgtrlegWrenchOut, id: [2] }
+      - { key: ast_actrlegWrenchOut, id: [2] }
+      - { key: ast_tgtllegWrenchOut, id: [2] }
+      - { key: ast_actllegWrenchOut, id: [2] }
+    bottom_label:
+    newline: false
+
+  moment xy (leg):
+    legends:
+      - { key: ast_tgtrlegWrenchOut, id: [3-4] }
+      - { key: ast_actrlegWrenchOut, id: [3-4] }
+      - { key: ast_tgtllegWrenchOut, id: [3-4] }
+      - { key: ast_actllegWrenchOut, id: [3-4] }
+    bottom_label:
+    newline: false
+
+# leg sub
+  force xy (leg):
+    legends:
+      - { key: ast_tgtrlegWrenchOut, id: [0-1] }
+      - { key: ast_actrlegWrenchOut, id: [0-1] }
+      - { key: ast_tgtllegWrenchOut, id: [0-1] }
+      - { key: ast_actllegWrenchOut, id: [0-1] }
+    bottom_label:
+    newline: false
+
+  moment z (leg):
+    legends:
+      - { key: ast_tgtrlegWrenchOut, id: [5] }
+      - { key: ast_actrlegWrenchOut, id: [5] }
+      - { key: ast_tgtllegWrenchOut, id: [5] }
+      - { key: ast_actllegWrenchOut, id: [5] }
+    bottom_label:

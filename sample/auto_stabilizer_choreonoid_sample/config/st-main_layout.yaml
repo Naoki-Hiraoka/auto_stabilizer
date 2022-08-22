@@ -1,0 +1,30 @@
+main:
+  cog zmp X:
+    legends:
+      - { key: ast_genCogOut, id: [0]}
+      - { key: ast_genDcmOut, id: [0]}
+      - { key: ast_genZmpOut, id: [0]}
+      - { key: ast_tgtZmpOut, id: [0]}
+      - { key: ast_actCogOut, id: [0]}
+      - { key: ast_actDcmOut, id: [0]}
+    bottom_label:
+
+  cog zmp Y:
+    legends:
+      - { key: ast_genCogOut, id: [1]}
+      - { key: ast_genDcmOut, id: [1]}
+      - { key: ast_genZmpOut, id: [1]}
+      - { key: ast_tgtZmpOut, id: [1]}
+      - { key: ast_actCogOut, id: [1]}
+      - { key: ast_actDcmOut, id: [1]}
+    bottom_label:
+
+  cog zmp Z:
+    legends:
+      - { key: ast_genCogOut, id: [2]}
+      - { key: ast_genDcmOut, id: [2]}
+      - { key: ast_genZmpOut, id: [2]}
+      - { key: ast_tgtZmpOut, id: [2]}
+      - { key: ast_actCogOut, id: [2]}
+      - { key: ast_actDcmOut, id: [2]}
+    bottom_label:

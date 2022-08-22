@@ -1,0 +1,182 @@
+extend:
+  ./common_plot.yaml
+
+sh_qOut:
+  func: plot_rad2deg
+  data:
+    - { log: sh_qOut, column: [0-33] }
+
+abc_q:
+  func: plot_rad2deg
+  data:
+    - { log: abc_q, column: [0-33] }
+
+st_q:
+  func: plot_rad2deg
+  data:
+    - { log: st_q, column: [0-33] }
+
+abst_q:
+  func: plot_rad2deg
+  data:
+    - { log: abst_q, column: [0-33] }
+
+el_q:
+  func: plot_rad2deg
+  data:
+    - { log: el_q, column: [0-33] }
+
+RobotHardware0_q:
+  func: plot_rad2deg
+  data:
+    - { log: RobotHardware0_q, column: [0-33] }
+
+enc_q:
+  func: plot_enc
+  data:
+    - { log: RobotHardware0_servoState, column: [0-33] }
+
+RobotHardware0_dq:
+  func: plot_rad2deg
+  data:
+    - { log: RobotHardware0_dq, column: [0-33] }
+
+el_dq:
+  func: plot_rad2deg_vel
+  data:
+    - { log: el_q, column: [0-33] }
+
+el_dq_adv:
+  func: plot_rad2deg_vel_advanced
+  data:
+    - { log: el_q, column: [0-33] }
+
+RobotHardware_choreonoid0_q:
+  func: plot_rad2deg
+  data:
+    - { log: RobotHardware_choreonoid0_q, column: [0-33] }
+
+RobotHardware_choreonoid0_dq:
+  func: plot_rad2deg
+  data:
+    - { log: RobotHardware_choreonoid0_dq, column: [0-33] }
+
+rh_st_diff:
+  func: plot_rh_q_st_q
+  data:
+    - { log: RobotHardware0_q, column: [0-33] }
+    - { log: st_q, column: [0-33] }
+
+rh_abc_diff:
+  func: plot_rh_q_st_q
+  data:
+    - { log: RobotHardware0_q, column: [0-33] }
+    - { log: abc_q, column: [0-33] }
+
+rh_abst_diff:
+  func: plot_rh_q_st_q
+  data:
+    - { log: RobotHardware0_q, column: [0-33] }
+    - { log: abst_q, column: [0-33] }
+
+rh_el_diff:
+  func: plot_rad2deg_diff
+  data:
+    - { log: RobotHardware0_q, column: [0-33] }
+    - { log: el_q, column: [0-33] }
+
+abs_enc_diff:
+  func: plot_abs_enc
+  data:
+    - { log: RobotHardware0_servoState, column: [0-33] }
+    - { log: RobotHardware0_servoState, column: [0-33] }
+
+rmfo_off_rfsensor:
+  data:
+    - { log: rmfo_off_rfsensor, column: [0-5] }
+
+rmfo_off_lfsensor:
+  data:
+    - { log: rmfo_off_lfsensor, column: [0-5] }
+
+rmfo_off_rhsensor:
+  data:
+    - { log: rmfo_off_rhsensor, column: [0-5] }
+
+rmfo_off_lhsensor:
+  data:
+    - { log: rmfo_off_lhsensor, column: [0-5] }
+
+rfu_ref_rhsensorOut:
+  data:
+    - { log: rfu_ref_rhsensorOut, column: [0-5] }
+
+rfu_ref_lhsensorOut:
+  data:
+    - { log: rfu_ref_lhsensorOut, column: [0-5] }
+
+current:
+  func: plot_current
+  data:
+    - { log: RobotHardware0_servoState, column: [0-33] }
+
+torque:
+  data:
+    - { log: RobotHardware0_tau, column: [0-33] }
+
+st_tau:
+  data:
+    - { log: st_tau, column: [0-33] }
+
+abc_tau:
+  data:
+    - { log: abc_tau, column: [0-33] }
+
+abst_tau:
+  data:
+    - { log: abst_modTau, column: [0-33] }
+
+choreonoid_torque:
+  data:
+    - { log: RobotHardware_choreonoid0_tau, column: [0-33] }
+
+imu_gsensor:
+  data:
+    - { log: RobotHardware0_gsensor, column: [0,1,2] }
+
+imu_gyrometer:
+  data:
+    - { log: RobotHardware0_gyrometer, column: [0,1,2] }
+
+motor_temp:
+  func: plot_motor_temp
+  data:
+    - { log: RobotHardware0_servoState, column: [0-33] }
+
+motor_outer_temp:
+  func: plot_motor_outer_temp
+  data:
+    - { log: RobotHardware0_servoState, column: [0-33] }
+
+
+watt:
+  func: plot_watt
+  data:
+    - { log: RobotHardware0_dq, column: [0-33]  }
+    - { log: RobotHardware0_tau, column: [0-33] }
+ServoState:
+  func: plot_servostate
+  data:
+    - { log: RobotHardware0_servoState, column: [0-33] }
+
+12V:
+  func: plot_12V
+  data:
+    - { log: RobotHardware0_servoState, column: [0-33] }
+
+80V:
+  func: plot_80V
+  data:
+    - { log: RobotHardware0_servoState, column: [0-33] }
+
+

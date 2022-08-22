@@ -1,0 +1,52 @@
+extend:
+  ./jaxon_plot.yaml
+
+ast_q:
+  func: plot_rad2deg
+  data:
+    - { log: ast_qOut, column: [0-33] }
+
+ast_genCogOut:
+  data:
+    - { log: ast_genCogOut, column: [0-2] }
+ast_genDcmOut:
+  data:
+    - { log: ast_genDcmOut, column: [0-2] }
+ast_genZmpOut:
+  data:
+    - { log: ast_genZmpOut, column: [0-2] }
+ast_tgtZmpOut:
+  data:
+    - { log: ast_tgtZmpOut, column: [0-2] }
+ast_actCogOut:
+  data:
+    - { log: ast_actCogOut, column: [0-2] }
+ast_actDcmOut:
+  data:
+    - { log: ast_actDcmOut, column: [0-2] }
+
+ast_tgtrlegWrenchOut:
+  data:
+    - { log: ast_tgtrlegWrenchOut, column: [0-5] }
+ast_tgtllegWrenchOut:
+  data:
+    - { log: ast_tgtllegWrenchOut, column: [0-5] }
+ast_tgtrarmWrenchOut:
+  data:
+    - { log: ast_tgtrarmWrenchOut, column: [0-5] }
+ast_tgtlarmWrenchOut:
+  data:
+    - { log: ast_tgtlarmWrenchOut, column: [0-5] }
+
+ast_actrlegWrenchOut:
+  data:
+    - { log: ast_actrlegWrenchOut, column: [0-5] }
+ast_actllegWrenchOut:
+  data:
+    - { log: ast_actllegWrenchOut, column: [0-5] }
+ast_actrarmWrenchOut:
+  data:
+    - { log: ast_actrarmWrenchOut, column: [0-5] }
+ast_actlarmWrenchOut:
+  data:
+    - { log: ast_actlarmWrenchOut, column: [0-5] }
