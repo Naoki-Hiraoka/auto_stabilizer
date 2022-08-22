@@ -45,7 +45,9 @@ bool FootStepGenerator::setFootSteps(const GaitParam& gaitParam, const std::vect
   footstepNodesList.push_back(gaitParam.footstepNodesList[0]);
 
   if(footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG]){ // 両足支持期を延長
-    footstepNodesList.back().remainTime = this->defaultStepTime; // this->defaultStepTime * this->defaultDoubleSupportRatio にするよりも重心を動かす時間が十分とれるので安定する
+    // 現在の時刻から突然refZmpTrajが変化すると、大きなZMP入力変化が必要になる. いまの位置でrefZmpTrajをthis->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio)の間とめて、次にthis->defaultStepTime * this->defaultDoubleSupportRatioの間で次の支持脚側に動かす
+    footstepNodesList.back().remainTime = this->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio);
+    footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * this->defaultDoubleSupportRatio));
   }
 
 
@@ -104,7 +106,9 @@ bool FootStepGenerator::goPos(const GaitParam& gaitParam, double x/*m*/, double 
   footstepNodesList.push_back(gaitParam.footstepNodesList[0]);
 
   if(footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG]){ // 両足支持期を延長
-    footstepNodesList.back().remainTime = this->defaultStepTime; // this->defaultStepTime * this->defaultDoubleSupportRatio にするよりも重心を動かす時間が十分とれるので安定する
+    // 現在の時刻から突然refZmpTrajが変化すると、大きなZMP入力変化が必要になる. いまの位置でrefZmpTrajをthis->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio)の間とめて、次にthis->defaultStepTime * this->defaultDoubleSupportRatioの間で次の支持脚側に動かす
+    footstepNodesList.back().remainTime = this->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio);
+    footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * this->defaultDoubleSupportRatio));
   }
 
   cnoid::Position currentPose;
