@@ -854,6 +854,7 @@ bool AutoStabilizer::stopImpedanceController(const std::string& i_name){
 bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService::AutoStabilizerParam& i_param){
   std::lock_guard<std::mutex> guard(this->mutex_);
 
+  // ignore i_param.ee_name
   if(this->mode_.now() == ControlMode::MODE_IDLE){
     for(int i=0;i<this->gaitParam_.jointControllable.size();i++) this->gaitParam_.jointControllable[i] = false;
     for(int i=0;i<i_param.controllable_joints.length();i++){
@@ -1108,6 +1109,8 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
 bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::AutoStabilizerParam& i_param) {
   std::lock_guard<std::mutex> guard(this->mutex_);
 
+  i_param.ee_name.length(this->gaitParam_.eeName.size());
+  for(int i=0;i<this->gaitParam_.eeName.size();i++) i_param.ee_name[i] = this->gaitParam_.eeName[i].c_str();
   std::vector<std::string> controllable_joints;
   for(int i=0;i<this->gaitParam_.jointControllable.size();i++) if(this->gaitParam_.jointControllable[i]) controllable_joints.push_back(this->gaitParam_.genRobot->joint(i)->name());
   i_param.controllable_joints.length(controllable_joints.size());

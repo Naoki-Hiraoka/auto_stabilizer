@@ -1,0 +1,12 @@
+2022-08-21 17:39:11,061 manager INFO 1.1.0
+2022-08-21 17:39:11,062 manager INFO Copyright (C) 2003-2010
+2022-08-21 17:39:11,062 manager INFO   Noriaki Ando
+2022-08-21 17:39:11,062 manager INFO   Intelligent Systems Research Institute, AIST
+2022-08-21 17:39:11,062 manager INFO Manager starting.
+2022-08-21 17:39:11,062 manager INFO Starting local logging.
+2022-08-21 17:39:11,063 manager.namingmanager INFO NameServer connection failed: corba/localhost
+2022-08-21 17:39:11,067 manager ERROR Traceback (most recent call last):
+  File "/opt/ros/melodic/lib/python2.7/dist-packages/OpenRTM_aist/Manager.py", line 1751, in initManagerServant
+    reffile = file(self._config.getProperty("manager.refstring_path"),'w')
+IOError: [Errno 13] Permission denied: '/var/log/rtcmanager.ref'
+

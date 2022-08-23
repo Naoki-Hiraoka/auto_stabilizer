@@ -79,7 +79,7 @@
    (send self :autostabilizerservice_waitFootSteps))
   (:set-auto-stabilizer-param
    (&rest args
-    &key default-zmp-offsets eefm-rot-damping-gain eefm-pos-damping-gain eefm-pos-time-const eefm-rot-time-const eefm-swing-pos-spring-gain eefm-swing-rot-spring-gain eefm-swing-pos-time-const eefm-swing-rot-time-const
+    &key default-zmp-offsets impedance-m-p impedance-d-p impedance-k-p impedance-m-r impedance-d-r impedance-k-r impedance-force-gain impedance-moment-gain eefm-rot-damping-gain eefm-pos-damping-gain eefm-pos-time-const eefm-rot-time-const eefm-swing-pos-spring-gain eefm-swing-rot-spring-gain eefm-swing-pos-time-const eefm-swing-rot-time-const
     &allow-other-keys)
    "Set AutoStabilizer param.
     For arguments, please see (send *ri* :get-auto-stabilizer-param-arguments)."
@@ -90,6 +90,38 @@
                  (let ((tmp (send prm :default_zmp_offsets)))
                    (setq (tmp . ros::_data) (apply #'concatenate float-vector default-zmp-offsets))
                    (list :default-zmp-offsets tmp)))
+             (if (and (memq :impedance-m-p args) impedance-m-p)
+                 (let ((tmp (send prm :impedance_m_p)))
+                   (setq (tmp . ros::_data) (apply #'concatenate float-vector impedance-m-p))
+                   (list :impedance-m-p tmp)))
+             (if (and (memq :impedance-d-p args) impedance-d-p)
+                 (let ((tmp (send prm :impedance_d_p)))
+                   (setq (tmp . ros::_data) (apply #'concatenate float-vector impedance-d-p))
+                   (list :impedance-d-p tmp)))
+             (if (and (memq :impedance-k-p args) impedance-k-p)
+                 (let ((tmp (send prm :impedance_k_p)))
+                   (setq (tmp . ros::_data) (apply #'concatenate float-vector impedance-k-p))
+                   (list :impedance-k-p tmp)))
+             (if (and (memq :impedance-m-r args) impedance-m-r)
+                 (let ((tmp (send prm :impedance_m_r)))
+                   (setq (tmp . ros::_data) (apply #'concatenate float-vector impedance-m-r))
+                   (list :impedance-m-r tmp)))
+             (if (and (memq :impedance-d-r args) impedance-d-r)
+                 (let ((tmp (send prm :impedance_d_r)))
+                   (setq (tmp . ros::_data) (apply #'concatenate float-vector impedance-d-r))
+                   (list :impedance-d-r tmp)))
+             (if (and (memq :impedance-k-r args) impedance-k-r)
+                 (let ((tmp (send prm :impedance_k_r)))
+                   (setq (tmp . ros::_data) (apply #'concatenate float-vector impedance-k-r))
+                   (list :impedance-k-r tmp)))
+             (if (and (memq :impedance-force-gain args) impedance-force-gain)
+                 (let ((tmp (send prm :impedance_force_gain)))
+                   (setq (tmp . ros::_data) (apply #'concatenate float-vector impedance-force-gain))
+                   (list :impedance-force-gain tmp)))
+             (if (and (memq :impedance-moment-gain args) impedance-moment-gain)
+                 (let ((tmp (send prm :impedance_moment_gain)))
+                   (setq (tmp . ros::_data) (apply #'concatenate float-vector impedance-moment-gain))
+                   (list :impedance-moment-gain tmp)))
              (if (and (memq :eefm-pos-damping-gain args) eefm-pos-damping-gain)
                  (let ((tmp (send prm :eefm_pos_damping_gain)))
                    (setq (tmp . ros::_data) (apply #'concatenate float-vector eefm-pos-damping-gain))
@@ -161,6 +193,54 @@
          #'(lambda (name &rest _args)
              (send self :autostabilizerservice_stopimpedancecontroller :name (string-downcase name)))
          :stop-impedance))
+  (:set-impedance-controller-param
+   (limb
+    &rest args
+    &key m-p d-p k-p m-r d-r k-r force-gain moment-gain)
+   "Set impedance controller parameter like (send *ri* :set-impedance-controller-param :rarm :K-p 400).
+    limb should be limb symbol name such as :rarm, :larm, :rleg, :lleg, :arms, or :legs.
+    For arguments, please see (send *ri* :get-impedance-controller-param-arguments)."
+   (case limb
+     (:arms
+      (list (send* self :set-impedance-controller-param :rarm args)
+            (send* self :set-impedance-controller-param :larm args)))
+     (:legs
+      (list (send* self :set-impedance-controller-param :rleg args)
+            (send* self :set-impedance-controller-param :lleg args)))
+     (t
+      (let* ((prm (send self :get-auto-stabilizer-param))
+             (limb-idx (position (string-downcase limb) (send prm :ee_name) :test #'equal)))
+        (send* self :set-auto-stabilizer-param
+               (append
+                (if (and (memq :m-p args) m-p)
+                    (let ((tmp (send prm :impedance_m_p)))
+                      (dotimes (i 3) (setelt (tmp . ros::_data) (+ (* 3 limb-idx) i) m-p))
+                      (list :impedance-m-p (list (tmp . ros::_data)))))
+                (if (and (memq :d-p args) d-p)
+                    (let ((tmp (send prm :impedance_d_p)))
+                      (dotimes (i 3) (setelt (tmp . ros::_data) (+ (* 3 limb-idx) i) d-p))
+                      (list :impedance-d-p (list (tmp . ros::_data)))))
+                (if (and (memq :k-p args) k-p)
+                    (let ((tmp (send prm :impedance_k_p)))
+                      (dotimes (i 3) (setelt (tmp . ros::_data) (+ (* 3 limb-idx) i) k-p))
+                      (list :impedance-k-p (list (tmp . ros::_data)))))
+                (if (and (memq :m-r args) m-r)
+                    (let ((tmp (send prm :impedance_m_r)))
+                      (dotimes (i 3) (setelt (tmp . ros::_data) (+ (* 3 limb-idx) i) m-r))
+                      (list :impedance-m-r (list (tmp . ros::_data)))))
+                (if (and (memq :d-r args) d-r)
+                    (let ((tmp (send prm :impedance_d_r)))
+                      (dotimes (i 3) (setelt (tmp . ros::_data) (+ (* 3 limb-idx) i) d-r))
+                      (list :impedance-d-r (list (tmp . ros::_data)))))
+                (if (and (memq :force-gain args) force-gain)
+                    (let ((tmp (send prm :impedance_force_gain)))
+                      (dotimes (i 3) (setelt (tmp . ros::_data) (+ (* 3 limb-idx) i) force-gain))
+                      (list :impedance-force-gain (list (tmp . ros::_data)))))
+                (if (and (memq :moment-gain args) moment-gain)
+                    (let ((tmp (send prm :impedance_moment_gain)))
+                      (dotimes (i 3) (setelt (tmp . ros::_data) (+ (* 3 limb-idx) i) moment-gain))
+                      (list :impedance-moment-gain (list (tmp . ros::_data)))))
+             nil))))))
   )
 
 

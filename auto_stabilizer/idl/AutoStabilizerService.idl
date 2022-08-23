@@ -99,6 +99,8 @@ module OpenHRP
     struct AutoStabilizerParam
     {
       // AutoStabilizer
+      /// 各endeffectorの名前. 変更不可. (.confファイルのend_effectorsの並び順を、hrpsys外のレイヤで取得する手段が他に無いので)
+      sequence<string> ee_name;
       /// AutoStablizerが変更する関節の名前. MODE_IDLEのとき以外変更不可.
       sequence<string> controllable_joints;
       /// Transition time [s] for start AutoBalancer. 下限0.01[s]
