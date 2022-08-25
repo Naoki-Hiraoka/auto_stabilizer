@@ -2,6 +2,7 @@
 #include "CnoidBodyUtil.h"
 #include "MathUtil.h"
 #include <cnoid/ForceSensor>
+#include <cnoid/EigenUtil>
 
 bool ActToGenFrameConverter::convertFrame(const GaitParam& gaitParam, double dt,// input
                                           cnoid::BodyPtr& actRobot, std::vector<cnoid::Position>& o_actEEPose, std::vector<cnoid::Vector6>& o_actEEWrench, cpp_filters::FirstOrderLowPassFilter<cnoid::Vector3>& o_actCogVel) const {
@@ -11,6 +12,8 @@ bool ActToGenFrameConverter::convertFrame(const GaitParam& gaitParam, double dt,
   {
     // FootOrigin座標系を用いてactRobotRawをgenerate frameに投影しactRobotとする
     cnoidbodyutil::copyRobotState(gaitParam.actRobotRaw, actRobot);
+    actRobot->rootLink()->R() = (actRobot->rootLink()->R() * cnoid::rotFromRpy(this->rpyOffset)).eval(); // rpyOffsetを適用
+    actRobot->calcForwardKinematics();
     cnoid::DeviceList<cnoid::ForceSensor> actForceSensors(gaitParam.actRobotRaw->devices());
     cnoid::DeviceList<cnoid::ForceSensor> actOriginForceSensors(actRobot->devices());
     for(int i=0;i<actForceSensors.size();i++){

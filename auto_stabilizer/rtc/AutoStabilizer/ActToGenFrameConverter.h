@@ -7,6 +7,7 @@
 class ActToGenFrameConverter {
 public:
   // ActToGenFrameConverterだけでつかうパラメータ
+  cnoid::Vector3 rpyOffset = cnoid::Vector3::Zero(); // [roll, pitch, yaw]. rootLink Frame. Actual robotのrootLinkの姿勢に加えるオフセット. IMUの取り付け位置のオフセットを考慮するためのものではない(それはモデルファイルを変えれば良い). 全身のキャリブのずれなど次第に出てくるなにかしらのずれをごますためのもの. 本来このようなパラメータは必要ないのが望ましいが、実用上は確かに必要.
 
 public:
   // constant

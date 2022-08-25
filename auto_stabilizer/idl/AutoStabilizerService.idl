@@ -128,6 +128,10 @@ module OpenHRP
       /// reference frameのfootMidCoordsを計算するときに使うか
       sequence<boolean, 2> reference_frame;
 
+      // ActToGenFrameConverter
+      /// Actual robotのrootLinkの姿勢にlocalで加えるオフセット
+      sequence<double, 3> rpy_offset;
+
       // ExternalForceHandler
       /// Whether use disturbance compensation or not.
       boolean use_disturbance_compensation;

@@ -926,6 +926,12 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
     }
   }
 
+  if(i_param.rpy_offset.length() == 3){
+    for(int i=0;i<3;i++) {
+      this->actToGenFrameConverter_.rpyOffset[i] = i_param.rpy_offset[i];
+    }
+  }
+
   this->externalForceHandler_.useDisturbanceCompensation = i_param.use_disturbance_compensation;
   this->externalForceHandler_.disturbanceCompensationTimeConst = std::max(i_param.disturbance_compensation_time_const, 0.01);
   this->externalForceHandler_.disturbanceCompensationStepNum = std::max(i_param.disturbance_compensation_step_num, 1);
@@ -1146,6 +1152,11 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
   i_param.reference_frame.length(NUM_LEGS);
   for(int i=0;i<NUM_LEGS;i++) {
     i_param.reference_frame[i] = (this->refToGenFrameConverter_.refFootOriginWeight[i].getGoal() == 1.0);
+  }
+
+  i_param.rpy_offset.length(3);
+  for(int i=0;i<3;i++) {
+    i_param.rpy_offset[i] = this->actToGenFrameConverter_.rpyOffset[i];
   }
 
   i_param.use_disturbance_compensation = this->externalForceHandler_.useDisturbanceCompensation;
