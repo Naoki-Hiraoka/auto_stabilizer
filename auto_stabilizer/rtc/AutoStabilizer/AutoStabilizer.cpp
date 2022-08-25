@@ -919,10 +919,10 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
     if(this->mode_.isABCRunning()) this->refToGenFrameConverter_.handFixMode.setGoal(i_param.is_hand_fix_mode ? 1.0 : 0.0, 1.0); // 1.0[s]で補間
     else this->refToGenFrameConverter_.handFixMode.reset(i_param.is_hand_fix_mode ? 1.0 : 0.0);
   }
-  if(i_param.ref_foot_origin_frame.length() == NUM_LEGS && (i_param.ref_foot_origin_frame[RLEG] || i_param.ref_foot_origin_frame[LLEG])){
+  if(i_param.reference_frame.length() == NUM_LEGS && (i_param.reference_frame[RLEG] || i_param.reference_frame[LLEG])){
     for(int i=0;i<NUM_LEGS;i++) {
-      if(this->mode_.isABCRunning()) this->refToGenFrameConverter_.refFootOriginWeight[i].setGoal(i_param.ref_foot_origin_frame[i] ? 1.0 : 0.0, 1.0); // 1.0[s]で補間
-      else this->refToGenFrameConverter_.refFootOriginWeight[i].reset(i_param.ref_foot_origin_frame[i] ? 1.0 : 0.0);
+      if(this->mode_.isABCRunning()) this->refToGenFrameConverter_.refFootOriginWeight[i].setGoal(i_param.reference_frame[i] ? 1.0 : 0.0, 1.0); // 1.0[s]で補間
+      else this->refToGenFrameConverter_.refFootOriginWeight[i].reset(i_param.reference_frame[i] ? 1.0 : 0.0);
     }
   }
 
@@ -1143,9 +1143,9 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
   }
 
   i_param.is_hand_fix_mode = (this->refToGenFrameConverter_.handFixMode.getGoal() == 1.0);
-  i_param.ref_foot_origin_frame.length(NUM_LEGS);
+  i_param.reference_frame.length(NUM_LEGS);
   for(int i=0;i<NUM_LEGS;i++) {
-    i_param.ref_foot_origin_frame[i] = (this->refToGenFrameConverter_.refFootOriginWeight[i].getGoal() == 1.0);
+    i_param.reference_frame[i] = (this->refToGenFrameConverter_.refFootOriginWeight[i].getGoal() == 1.0);
   }
 
   i_param.use_disturbance_compensation = this->externalForceHandler_.useDisturbanceCompensation;

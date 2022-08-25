@@ -126,7 +126,7 @@ module OpenHRP
       /// Flag for fix hand while walking.
       boolean is_hand_fix_mode;
       /// reference frameのfootMidCoordsを計算するときに使うか
-      sequence<boolean, 2> ref_foot_origin_frame;
+      sequence<boolean, 2> reference_frame;
 
       // ExternalForceHandler
       /// Whether use disturbance compensation or not.

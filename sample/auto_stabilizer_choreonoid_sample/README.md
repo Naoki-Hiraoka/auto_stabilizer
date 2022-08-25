@@ -1,4 +1,31 @@
-auto_stabilizer と auto_stabilizer_choreonoid_sampleの.rosinstallを使う. choreonoidにはrtmros_choreonoidのpatchをあてる.
+## 環境構築
+### rosinstall
+```bash
+catkin_ws/src$ emacs -nw .rosinstall # auto_stabilizerのディレクトリにある.rosinstall と auto_stabilizer_choreonoid_sampleのディレクトリにある.rosinstallの内容を記入する. このリポジトリが入っていないので追加する.
+catkin_ws/src$ wstool update
+```
+### ビルド
+```bash
+catkin_ws/src$ cd ..
+# 依存ライブラリをインストールする.
+catkin_ws$ rosdep install -r --from-paths src --ignore-src -y
+# 参考 https://github.com/start-jsk/rtmros_hironx/issues/539
+catkin_ws$ echo "export ORBgiopMaxMsgSize=2097152000" >> ~/.bashrc
+catkin_ws$ source ~/.bashrc
+# for choreonoid. 参考 https://github.com/start-jsk/rtmros_choreonoid
+# choreonoidはrosdepに対応しておらず，代わりに依存ライブラリをaptでインストールするスクリプトがあるのでそれを実行
+catkin_ws$ ./src/choreonoid/misc/script/install-requisites-ubuntu-18.04.sh # if ubuntu 18.04
+# choreonoidのコンパイルオプションを設定
+catkin_ws$ patch -p1 -d src/choreonoid < src/rtm-ros-robotics/rtmros_choreonoid/choreonoid.patch
+```
+* ビルド
+```bash
+catkin_ws$ source /opt/ros/melodic/setup.bash
+catkin_ws$ catkin build auto_stabilizer_choreonoid_sample # 失敗してもそのままもう一回同じビルドを行うと通ることがある
+catkin_ws$ source devel/setup.bash
+```
+
+## 実行
 
 ```shell
 rtmlaunch auto_stabilizer_choreonoid_sample jaxon_jvrc_choreonoid.launch
@@ -31,13 +58,17 @@ roseus
               (make-coords :pos (float-vector 0 100 0) :name :lleg)
               (make-coords :pos (float-vector 0 100 0) :name :lleg)
               (make-coords :pos (float-vector 0 100 0) :name :lleg)))
+(send *ri* :start-impedance :arms)
+(send *ri* :stop-impedance :arms)
+(print-ros-msg (send *ri* :get-auto-stabilizer-param))
 
+;; 片足立ちしてもう片方の足をangle-vectorで動かす.
 (send *robot* :reset-pose)
 (send *robot* :larm :move-end-pos #F(0 100 0))
 (send *ri* :angle-vector (send *robot* :angle-vector) 3000)
 (send *ri* :wait-interpolation)
 (send *ri* :set-auto-stabilizer-param
-      :ref-foot-origin-frame (list nil t)
+      :reference-frame (list nil t)
       :is-hand-fix-mode t
       )
 (send *ri* :set-foot-steps-with-param
@@ -54,13 +85,13 @@ roseus
 (send *robot* :rleg :move-end-pos #F(0 -50 50))
 (send *robot* :rleg :move-end-rot 15 :y :local)
 (send *ri* :angle-vector (send *robot* :angle-vector) 3000)
+(send *ri* :go-pos 0 0 0)
+(send *ri* :set-auto-stabilizer-param
+      :reference-frame (list t t)
+      :is-hand-fix-mode nil
+      )
 
-(send *ri* :start-impedance :arms)
-(send *ri* :stop-impedance :arms)
-
-(print-ros-msg (send *ri* :get-auto-stabilizer-param))
-
-;; stair
+;; stair. 階段の前に移動させてから行う
 (send *robot* :reset-pose)
 (send *robot* :legs :move-end-pos #F(0 0 150))
 (send *ri* :angle-vector (send *robot* :angle-vector) 3000)

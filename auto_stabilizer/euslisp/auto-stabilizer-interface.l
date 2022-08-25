@@ -142,7 +142,7 @@
   (:raw-get-foot-step-state
    ()
    (send (send self :autostabilizerservice_getfootstepstate) :i_param))
-  (:get-foot-step-state
+  (:get-foot-step-states
    ()
    "Get AutoBalancer foot step state."
    (let ((param (send self :raw-get-foot-step-state)))
@@ -158,6 +158,10 @@
               '(:support_leg)
               '(:support-leg)))
      ))
+  (:get-foot-step-state
+   (param-name)
+   (cadr (memq param-name (send self :get-foot-step-states)))
+   )
   (:eus-footstep->abc-footstep
    (f)
    (instance auto_stabilizer::openhrp_autostabilizerservice_footstep :init
@@ -234,13 +238,43 @@
                       (list :impedance-d-r (list (tmp . ros::_data)))))
                 (if (and (memq :force-gain args) force-gain)
                     (let ((tmp (send prm :impedance_force_gain)))
-                      (dotimes (i 3) (setelt (tmp . ros::_data) (+ (* 3 limb-idx) i) force-gain))
+                      (dotimes (i 3) (setelt (tmp . ros::_data) (+ (* 3 limb-idx) i) (elt force-gain i)))
                       (list :impedance-force-gain (list (tmp . ros::_data)))))
                 (if (and (memq :moment-gain args) moment-gain)
                     (let ((tmp (send prm :impedance_moment_gain)))
-                      (dotimes (i 3) (setelt (tmp . ros::_data) (+ (* 3 limb-idx) i) moment-gain))
+                      (dotimes (i 3) (setelt (tmp . ros::_data) (+ (* 3 limb-idx) i) (elt moment-gain i)))
                       (list :impedance-moment-gain (list (tmp . ros::_data)))))
-             nil))))))
+                nil))))))
+  (:calc-dvel-with-velocity-center-offset
+   (ang velocity-center-offset)
+   "Calculate velocity params for rotating with given velocity center offset.
+    Ang : [deg], offset vector [mm]"
+   (let* ((default-step-time (send (send self :get-auto-stabilizer-param) :default_step_time))
+          (cen (make-cascoords :pos velocity-center-offset))
+          (cc (make-cascoords)))
+     (send cen :assoc cc)
+     (send cen :rotate (deg2rad ang) :z)
+     (let ((tf (send (make-coords) :transformation cc)))
+       (list
+        (/ (* 1e-3 (elt (send tf :worldpos) 0)) default-step-time)
+        (/ (* 1e-3 (elt (send tf :worldpos) 1)) default-step-time)
+        (/ ang default-step-time)
+        ))))
+  (:calc-go-velocity-param-from-velocity-center-offset
+   (ang velocity-center-offset)
+   "Calculate go-velocity velocities from rotation center and rotation angle.
+    ang is rotation angle [rad]. velocity-center-offset is velocity center offset [mm] from foot mid coords."
+   (let* ((default-step-time (send (send self :get-auto-stabilizer-param) :default_step_time)) ;; [s]
+          (cen (make-cascoords :pos velocity-center-offset))
+          (cc (make-cascoords)))
+     (send cen :assoc cc)
+     (send cen :rotate (deg2rad ang) :z)
+     (let ((tf (send (make-coords) :transformation cc)))
+       (list
+        (/ (* 1e-3 (elt (send tf :worldpos) 0)) default-step-time) ;; velx [m/s]
+        (/ (* 1e-3 (elt (send tf :worldpos) 1)) default-step-time) ;; vely [m/s]
+        (/ ang default-step-time) ;; velth [rad/s]
+        ))))
   )
 
 

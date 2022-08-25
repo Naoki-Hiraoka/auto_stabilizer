@@ -1,6 +1,9 @@
 - git: # hrpsysのRobotHardwareがmasterと異なるため再ビルド必要
     uri: https://github.com/start-jsk/rtmros_choreonoid
     local-name: rtm-ros-robotics/rtmros_choreonoid
+- git: # hrpsys_choreonoid_tutorialsが依存
+    uri: https://github.com/start-jsk/rtmros_tutorials
+    local-name: rtm-ros-robotics/rtmros_tutorials
 - git:
     uri: https://github.com/Naoki-Hiraoka/vnoid_world
     local-name: vnoid_world
