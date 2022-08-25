@@ -70,6 +70,7 @@ roseus
 (send *ri* :set-auto-stabilizer-param
       :reference-frame (list nil t)
       :is-hand-fix-mode t
+      :default-zmp-offsets (list #F(0 0) #F(0 0))
       )
 (send *ri* :set-foot-steps-with-param
         (list (make-coords :pos (float-vector 0 100 0) :name :lleg)
@@ -89,6 +90,7 @@ roseus
 (send *ri* :set-auto-stabilizer-param
       :reference-frame (list t t)
       :is-hand-fix-mode nil
+      :default-zmp-offsets (list #F(0 0.02) #F(0 -0.02))
       )
 
 ;; stair. 階段の前に移動させてから行う

@@ -139,13 +139,13 @@
                    (setq (tmp . ros::_data) (apply #'concatenate float-vector eefm-rot-time-const))
                    (list :eefm-rot-time-const tmp)))
              args))))
-  (:raw-get-foot-step-state
+  (:raw-get-foot-step-states
    ()
    (send (send self :autostabilizerservice_getfootstepstate) :i_param))
   (:get-foot-step-states
    ()
    "Get AutoBalancer foot step state."
-   (let ((param (send self :raw-get-foot-step-state)))
+   (let ((param (send self :raw-get-foot-step-states)))
      (append
       (mapcan #'(lambda (meth param-name) (list param-name (mapcar #'(lambda (p) (send self :abc-footstep->eus-footstep p)) (send param meth))))
               '(:leg_coords :leg_src_coords :leg_dst_coords)
@@ -155,8 +155,8 @@
               '(:dst-foot-midcoords))
       (mapcan #'(lambda (meth param-name)
                   (list param-name (send param meth)))
-              '(:support_leg)
-              '(:support-leg)))
+              '(:support_leg :joint_angle)
+              '(:support-leg :joint-angle)))
      ))
   (:get-foot-step-state
    (param-name)

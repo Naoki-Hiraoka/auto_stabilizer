@@ -781,7 +781,7 @@ bool AutoStabilizer::stopAutoBalancer(){
     usleep(1000);
     return true;
   }else{
-    std::cerr << "[" << this->m_profile.instance_name << "] auto balancer is already stopped" << std::endl;
+    std::cerr << "[" << this->m_profile.instance_name << "] auto balancer is already stopped or stabilizer is running" << std::endl;
     return false;
   }
 }
@@ -1345,6 +1345,10 @@ bool AutoStabilizer::getFootStepState(OpenHRP::AutoStabilizerService::FootStepSt
   else if(weights[RLEG] == 1.0) i_param.dst_foot_midcoords.leg = "rleg";
   else if(weights[LLEG] == 1.0) i_param.dst_foot_midcoords.leg = "lleg";
   AutoStabilizer::copyEigenCoords2FootStep(mathutil::orientCoordToAxis(mathutil::calcMidCoords(this->gaitParam_.footstepNodesList[0].dstCoords, weights), cnoid::Vector3::UnitZ()), i_param.dst_foot_midcoords);
+  i_param.joint_angle.length(this->gaitParam_.genRobot->numJoints());
+  for(int i=0;i<this->gaitParam_.genRobot->numJoints();i++){
+    i_param.joint_angle[i] = this->gaitParam_.genRobot->joint(i)->q();
+  }
   return true;
 }
 

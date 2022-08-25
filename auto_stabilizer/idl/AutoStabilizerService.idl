@@ -101,7 +101,7 @@ module OpenHRP
       // AutoStabilizer
       /// 各endeffectorの名前. 変更不可. (.confファイルのend_effectorsの並び順を、hrpsys外のレイヤで取得する手段が他に無いので)
       sequence<string> ee_name;
-      /// AutoStablizerが変更する関節の名前. MODE_IDLEのとき以外変更不可.
+      /// 要素数と順序はnumJoints()と同じ. falseの場合、qやtauはrefの値をそのまま出力する(writeOutputPort時にref値で上書き). IKでは動かさない(ref値をそのまま). トルク計算では目標トルクを通常通り計算する. このパラメータはMODE_IDLEのときにしか変更されない
       sequence<string> controllable_joints;
       /// Transition time [s] for start AutoBalancer. 下限0.01[s]
       double abc_start_transition_time;
@@ -113,109 +113,117 @@ module OpenHRP
       double st_stop_transition_time;
 
       // GaitParam
-      /// ZMP offset vectors[m] for rleg and lleg (<-please set by this order)
+      /// 要素数2. rleg: 0. lleg: 1. endeffector frame. 足裏COPの目標位置. 幾何的な位置はcopOffset.value()無しで考えるが、目標COPを考えるときはcopOffset.value()を考慮する. クロスできたりジャンプできたりする脚でないと左右方向(外側向き)の着地位置修正は難しいので、その方向に転びそうになることが極力ないように内側にcopをオフセットさせておくとよい.
       sequence<sequence<double, 2>, 2> default_zmp_offsets;
-      /// convex hull.
+      /// 要素数2. rleg: 0. lleg: 1. endeffector frame.  凸形状で,上から見て半時計回り. 単位[m]
       sequence<sequence<sequence<double, 2> >, 2> leg_hull;
-      /// Foot position offset in Y axis[m] (rleg and lleg)
+      /// goPos, goVelocity, setFootSteps等するときの右脚と左脚の中心からの相対位置.(Y[m]) また、reference frameとgenerate frameの対応付けに用いられる.
       sequence<double, 2> leg_default_translate_pos;
-      ///
+      /// 要素数2. 0: rleg. 1: lleg. 0~1. 1ならicEETargetPoseに従い、refEEWrenchに応じて重心をオフセットする. 0ならImpedanceControlをせず、refEEWrenchを無視し、DampingControlを行わない. 静止状態で無い場合や、支持脚の場合は、勝手に0になる. 両足が同時に1になることはない. 1にするなら、RefToGenFrameConverter.refFootOriginWeightを0にしたほうが良い.
       sequence<boolean, 2> is_manual_control_mode;
 
       // RefToGenFrameConverter
-      /// Flag for fix hand while walking.
+      /// trueならHandは重心の動きに合わせて左右に揺れる. falseなら揺れない.
       boolean is_hand_fix_mode;
-      /// reference frameのfootMidCoordsを計算するときに使うか
+      /// 要素数2. 0: rleg. 1: lleg. reference frameのfootMidCoordsを計算するときに使うか
       sequence<boolean, 2> reference_frame;
 
       // ActToGenFrameConverter
-      /// Actual robotのrootLinkの姿勢にlocalで加えるオフセット
+      /// [roll, pitch, yaw]. rootLink Frame. Actual robotのrootLinkの姿勢に加えるオフセット. IMUの取り付け位置のオフセットを考慮するためのものではない(それはモデルファイルを変えれば良い). 全身のキャリブのずれなど次第に出てくるなにかしらのずれをごますためのもの. 本来このようなパラメータは必要ないのが望ましいが、実用上は確かに必要.
       sequence<double, 3> rpy_offset;
 
       // ExternalForceHandler
-      /// Whether use disturbance compensation or not.
+      /// 長期的外乱補償を行うかどうか
       boolean use_disturbance_compensation;
-      /// Time Const for disturbance compensation [s]. 下限0.01[s]
+      /// 単位[s].長期的外乱補償の時定数. (外乱が減る方向には0.1倍になる).下限0.01[s]
       double disturbance_compensation_time_const;
-      /// 下限1
+      /// footstepNodesListsの何ステップぶんを積算するか. 4なら、右脚+左脚ぶんになる. 片足を踏み出す時間だけだと左右方向にかなりずれるので、両足を踏み出す時間だけ積算したほうが良い. 下限1
       long disturbance_compensation_step_num;
-      /// 下限0[m]
+      /// 単位[m]. 長期的外乱補償の上限. 下限0[m]
       double disturbance_compensation_limit;
 
       // ImpedanceController
+      /// 要素数EndEffectors. EndEffector frame(icTargetPose). endEffector origin.
       sequence<sequence<double, 3> > impedance_M_p;
+      /// 要素数EndEffectors. EndEffector frame(icTargetPose). endEffector origin.
       sequence<sequence<double, 3> > impedance_D_p;
+      /// 要素数EndEffectors. EndEffector frame(icTargetPose). endEffector origin.
       sequence<sequence<double, 3> > impedance_K_p;
+      /// 要素数EndEffectors. EndEffector frame(icTargetPose). endEffector origin.
       sequence<sequence<double, 3> > impedance_M_r;
+      /// 要素数EndEffectors. EndEffector frame(icTargetPose). endEffector origin.
       sequence<sequence<double, 3> > impedance_D_r;
+      /// 要素数EndEffectors. EndEffector frame(icTargetPose). endEffector origin.
       sequence<sequence<double, 3> > impedance_K_r;
+      /// 要素数EndEffectors. EndEffector frame(icTargetPose). endEffector origin.
       sequence<sequence<double, 3> > impedance_force_gain;
+      /// 要素数EndEffectors. EndEffector frame(icTargetPose). endEffector origin.
       sequence<sequence<double, 3> > impedance_moment_gain;
-      /// StopImpedanceControllerのとき以外変更不可
+      /// 要素数EndEffectors. EndEffector frame(icTargetPose). endEffector origin. StopImpedanceControllerのとき以外変更不可
       sequence<sequence<double, 3> > impedance_pos_compensation_limit;
-      /// StopImpedanceControllerのとき以外変更不可
+      /// 要素数EndEffectors. EndEffector frame(icTargetPose). endEffector origin. StopImpedanceControllerのとき以外変更不可
       sequence<sequence<double, 3> > impedance_rot_compensation_limit;
 
       // CmdVelGenerator
-      ///
+      /// ImpedanceControllerの変位の方向に歩くかどうか
       boolean graspless_manip_mode;
-      /// 要素数0~2. endeffector名
+      /// graspLessManipの対象とするendeffectorの名前. 要素数は0~2.
       sequence<string> graspless_manip_arm;
-      /// 下限0.01[s]
+      /// 単位[s]. 下限0.01[s]
       sequence<double, 3> graspless_manip_time_const;
 
       // FootStepGenerator
-      /// Step time [s]. 下限0.01[s]
+      /// [s]. goPosやgoVelocityのときに自動生成されるfootstepの一歩の時間. 下限0.01[s]
       double default_step_time;
-      /// 下限0[rad]
+      /// [rad]. goPosやgoVelocityのときに自動生成されるfootstepの上下限. 支持脚相対. 下限0[rad]
       double default_stride_limitation_theta;
-      /// convex hull. [m]
+      /// 要素数2. 0: rleg用, 1: lleg用. 単位[m]. goPosやgoVelocityのときに自動生成されるfootstepの、遊脚のエンドエフェクタの着地位置の範囲の凸包. 反対の脚のEndEffector frame(Z軸は鉛直)で表現した着地可能領域(自己干渉やIKの考慮が含まれる). 凸形状で,上から見て半時計回り. thetaとは独立に評価されるので、defaultStrideLimitationThetaだけ傾いていても大丈夫なようにせよ
       sequence<sequence<sequence<double, 2> >, 2> default_stride_limitation;
-      /// Ratio of double support period. 下限0.01. 上限0.99
+      /// defaultStepTimeのうちの、両足支持期の時間の割合. 下限0.01. 上限0.99
       double default_double_support_ratio;
-      /// Step height [m]. 0以上
+      /// goPosやgoVelocityのときに自動生成されるfootstepの足上げ高さ[m]. 0以上
       double default_step_height;
-      /// 下限1
+      /// goVelocity中にfootStepNodesListの将来の何ステップぶんを常に生成するか. 下限1
       long go_velocity_step_num;
-      /// Whether modify footsteps based on Capture Point
+      /// 着地位置時間修正を行うかどうか
       boolean modify_footsteps;
-      /// overwritable remainTime[s]. 下限0.0[s]
+      /// 単位[s]. 次indexまでの残り時間がこの値を下回っている場合、着地位置時間修正を行わない. 下限0.0[s]
       double overwritable_remain_time;
-      /// overwritable min time[s]. 下限0.01[s]
+      /// 単位[s]. 次indexまでの残り時間がこの値を下回るようには着地時間修正を行わない. もともと下回っている場合には、その値を下回るようには着地時間修正を行わない. これが無いと脚を空中から下ろす時間が足りなくて急激に動く. 下限0.01[s]
       double overwritable_min_time;
-      /// overwritable min step time[s]. 下限0.01[s]
+      /// 単位[s]. 現index開始時からの経過時間がこの値を下回るようには着地時間修正を行わない. もともと下回っている場合には、その値を下回るようには着地時間修正を行わない. これが無いと脚を地面から上げて下ろす時間が足りなくて急激に動く. 下限0.01[s]
       double overwritable_min_step_time;
-      /// overwritable max step time[s]. 下限overwritable_min_step_time[s].
+      /// 単位[s]. 現index開始時からの経過時間がこの値を上回るようには着地時間修正を行わない. もともと上回っている場合には、その値を上回るようには着地時間修正を行わない. これが無いと、DCMが片足のcopとほぼ一致しているときに、ずっと脚を浮かせたまま止まってしまう. 下限overwritable_min_step_time[s].
       double overwritable_max_step_time;
-      /// 下限0.0[m/s].
+      /// 単位[m/s]. 今の遊脚の位置のXYから着地位置のXYまで移動するための速度がこの値を上回るようには着地位置時間修正を行わない. 下限0.0[m/s].
       double overwritable_max_swing_velocity;
-      /// convex hull. [s]
+      /// 要素数2. rleg: 0. lleg: 1. leg frame. 単位[m]. 凸形状で,上から見て半時計回り. 大きさはleg_hull以下にすること
       sequence<sequence<sequence<double, 2> >, 2> safe_leg_hull;
-      /// convex hull. [m]. 歩行中は変更不可
+      /// 要素数2. 0: rleg用, 1: lleg用. 単位[m. 着地位置修正時に自動生成されるfootstepの上下限の凸包. 反対の脚のEndEffector frame(Z軸は鉛直)で表現した着地可能領域(自己干渉やIKの考慮が含まれる). 凸形状で,上から見て半時計回り. thetaとは独立に評価されるので、defaultStrideLimitationThetaだけ傾いていても大丈夫なようにせよ. 斜め方向の角を削るなどして、IKが解けるようにせよ. 歩行中は変更不可
       sequence<sequence<sequence<double, 2> >, 2> overwritable_stride_limitation;
-      /// [N]
+      /// [N]. generate frameで遊脚が着地時に鉛直方向にこの大きさ以上の力を受けたら接地とみなして、EarlyTouchDown処理を行う
       double contact_detection_threshold;
-      /// whether step when emergency
+      /// 現在静止状態で、CapturePointがsafeLegHullの外にあるまたは目標ZMPからemergencyStepCpCheckMargin以上離れているなら、footstepNodesListがemergencyStepNumのサイズになるまで歩くnodeが末尾に入る. (modifyFootSteps=trueのときのみ有効)
       boolean is_emergency_step_mode;
-      /// whether gostop after becoming stable
+      /// [m]. EmergencyStepの閾値.
+      double emergency_step_cp_check_margin;
+      /// 現在非静止状態で、着地位置修正を行ったなら、footstepNodesListがemergencyStepNumのサイズになるまで歩くnodeが末尾に入る. (modifyFootSteps=trueのときのみ有効)
       boolean is_stable_go_stop_mode;
       /// 下限1
       long emergency_step_num;
-      /// CP margin [m]
-      double emergency_step_cp_check_margin;
 
       // LegCoordsGenerator
-      /// Time offset [s] for swing trajectory by delay_hoffarbib_trajectory_generator. 下限0.0
+      /// 単位[s]. swing期は、(remainTime - delayTimeOffset)後にdstCoordsに到達するようなrectangle軌道を生成し、その軌道にdelayTimeOffset遅れで滑らかに追従するような軌道を生成する. 下限0.0
       double swing_trajectory_delay_time_offset;
-      /// 下限0.001[m/s]
+      /// 単位[m/s]. この速さで足を下ろした場合に着地までに要する時間をremainTimeが下回るまで、足下げを始めない. 下限0.001[m/s]
       double swing_trajectory_touch_vel;
-      /// Weight parameter for distance of final path of delay_hoffarbib_trajectory_generator. 下限0.01
+      /// swing期のDOWN_PHASEの速さを、他のPHASEとくらべ何倍遅くするか. 大きくすると足をまっすぐ下ろせる利点がある. 大きくするとswingの速度が上がるため、遊脚の力センサにノイズが乗って着地誤検知しやすいという欠点がある. 下限0.01
       double swing_trajectory_final_distance_weight;
-      /// [N]. 上限0.0. 歩行中は変更不可
+      /// [m]. 遊脚軌道生成時に、次に着地する場合、generate frameで鉛直方向に, 目標着地位置に対して加えるオフセット. 遅づきに対応するためのもの. 位置制御だと着地の衝撃が大きいのでデフォルトを0にしているが、トルク制御時や、高低差がある地形や、衝撃を気にする必要がないシミュレーションでは-0.05等にした方がよい. 上限0.0. 歩行中は変更不可
       double goal_offset;
-      /// 下限2
+      /// ZMPと重心軌道を生成する際に予見するfootStepNodesListのサイズ. 着地位置修正アルゴリズムが1 step capturabilityに基づくものであるため、previewStepNum = 2にして今の一歩だけを予見して重心軌道を生成した方がいいように思えるが、実際には4以上でないと目標軌道に追従するために必要なZmp入力が大きく、refZmpTrajの値を大きく外れてしまう. 下限2
       long preview_step_num;
-      /// [s]. 下限0.01[s]
+      /// [s]. refZmpTrajの終端時間. 0より大きい. (1.0[s]だと大きすぎて, 両足で立っているときに傾いたままなかなか戻ってこなかったり、停止時に重心がなかなか中央に戻らずemergency stepが無限誘発したり、少しずつ傾いていくことがある). 下限0.01[s]
       double footguided_balance_time;
 
       // Stabilizer
@@ -237,7 +245,7 @@ module OpenHRP
       sequence<double, 2> eefm_pos_compensation_limit;
       /// Sequence of all end-effector rot compensation limit [rad]. stabilierが動いているときは変更不可. 下限0.0
       sequence<double, 2> eefm_rot_compensation_limit;
-      ///
+      /// falseなら位置制御のみ. この値はisSTRunning時には変更されない. trueにするなら事前にself.rh_svc.setServoTorqueGainPercentage("all",100)を呼んでおくこと.
       boolean is_torque_control_mode;
       /// 下限0.01[s]
       double swing2landing_transition_time;
@@ -245,17 +253,17 @@ module OpenHRP
       double landing2support_transition_time;
       /// 下限0.01[s]
       double support2swing_transition_time;
-      /// 下限0 上限100
+      /// 要素数2. [rleg, lleg]. rootLinkから各endeffectorまでの各関節のゲイン. 0~100. 下限0 上限100
       sequence<sequence<double> > support_pgain;
-      /// 下限0 上限100
+      /// 要素数2. [rleg, lleg]. rootLinkから各endeffectorまでの各関節のゲイン. 0~100. 下限0 上限100
       sequence<sequence<double> > support_dgain;
-      /// 下限0 上限100
+      /// 要素数2. [rleg, lleg]. rootLinkから各endeffectorまでの各関節のゲイン. 0~100. 下限0 上限100
       sequence<sequence<double> > landing_pgain;
-      /// 下限0 上限100
+      /// 要素数2. [rleg, lleg]. rootLinkから各endeffectorまでの各関節のゲイン. 0~100. 下限0 上限100
       sequence<sequence<double> > landing_dgain;
-      /// 下限0 上限100
+      /// 要素数2. [rleg, lleg]. rootLinkから各endeffectorまでの各関節のゲイン. 0~100. 下限0 上限100
       sequence<sequence<double> > swing_pgain;
-      /// 下限0 上限100
+      /// 要素数2. [rleg, lleg]. rootLinkから各endeffectorまでの各関節のゲイン. 0~100. 下限0 上限100
       sequence<sequence<double> > swing_dgain;
     };
 
@@ -280,6 +288,7 @@ module OpenHRP
      */
     boolean goStop();
 
+    // TODO
     boolean jumpTo(in double x, in double y, in double z, in double ts, in double tf);
 
     /**
@@ -322,6 +331,7 @@ module OpenHRP
      * @param
      * @return true if set successfully, false otherwise
      */
+    // TODO
     boolean releaseEmergencyStop();
 
     /**
@@ -378,6 +388,7 @@ module OpenHRP
       sequence<Footstep, 2> leg_dst_coords;
       // 現在支持脚、または現在遊脚で次支持脚になる脚の、dstCoordsの中間. 水平
       Footstep dst_foot_midcoords;
+      sequence<double> joint_angle;
     };
 
     boolean getFootStepState(out FootStepState i_param);

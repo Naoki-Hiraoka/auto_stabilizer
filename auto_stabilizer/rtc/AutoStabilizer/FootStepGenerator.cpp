@@ -234,7 +234,7 @@ bool FootStepGenerator::calcFootSteps(const GaitParam& gaitParam, const double& 
        gaitParam.prevSupportPhase[LLEG] != gaitParam.footstepNodesList[0].isSupportPhase[LLEG]){ // footstepの切り替わりのタイミング. this->updateGoVelocityStepsを毎周期呼ぶと、数値誤差でだんだん変にずれてくるので.
       this->updateGoVelocitySteps(footstepNodesList, gaitParam.defaultTranslatePos, gaitParam.cmdVel);
     }
-    while(footstepNodesList.size() < this->goVelocityStepNum){
+    while(footstepNodesList.size() <= this->goVelocityStepNum){
       if(footstepNodesList.size() == 1 &&
          footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG]){ // 両足支持期を延長
         // 現在の時刻から突然refZmpTrajが変化すると、大きなZMP入力変化が必要になる. いまの位置でrefZmpTrajをthis->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio)の間とめて、次にthis->defaultStepTime * this->defaultDoubleSupportRatioの間で次の支持脚側に動かす
@@ -711,7 +711,7 @@ void FootStepGenerator::checkEmergencyStep(std::vector<GaitParam::FootStepNodes>
     cnoid::Vector3 dir = gaitParam.footMidCoords.value().linear().transpose() * (actCMP - gaitParam.footMidCoords.value().translation()); // footmidcoords frame
     dir[2] = 0.0;
     if(dir.norm() > 0.0) dir = dir.normalized();
-    while(footstepNodesList.size() < this->emergencyStepNum){
+    while(footstepNodesList.size() <= this->emergencyStepNum){
       if(footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG]){
         footstepNodesList.back().remainTime = this->defaultStepTime * this->defaultDoubleSupportRatio; // 末尾の両足支持期を短縮 & 延長
       }

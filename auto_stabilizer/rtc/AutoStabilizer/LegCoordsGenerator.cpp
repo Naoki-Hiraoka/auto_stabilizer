@@ -207,7 +207,9 @@ void LegCoordsGenerator::calcCOMCoords(const GaitParam& gaitParam, double dt, cn
       for(int i=0;i<NUM_LEGS;i++){
         if(!gaitParam.footstepNodesList[0].isSupportPhase[i]) continue;
         for(int j=0;j<gaitParam.legHull[i].size();j++){
-          vertices.push_back(gaitParam.genCoords[i].value()*gaitParam.legHull[i][j]);
+          cnoid::Vector3 p = gaitParam.genCoords[i].value()*gaitParam.legHull[i][j];
+          if(p[2] > gaitParam.actCog[2] - 1e-2) p[2] = gaitParam.actCog[2] - 1e-2; // 重心よりも支持点が高いと射影が破綻するので
+          vertices.push_back(p);
         }
       }
       genZmp = mathutil::calcInsidePointOfPolygon3D(genZmp,vertices,gaitParam.genCog - cnoid::Vector3(gaitParam.l[0],gaitParam.l[1], 0.0));
