@@ -3,18 +3,17 @@
 #include <cnoid/EigenUtil>
 
 bool FootStepGenerator::initFootStepNodesList(const GaitParam& gaitParam,
-                                              std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<cnoid::Position>& o_dstCoordsOrg, std::vector<bool>& o_prevSupportPhase) const{
+                                              std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<cnoid::Position>& o_dstCoordsOrg, double& o_remainTimeOrg, std::vector<bool>& o_prevSupportPhase) const{
   // footStepNodesListを初期化する
   std::vector<GaitParam::FootStepNodes> footstepNodesList(1);
-  std::vector<cnoid::Position> srcCoords;
-  std::vector<cnoid::Position> dstCoordsOrg;
   cnoid::Position rlegCoords = gaitParam.genRobot->link(gaitParam.eeParentLink[RLEG])->T()*gaitParam.eeLocalT[RLEG];
   cnoid::Position llegCoords = gaitParam.genRobot->link(gaitParam.eeParentLink[LLEG])->T()*gaitParam.eeLocalT[LLEG];
   footstepNodesList[0].dstCoords = {rlegCoords, llegCoords};
   footstepNodesList[0].isSupportPhase = {(gaitParam.isManualControlMode[RLEG].getGoal() == 0.0), (gaitParam.isManualControlMode[LLEG].getGoal() == 0.0)};
   footstepNodesList[0].remainTime = 0.0;
-  srcCoords = footstepNodesList[0].dstCoords;
-  dstCoordsOrg = footstepNodesList[0].dstCoords;
+  std::vector<cnoid::Position> srcCoords = footstepNodesList[0].dstCoords;
+  std::vector<cnoid::Position> dstCoordsOrg = footstepNodesList[0].dstCoords;
+  double remainTimeOrg = footstepNodesList[0].remainTime;
 
   std::vector<bool> prevSupportPhase(NUM_LEGS);
   for(int i=0;i<NUM_LEGS;i++){
@@ -25,6 +24,7 @@ bool FootStepGenerator::initFootStepNodesList(const GaitParam& gaitParam,
   o_footstepNodesList = footstepNodesList;
   o_srcCoords = srcCoords;
   o_dstCoordsOrg = dstCoordsOrg;
+  o_remainTimeOrg = remainTimeOrg;
 
   return true;
 }
@@ -185,12 +185,13 @@ bool FootStepGenerator::goStop(const GaitParam& gaitParam,
 
 // FootStepNodesListをdtすすめる
 bool FootStepGenerator::procFootStepNodesList(const GaitParam& gaitParam, const double& dt, bool useActState,
-                                              std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<cnoid::Position>& o_dstCoordsOrg, std::vector<GaitParam::SwingState_enum>& o_swingState, double& o_elapsedTime, std::vector<bool>& o_prevSupportPhase) const{
+                                              std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<cnoid::Position>& o_dstCoordsOrg, double& o_remainTimeOrg, std::vector<GaitParam::SwingState_enum>& o_swingState, double& o_elapsedTime, std::vector<bool>& o_prevSupportPhase) const{
   std::vector<GaitParam::FootStepNodes> footstepNodesList = gaitParam.footstepNodesList;
   std::vector<bool> prevSupportPhase = gaitParam.prevSupportPhase;
   double elapsedTime = gaitParam.elapsedTime;
   std::vector<cnoid::Position> srcCoords = gaitParam.srcCoords;
   std::vector<cnoid::Position> dstCoordsOrg = gaitParam.dstCoordsOrg;
+  double remainTimeOrg = gaitParam.remainTimeOrg;
   std::vector<GaitParam::SwingState_enum> swingState = gaitParam.swingState;
 
   if(useActState){
@@ -211,7 +212,7 @@ bool FootStepGenerator::procFootStepNodesList(const GaitParam& gaitParam, const 
 
     // footstepNodesList[1]へ進む
     this->goNextFootStepNodesList(gaitParam, dt,
-                                  footstepNodesList, srcCoords, dstCoordsOrg, swingState, elapsedTime);
+                                  footstepNodesList, srcCoords, dstCoordsOrg, remainTimeOrg, swingState, elapsedTime);
   }
 
   o_footstepNodesList = footstepNodesList;
@@ -219,6 +220,7 @@ bool FootStepGenerator::procFootStepNodesList(const GaitParam& gaitParam, const 
   o_elapsedTime = elapsedTime;
   o_srcCoords = srcCoords;
   o_dstCoordsOrg = dstCoordsOrg;
+  o_remainTimeOrg = remainTimeOrg;
   o_swingState = swingState;
 
   return true;
@@ -262,7 +264,7 @@ bool FootStepGenerator::calcFootSteps(const GaitParam& gaitParam, const double& 
 }
 
 bool FootStepGenerator::goNextFootStepNodesList(const GaitParam& gaitParam, double dt,
-                                                std::vector<GaitParam::FootStepNodes>& footstepNodesList, std::vector<cnoid::Position>& srcCoords, std::vector<cnoid::Position>& dstCoordsOrg, std::vector<GaitParam::SwingState_enum>& swingState, double& elapsedTime) const{
+                                                std::vector<GaitParam::FootStepNodes>& footstepNodesList, std::vector<cnoid::Position>& srcCoords, std::vector<cnoid::Position>& dstCoordsOrg, double& remainTimeOrg, std::vector<GaitParam::SwingState_enum>& swingState, double& elapsedTime) const{
   // 今のgenCoordsとdstCoordsが異なるなら、将来のstepの位置姿勢をそれに合わせてずらす. (特にgoalOffsetがある場合にはこの処理が必要)
   //   footstepNodesList[1:]で一回でも遊脚になった以降は、位置とYawをずらす. footstepNodesList[1:]で最初に遊脚になる脚があるならその反対の脚の偏差にあわせてずらす. そうでないなら両脚の中心(+-defaultTranslatePos)の偏差にあわせてずらす
   //   footstepNodesList[1]が支持脚なら、遊脚になるまで、位置姿勢をその足の今の偏差にあわせてずらす.
@@ -309,6 +311,7 @@ bool FootStepGenerator::goNextFootStepNodesList(const GaitParam& gaitParam, doub
     dstCoordsOrg[i] = footstepNodesList[0].dstCoords[i];
     swingState[i] = GaitParam::LIFT_PHASE;
   }
+  remainTimeOrg = footstepNodesList[0].remainTime;
   elapsedTime = 0.0;
 
   return true;
@@ -488,7 +491,7 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
     2. steppable: 達成不可の場合は、考慮しない
     3. capturable: 達成不可の場合は、可能な限り近い位置. 複数ある場合は時間が速い方優先. (次の一歩に期待) (角運動量 TODO)
     4. もとの着地位置(dstCoordsOrg): 達成不可の場合は、各hullの中の最も近い位置をそれぞれ求めて、着地位置修正前の進行方向(遊脚のsrcCoordsからの方向)に最も進むもの優先 (支持脚からの方向にすると、横歩き時に後ろ足の方向が逆になってしまう)
-    5. もとの着地時刻(remainTime): 達成不可の場合は、可能な限り近い時刻
+    5. もとの着地時刻(remainTimeOrg): 達成不可の場合は、可能な限り近い時刻
    */
 
   std::vector<std::pair<std::vector<cnoid::Vector3>, double> > candidates; // first: generate frame. 着地領域(convex Hull). second: 着地時刻. サイズが0になることはない
@@ -637,12 +640,13 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
   // std::cerr << "pos" << std::endl;
   // std::cerr << candidates << std::endl;
 
-  // 5. もとの着地時刻(remainTime): 達成不可の場合は、可能な限り近い時刻
+  // 5. もとの着地時刻(remainTimeOrg): 達成不可の場合は、可能な限り近い時刻
   {
     std::vector<std::pair<std::vector<cnoid::Vector3>, double> > nextCandidates;
+    double targetRemainTime = gaitParam.remainTimeOrg - gaitParam.elapsedTime; // 負になっているかもしれない.
     double minDiffTime = std::numeric_limits<double>::max();
     for(int i=0;i<candidates.size();i++){
-      double diffTime = std::abs(candidates[i].second - footstepNodesList[0].remainTime);
+      double diffTime = std::abs(candidates[i].second - targetRemainTime);
       if(diffTime < minDiffTime){
         minDiffTime = diffTime;
         nextCandidates.clear();

@@ -390,7 +390,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
     impedanceController.initImpedanceOutput(gaitParam,
                                             gaitParam.icEEOffset);
     footStepGenerator.initFootStepNodesList(gaitParam,
-                                            gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.dstCoordsOrg, gaitParam.prevSupportPhase);
+                                            gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.dstCoordsOrg, gaitParam.remainTimeOrg, gaitParam.prevSupportPhase);
     legCoordsGenerator.initLegCoords(gaitParam,
                                      gaitParam.refZmpTraj, gaitParam.genCoords);
     stabilizer.initStabilizerOutput(gaitParam,
@@ -423,7 +423,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
 
   // AutoBalancer
   footStepGenerator.procFootStepNodesList(gaitParam, dt, mode.isSTRunning(),
-                                          gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.dstCoordsOrg, gaitParam.swingState, gaitParam.elapsedTime, gaitParam.prevSupportPhase);
+                                          gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.dstCoordsOrg, gaitParam.remainTimeOrg, gaitParam.swingState, gaitParam.elapsedTime, gaitParam.prevSupportPhase);
   footStepGenerator.calcFootSteps(gaitParam, dt, mode.isSTRunning(),
                                   gaitParam.footstepNodesList);
   legCoordsGenerator.calcLegCoords(gaitParam, dt, mode.isSTRunning(),

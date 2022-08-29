@@ -42,6 +42,8 @@ roseus
 ;;(send *ri* :start-auto-balancer)
 ;;(send *ri* :start-st)
 
+(send *ri* :set-auto-stabilizer-param :goal-offset -0.05)
+
 (send *ri* :go-velocity 0 0 0)
 (send *ri* :go-stop)
 (send *ri* :go-pos 1 0 0)
