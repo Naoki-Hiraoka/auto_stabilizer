@@ -229,6 +229,15 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
       this->addInPort(name.c_str(), *(this->ports_.m_actWrenchIn_[i]));
     }
 
+    // 各EndEffectorにつき、act<name>PoseOutというOutPortをつくる
+    this->ports_.m_actEEPoseOut_.resize(this->gaitParam_.eeName.size());
+    this->ports_.m_actEEPose_.resize(this->gaitParam_.eeName.size());
+    for(int i=0;i<this->gaitParam_.eeName.size();i++){
+      std::string name = "act"+this->gaitParam_.eeName[i]+"PoseOut";
+      this->ports_.m_actEEPoseOut_[i] = std::make_unique<RTC::OutPort<RTC::TimedPose3D> >(name.c_str(), this->ports_.m_actEEPose_[i]);
+      this->addOutPort(name.c_str(), *(this->ports_.m_actEEPoseOut_[i]));
+    }
+
     // 各EndEffectorにつき、tgt<name>WrenchOutというOutPortをつくる
     this->ports_.m_tgtEEWrenchOut_.resize(this->gaitParam_.eeName.size());
     this->ports_.m_tgtEEWrench_.resize(this->gaitParam_.eeName.size());
@@ -611,6 +620,17 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
     ports.m_actDcm_.data.y = actDcm[1];
     ports.m_actDcm_.data.z = actDcm[2];
     ports.m_actDcmOut_.write();
+    for(int i=0;i<gaitParam.eeName.size();i++){
+      ports.m_actEEPose_[i].tm = ports.m_qRef_.tm;
+      ports.m_actEEPose_[i].data.position.x = gaitParam.actEEPose[i].translation()[0];
+      ports.m_actEEPose_[i].data.position.y = gaitParam.actEEPose[i].translation()[1];
+      ports.m_actEEPose_[i].data.position.z = gaitParam.actEEPose[i].translation()[2];
+      cnoid::Vector3 rpy = cnoid::rpyFromRot(gaitParam.actEEPose[i].linear());
+      ports.m_actEEPose_[i].data.orientation.r = rpy[0];
+      ports.m_actEEPose_[i].data.orientation.p = rpy[1];
+      ports.m_actEEPose_[i].data.orientation.y = rpy[2];
+      ports.m_actEEPoseOut_[i]->write();
+    }
     for(int i=0;i<gaitParam.eeName.size();i++){
       ports.m_actEEWrench_[i].tm = ports.m_qRef_.tm;
       ports.m_actEEWrench_[i].data.length(6);
