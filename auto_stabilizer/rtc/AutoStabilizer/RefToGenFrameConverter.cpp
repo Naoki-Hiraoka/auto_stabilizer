@@ -65,13 +65,13 @@ bool RefToGenFrameConverter::convertFrame(const GaitParam& gaitParam, double dt,
   trans_footMidCoordsLocal[1] *= (1.0 - handFixMode.value());
   genFootMidCoords.translation() = footMidCoords.value().translation() + footMidCoords.value().linear() * trans_footMidCoordsLocal;
 
-  // refRobotRawをrefRobotに変換する
+  // refRobotRawのrefFootMidCoordsを求めてrefRobotに変換する
   double refdz;
   std::vector<cnoid::Position> refEEPoseFK(gaitParam.eeName.size());
   this->convertRefRobotRaw(gaitParam, genFootMidCoords,
                            refRobot, refEEPoseFK, refdz);
 
-  // refEEPoseRawを変換する
+  // refEEPoseRawのrefFootMidCoordsを求めて変換する
   std::vector<cnoid::Position> refEEPoseWithOutFK(gaitParam.eeName.size());
   this->convertRefEEPoseRaw(gaitParam, genFootMidCoords,
                             refEEPoseWithOutFK);
@@ -173,10 +173,10 @@ void RefToGenFrameConverter::convertRefRobotRaw(const GaitParam& gaitParam, cons
 
 // refEEPoseRawを変換する.
 void RefToGenFrameConverter::convertRefEEPoseRaw(const GaitParam& gaitParam, const cnoid::Position& genFootMidCoords, std::vector<cnoid::Position>& refEEPoseWithOutFK) const{
-  cnoid::Position refFootMidCoords = this->calcRefFootMidCoords(gaitParam.refEEPoseRaw[RLEG], gaitParam.refEEPoseRaw[LLEG], gaitParam);
+  cnoid::Position refFootMidCoords = this->calcRefFootMidCoords(gaitParam.refEEPoseRaw[RLEG].value(), gaitParam.refEEPoseRaw[LLEG].value(), gaitParam);
   cnoid::Position transform = genFootMidCoords * refFootMidCoords.inverse();
   for(int i=0;i<gaitParam.eeName.size();i++){
-    refEEPoseWithOutFK[i] = transform * gaitParam.refEEPoseRaw[i];
+    refEEPoseWithOutFK[i] = transform * gaitParam.refEEPoseRaw[i].value();
   }
 }
 
