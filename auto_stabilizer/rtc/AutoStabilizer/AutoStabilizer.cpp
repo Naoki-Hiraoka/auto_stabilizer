@@ -171,7 +171,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
 
       // check validity
       name.erase(std::remove(name.begin(), name.end(), ' '), name.end()); // remove whitespace
-      parentLink.erase(std::remove(name.begin(), name.end(), ' '), name.end()); // remove whitespace
+      parentLink.erase(std::remove(parentLink.begin(), parentLink.end(), ' '), parentLink.end()); // remove whitespace
       if(!this->gaitParam_.refRobotRaw->link(parentLink)){
         std::cerr << "\x1b[31m[" << this->m_profile.instance_name << "] " << " link [" << parentLink << "]" << " is not found for " << name << "\x1b[39m" << std::endl;
         return RTC::RTC_ERROR;

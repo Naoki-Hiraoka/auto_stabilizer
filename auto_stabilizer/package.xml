@@ -12,7 +12,6 @@
 
   <buildtool_depend>catkin</buildtool_depend>
 
-  <!-- <depend>qpoases_vendor</depend> -->
   <depend>rtmbuild2</depend>
   <depend>cpp_filters</depend>
   <depend>choreonoid</depend>
