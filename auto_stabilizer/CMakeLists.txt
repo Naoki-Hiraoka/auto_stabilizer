@@ -4,10 +4,6 @@ project(auto_stabilizer)
 add_compile_options(-std=c++11)
 set(CMAKE_BUILD_TYPE Release)
 
-# rtmbuild has non exist dependency
-# (ROSBUILD_genmsg_cpp) and (RTMBUILD_${PROJECT_NAME}_genidl)
-cmake_policy(SET CMP0046 OLD)
-
 find_package(catkin REQUIRED COMPONENTS
   rtmbuild2
   roscpp
