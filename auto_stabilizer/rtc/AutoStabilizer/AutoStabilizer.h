@@ -98,6 +98,7 @@ protected:
     std::vector<std::unique_ptr<RTC::InPort<RTC::TimedDoubleSeq> > > m_actWrenchIn_;
     std::vector<RTC::TimedPose3D> m_refEEPose_; // Reference World frame. 要素数及び順番はgaitParam_.eeNameと同じ
     std::vector<std::unique_ptr<RTC::InPort<RTC::TimedPose3D> > > m_refEEPoseIn_;
+    RTC::Time refEEPoseLastUpdateTime_; // m_refEEPoseIn_のどれかに最後にdataが届いたときの、m_qRef_.tmの時刻
 
     RTC::TimedDoubleSeq m_q_;
     RTC::OutPort<RTC::TimedDoubleSeq> m_qOut_;

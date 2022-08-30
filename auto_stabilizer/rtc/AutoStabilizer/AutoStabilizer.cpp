@@ -363,6 +363,7 @@ bool AutoStabilizer::readInPortData(const double& dt, AutoStabilizer::Ports& por
         pose.translation()[2] = ports.m_refEEPose_[i].data.position.z;
         pose.linear() = cnoid::rotFromRpy(ports.m_refEEPose_[i].data.orientation.r, ports.m_refEEPose_[i].data.orientation.p, ports.m_refEEPose_[i].data.orientation.y);
         refEEPoseRaw[i].setGoal(pose, 0.3); // 0.3秒で補間
+        ports.refEEPoseLastUpdateTime_ = ports.m_qRef_.tm;
       }
     }
     refEEPoseRaw[i].interpolate(dt);
@@ -902,11 +903,9 @@ bool AutoStabilizer::startWholeBodyMasterSlave(void){
       std::cerr << "[" << this->m_profile.instance_name << "] WholeBodyMasterSlave is already started" << std::endl;
       return false;
     }
-    for(int i=0;i<this->ports_.m_refEEPose_.size();i++){
-      if(std::abs((this->ports_.m_refEEPose_[i].tm.sec - this->ports_.m_qRef_.tm.sec) + 1e-9 * (this->ports_.m_refEEPose_[i].tm.nsec - this->ports_.m_qRef_.tm.nsec)) > 1.0) { // 最新のm_refEEPose_が1秒以上前. master sideが立ち上がっていないので、姿勢の急変を引き起こし危険
-        std::cerr << "[" << this->m_profile.instance_name << "] Please start master side" << std::endl;
-        return false;
-      }
+    if(std::abs((this->ports_.refEEPoseLastUpdateTime_.sec - this->ports_.m_qRef_.tm.sec) + 1e-9 * (this->ports_.refEEPoseLastUpdateTime_.nsec - this->ports_.m_qRef_.tm.nsec)) > 1.0) { // 最新のm_refEEPose_が1秒以上前. master sideが立ち上がっていないので、姿勢の急変を引き起こし危険
+      std::cerr << "[" << this->m_profile.instance_name << "] Please start master side" << std::endl;
+      return false;
     }
     this->refToGenFrameConverter_.solveFKMode.setGoal(0.0, 5.0); // 5秒で遷移
     std::cerr << "[" << this->m_profile.instance_name << "] Start WholeBodyMasterSlave" << std::endl;
