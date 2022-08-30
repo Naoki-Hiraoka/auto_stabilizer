@@ -245,6 +245,12 @@
                       (dotimes (i 3) (setelt (tmp . ros::_data) (+ (* 3 limb-idx) i) (elt moment-gain i)))
                       (list :impedance-moment-gain (list (tmp . ros::_data)))))
                 nil))))))
+  (:start-whole-body-master-slave
+   ()
+   (send self :autostabilizerservice_startWholeBodyMasterSlave))
+  (:stop-whole-body-master-slave
+   ()
+   (send self :autostabilizerservice_stopWholeBodyMasterSlave))
   (:calc-dvel-with-velocity-center-offset
    (ang velocity-center-offset)
    "Calculate velocity params for rotating with given velocity center offset.
