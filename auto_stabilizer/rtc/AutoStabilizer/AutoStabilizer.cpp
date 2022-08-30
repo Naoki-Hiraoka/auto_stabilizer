@@ -892,6 +892,42 @@ bool AutoStabilizer::stopImpedanceController(const std::string& i_name){
     return false;
   }
 }
+bool AutoStabilizer::startWholeBodyMasterSlave(void){
+  std::lock_guard<std::mutex> guard(this->mutex_);
+  if(this->mode_.isABCRunning()){
+    if(this->refToGenFrameConverter_.solveFKMode.getGoal() == 0.0){
+      std::cerr << "[" << this->m_profile.instance_name << "] WholeBodyMasterSlave is already started" << std::endl;
+      return false;
+    }
+    for(int i=0;i<this->ports_.m_refEEPose_.size();i++){
+      if(std::abs((this->ports_.m_refEEPose_[i].tm.sec - this->ports_.m_qRef_.tm.sec) + 1e-9 * (this->ports_.m_refEEPose_[i].tm.nsec - this->ports_.m_qRef_.tm.nsec)) > 1.0) { // 最新のm_refEEPose_が1秒以上前. master sideが立ち上がっていないので、姿勢の急変を引き起こし危険
+        std::cerr << "[" << this->m_profile.instance_name << "] Please start master side" << std::endl;
+        return false;
+      }
+    }
+    this->refToGenFrameConverter_.solveFKMode.setGoal(0.0, 5.0); // 5秒で遷移
+    std::cerr << "[" << this->m_profile.instance_name << "] Start WholeBodyMasterSlave" << std::endl;
+    return true;
+  }else{
+    std::cerr << "[" << this->m_profile.instance_name << "] Please start AutoBalancer" << std::endl;
+    return false;
+  }
+}
+bool AutoStabilizer::stopWholeBodyMasterSlave(void){
+  std::lock_guard<std::mutex> guard(this->mutex_);
+  if(this->mode_.isABCRunning()){
+    if(this->refToGenFrameConverter_.solveFKMode.getGoal() == 1.0){
+      std::cerr << "[" << this->m_profile.instance_name << "] WholeBodyMasterSlave is already stopped" << std::endl;
+      return false;
+    }
+    this->refToGenFrameConverter_.solveFKMode.setGoal(1.0, 5.0); // 5秒で遷移
+    std::cerr << "[" << this->m_profile.instance_name << "] Stop WholeBodyMasterSlave" << std::endl;
+    return true;
+  }else{
+    std::cerr << "[" << this->m_profile.instance_name << "] Please start AutoBalancer" << std::endl;
+    return false;
+  }
+}
 
 bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService::AutoStabilizerParam& i_param){
   std::lock_guard<std::mutex> guard(this->mutex_);

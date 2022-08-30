@@ -13,7 +13,9 @@ bool RefToGenFrameConverter::initGenRobot(const GaitParam& gaitParam, // input
     genRobot->joint(i)->u() = gaitParam.refRobotRaw->joint(i)->u();
   }
   genRobot->calcForwardKinematics();
-  cnoid::Position refFootMidCoords = this->calcRefFootMidCoords(genRobot, gaitParam);
+  cnoid::Position rleg = genRobot->link(gaitParam.eeParentLink[RLEG])->T()*gaitParam.eeLocalT[RLEG];
+  cnoid::Position lleg = genRobot->link(gaitParam.eeParentLink[LLEG])->T()*gaitParam.eeLocalT[LLEG];
+  cnoid::Position refFootMidCoords = this->calcRefFootMidCoords(rleg, lleg, gaitParam);
   cnoid::Position footMidCoords = mathutil::orientCoordToAxis(refFootMidCoords, cnoid::Vector3::UnitZ());
   cnoidbodyutil::moveCoords(genRobot, footMidCoords, refFootMidCoords);
   genRobot->calcForwardKinematics(true);
@@ -28,7 +30,6 @@ bool RefToGenFrameConverter::initGenRobot(const GaitParam& gaitParam, // input
 
 bool RefToGenFrameConverter::convertFrame(const GaitParam& gaitParam, double dt,// input
                                           cnoid::BodyPtr& refRobot, std::vector<cnoid::Position>& o_refEEPose, std::vector<cnoid::Vector6>& o_refEEWrench, double& o_refdz, cpp_filters::TwoPointInterpolatorSE3& o_footMidCoords) const{ // output
-  cnoidbodyutil::copyRobotState(gaitParam.refRobotRaw, refRobot);
 
   /*
     静止時に、足のrefEEPoseとgenCoordsの位置がそろっていて欲しい.(refEEPoseとgenCoordsの左右の足が水平で相対位置が同じなら)
@@ -46,87 +47,40 @@ bool RefToGenFrameConverter::convertFrame(const GaitParam& gaitParam, double dt,
         XYZ Yawはreference脚のrefEEPose + copOffset(local) - defaultTranslatePos(local). [handFixModeなら一致する]
    */
 
-  //footMidCoordsを進める
-  cpp_filters::TwoPointInterpolatorSE3 footMidCoords = gaitParam.footMidCoords;
-  {
-    cnoid::Position rleg = gaitParam.footstepNodesList[0].dstCoords[RLEG];
-    rleg.translation() += rleg.linear() * gaitParam.copOffset[RLEG].value();
-    cnoid::Position lleg = gaitParam.footstepNodesList[0].dstCoords[LLEG];
-    lleg.translation() += lleg.linear() * gaitParam.copOffset[LLEG].value();
-    cnoid::Position midCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{rleg, lleg}, std::vector<double>{1.0, 1.0});
-    rleg = mathutil::orientCoordToAxis(rleg, cnoid::Vector3::UnitZ());
-    lleg = mathutil::orientCoordToAxis(lleg, cnoid::Vector3::UnitZ());
-    midCoords = mathutil::orientCoordToAxis(midCoords, cnoid::Vector3::UnitZ());
-    rleg.translation() -= rleg.linear() * gaitParam.defaultTranslatePos[RLEG].value();
-    lleg.translation() -= lleg.linear() * gaitParam.defaultTranslatePos[LLEG].value();
-    if(gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && gaitParam.footstepNodesList[0].isSupportPhase[LLEG]){ // 両足支持
-      footMidCoords.setGoal(midCoords, gaitParam.footstepNodesList[0].remainTime);
-    }else if(gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && !gaitParam.footstepNodesList[0].isSupportPhase[LLEG]){ // 右足支持
-      if(gaitParam.footstepNodesList.size() > 1 &&
-         (gaitParam.footstepNodesList[1].isSupportPhase[RLEG] && gaitParam.footstepNodesList[1].isSupportPhase[LLEG]) // 次が両足支持
-         ){
-        cnoid::Position rleg = gaitParam.footstepNodesList[1].dstCoords[RLEG];
-        rleg.translation() += rleg.linear() * gaitParam.copOffset[RLEG].value();
-        cnoid::Position lleg = gaitParam.footstepNodesList[1].dstCoords[LLEG];
-        lleg.translation() += lleg.linear() * gaitParam.copOffset[LLEG].value();
-        cnoid::Position midCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{rleg, lleg}, std::vector<double>{1.0, 1.0});
-        midCoords = mathutil::orientCoordToAxis(midCoords, cnoid::Vector3::UnitZ());
-        footMidCoords.setGoal(midCoords, gaitParam.footstepNodesList[0].remainTime + gaitParam.footstepNodesList[1].remainTime);
-      }else{
-        footMidCoords.setGoal(rleg, gaitParam.footstepNodesList[0].remainTime);
-      }
-    }else if(!gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && gaitParam.footstepNodesList[0].isSupportPhase[LLEG]){ // 左足支持
-      if(gaitParam.footstepNodesList.size() > 1 &&
-         (gaitParam.footstepNodesList[1].isSupportPhase[RLEG] && gaitParam.footstepNodesList[1].isSupportPhase[LLEG]) // 次が両足支持
-         ){
-        cnoid::Position rleg = gaitParam.footstepNodesList[1].dstCoords[RLEG];
-        rleg.translation() += rleg.linear() * gaitParam.copOffset[RLEG].value();
-        cnoid::Position lleg = gaitParam.footstepNodesList[1].dstCoords[LLEG];
-        lleg.translation() += lleg.linear() * gaitParam.copOffset[LLEG].value();
-        cnoid::Position midCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{rleg, lleg}, std::vector<double>{1.0, 1.0});
-        midCoords = mathutil::orientCoordToAxis(midCoords, cnoid::Vector3::UnitZ());
-        footMidCoords.setGoal(midCoords, gaitParam.footstepNodesList[0].remainTime + gaitParam.footstepNodesList[1].remainTime);
-      }else{
-        footMidCoords.setGoal(lleg, gaitParam.footstepNodesList[0].remainTime);
-      }
-    }else{ // 滞空期 TODO
-      if(gaitParam.footstepNodesList[1].isSupportPhase[RLEG] && !gaitParam.footstepNodesList[1].isSupportPhase[LLEG]) { // 次が右足支持
-        footMidCoords.setGoal(rleg, gaitParam.footstepNodesList[0].remainTime);
-      }else if(!gaitParam.footstepNodesList[1].isSupportPhase[RLEG] && gaitParam.footstepNodesList[1].isSupportPhase[LLEG]) { // 次が左足支持
-        footMidCoords.setGoal(lleg, gaitParam.footstepNodesList[0].remainTime);
-      }else{
-        footMidCoords.setGoal(midCoords, gaitParam.footstepNodesList[0].remainTime);
-      }
-    }
-
-    footMidCoords.interpolate(dt);
-  }
-
   /*
     次の2つの座標系が一致するようにreference frameとgenerate frameを対応付ける
     - refRobotRawの、refFootOriginWeightとdefaultTranslatePosとcopOffsetに基づいて求めた足裏中間座標 (イメージとしては静止状態の目標ZMP位置にdefaultTranslatePosを作用させたもの)
     - 位置はgenRobotの重心位置 - l. 姿勢はfootMidCoords. (ただしHandFixModeなら、位置のfootMidCoords座標系Y成分はfootMidCoordsの位置.)
-      - handControlWeight = 0なら、位置も姿勢もfootMidCoords
 
     startAutoBalancer直後の初回は、refRobotRawの重心位置とfootOriginのXY位置が異なる場合, refEEPoseが不連続に変化してしまう. startAutoBalancerのtransition_timeで補間してごまかす.
   */
 
-  cnoid::Position refFootMidCoords = this->calcRefFootMidCoords(refRobot, gaitParam);
-  double refdz = (refFootMidCoords.inverse() * refRobot->centerOfMass())[2]; // ref重心高さ
-  cnoid::Position genFootMidCoords;
+  // 現在のFootStepNodesListから、genRobotのfootMidCoordsを求める
+  cpp_filters::TwoPointInterpolatorSE3 footMidCoords = gaitParam.footMidCoords; //generate frame. gaitParam.footMidCoords. 両足の中間
+  this->calcFootMidCoords(gaitParam, dt, footMidCoords); // 1周期前のfootstepNodesListを使っているが、footMidCoordsは不連続に変化するものではないのでよい
+  cnoid::Position genFootMidCoords;  //generate frame. 実際に対応づけに使用する
   genFootMidCoords.linear() = footMidCoords.value().linear();
   genFootMidCoords.translation() = gaitParam.genCog - gaitParam.l; // 1周期前のlを使っているtが、lは不連続に変化するものではないので良い
   cnoid::Vector3 trans_footMidCoordsLocal = footMidCoords.value().linear().transpose() * (genFootMidCoords.translation() - footMidCoords.value().translation());
   trans_footMidCoordsLocal[1] *= (1.0 - handFixMode.value());
   genFootMidCoords.translation() = footMidCoords.value().translation() + footMidCoords.value().linear() * trans_footMidCoordsLocal;
-  cnoidbodyutil::moveCoords(refRobot, genFootMidCoords, refFootMidCoords); // 1周期前のfootMidCoordsを使っているが、footMidCoordsは不連続に変化するものではないのでよい
-  refRobot->calcForwardKinematics();
-  refRobot->calcCenterOfMass();
 
-  // refEEPoseを計算
+  // refRobotRawをrefRobotに変換する
+  double refdz;
+  std::vector<cnoid::Position> refEEPoseFK(gaitParam.eeName.size());
+  this->convertRefRobotRaw(gaitParam, genFootMidCoords,
+                           refRobot, refEEPoseFK, refdz);
+
+  // refEEPoseRawを変換する
+  std::vector<cnoid::Position> refEEPoseWithOutFK(gaitParam.eeName.size());
+  this->convertRefEEPoseRaw(gaitParam, genFootMidCoords,
+                            refEEPoseWithOutFK);
+
+  // refEEPoseを求める
   std::vector<cnoid::Position> refEEPose(gaitParam.eeName.size());
   for(int i=0;i<gaitParam.eeName.size();i++){
-    refEEPose[i] = refRobot->link(gaitParam.eeParentLink[i])->T() * gaitParam.eeLocalT[i];
+    refEEPose[i] = mathutil::calcMidCoords(std::vector<cnoid::Position>{refEEPoseFK[i], refEEPoseWithOutFK[i]},
+                                           std::vector<double>{this->solveFKMode.value(), 1.0 - this->solveFKMode.value()});
   }
 
   // refEEWrenchを計算
@@ -144,11 +98,92 @@ bool RefToGenFrameConverter::convertFrame(const GaitParam& gaitParam, double dt,
   return true;
 }
 
-cnoid::Position RefToGenFrameConverter::calcRefFootMidCoords(const cnoid::BodyPtr& robot, const GaitParam& gaitParam) const {
-
-  cnoid::Position rleg = robot->link(gaitParam.eeParentLink[RLEG])->T()*gaitParam.eeLocalT[RLEG];
+// 現在のFootStepNodesListから、genRobotのfootMidCoordsを求める (gaitParam.footMidCoords)
+void RefToGenFrameConverter::calcFootMidCoords(const GaitParam& gaitParam, double dt, cpp_filters::TwoPointInterpolatorSE3& footMidCoords) const {
+  //footMidCoordsを進める
+  cnoid::Position rleg = gaitParam.footstepNodesList[0].dstCoords[RLEG];
   rleg.translation() += rleg.linear() * gaitParam.copOffset[RLEG].value();
-  cnoid::Position lleg = robot->link(gaitParam.eeParentLink[LLEG])->T()*gaitParam.eeLocalT[LLEG];
+  cnoid::Position lleg = gaitParam.footstepNodesList[0].dstCoords[LLEG];
+  lleg.translation() += lleg.linear() * gaitParam.copOffset[LLEG].value();
+  cnoid::Position midCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{rleg, lleg}, std::vector<double>{1.0, 1.0});
+  rleg = mathutil::orientCoordToAxis(rleg, cnoid::Vector3::UnitZ());
+  lleg = mathutil::orientCoordToAxis(lleg, cnoid::Vector3::UnitZ());
+  midCoords = mathutil::orientCoordToAxis(midCoords, cnoid::Vector3::UnitZ());
+  rleg.translation() -= rleg.linear() * gaitParam.defaultTranslatePos[RLEG].value();
+  lleg.translation() -= lleg.linear() * gaitParam.defaultTranslatePos[LLEG].value();
+  if(gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && gaitParam.footstepNodesList[0].isSupportPhase[LLEG]){ // 両足支持
+    footMidCoords.setGoal(midCoords, gaitParam.footstepNodesList[0].remainTime);
+  }else if(gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && !gaitParam.footstepNodesList[0].isSupportPhase[LLEG]){ // 右足支持
+    if(gaitParam.footstepNodesList.size() > 1 &&
+       (gaitParam.footstepNodesList[1].isSupportPhase[RLEG] && gaitParam.footstepNodesList[1].isSupportPhase[LLEG]) // 次が両足支持
+       ){
+      cnoid::Position rleg = gaitParam.footstepNodesList[1].dstCoords[RLEG];
+      rleg.translation() += rleg.linear() * gaitParam.copOffset[RLEG].value();
+      cnoid::Position lleg = gaitParam.footstepNodesList[1].dstCoords[LLEG];
+      lleg.translation() += lleg.linear() * gaitParam.copOffset[LLEG].value();
+      cnoid::Position midCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{rleg, lleg}, std::vector<double>{1.0, 1.0});
+      midCoords = mathutil::orientCoordToAxis(midCoords, cnoid::Vector3::UnitZ());
+      footMidCoords.setGoal(midCoords, gaitParam.footstepNodesList[0].remainTime + gaitParam.footstepNodesList[1].remainTime);
+    }else{
+      footMidCoords.setGoal(rleg, gaitParam.footstepNodesList[0].remainTime);
+    }
+  }else if(!gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && gaitParam.footstepNodesList[0].isSupportPhase[LLEG]){ // 左足支持
+    if(gaitParam.footstepNodesList.size() > 1 &&
+       (gaitParam.footstepNodesList[1].isSupportPhase[RLEG] && gaitParam.footstepNodesList[1].isSupportPhase[LLEG]) // 次が両足支持
+       ){
+      cnoid::Position rleg = gaitParam.footstepNodesList[1].dstCoords[RLEG];
+      rleg.translation() += rleg.linear() * gaitParam.copOffset[RLEG].value();
+      cnoid::Position lleg = gaitParam.footstepNodesList[1].dstCoords[LLEG];
+      lleg.translation() += lleg.linear() * gaitParam.copOffset[LLEG].value();
+      cnoid::Position midCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{rleg, lleg}, std::vector<double>{1.0, 1.0});
+      midCoords = mathutil::orientCoordToAxis(midCoords, cnoid::Vector3::UnitZ());
+      footMidCoords.setGoal(midCoords, gaitParam.footstepNodesList[0].remainTime + gaitParam.footstepNodesList[1].remainTime);
+    }else{
+      footMidCoords.setGoal(lleg, gaitParam.footstepNodesList[0].remainTime);
+    }
+  }else{ // 滞空期 TODO
+    if(gaitParam.footstepNodesList[1].isSupportPhase[RLEG] && !gaitParam.footstepNodesList[1].isSupportPhase[LLEG]) { // 次が右足支持
+      footMidCoords.setGoal(rleg, gaitParam.footstepNodesList[0].remainTime);
+    }else if(!gaitParam.footstepNodesList[1].isSupportPhase[RLEG] && gaitParam.footstepNodesList[1].isSupportPhase[LLEG]) { // 次が左足支持
+      footMidCoords.setGoal(lleg, gaitParam.footstepNodesList[0].remainTime);
+    }else{
+      footMidCoords.setGoal(midCoords, gaitParam.footstepNodesList[0].remainTime);
+    }
+  }
+
+  footMidCoords.interpolate(dt);
+}
+
+// refRobotRawをrefRobotに変換する.
+void RefToGenFrameConverter::convertRefRobotRaw(const GaitParam& gaitParam, const cnoid::Position& genFootMidCoords, cnoid::BodyPtr& refRobot, std::vector<cnoid::Position>& refEEPoseFK, double& refdz) const{
+  cnoidbodyutil::copyRobotState(gaitParam.refRobotRaw, refRobot);
+  cnoid::Position rleg = refRobot->link(gaitParam.eeParentLink[RLEG])->T()*gaitParam.eeLocalT[RLEG];
+  cnoid::Position lleg = refRobot->link(gaitParam.eeParentLink[LLEG])->T()*gaitParam.eeLocalT[LLEG];
+  cnoid::Position refFootMidCoords = this->calcRefFootMidCoords(rleg, lleg, gaitParam);
+  refdz = (refFootMidCoords.inverse() * refRobot->centerOfMass())[2]; // ref重心高さ
+
+  cnoidbodyutil::moveCoords(refRobot, genFootMidCoords, refFootMidCoords);
+  refRobot->calcForwardKinematics();
+  refRobot->calcCenterOfMass();
+
+  for(int i=0;i<gaitParam.eeName.size();i++){
+    refEEPoseFK[i] = refRobot->link(gaitParam.eeParentLink[i])->T() * gaitParam.eeLocalT[i];
+  }
+}
+
+// refEEPoseRawを変換する.
+void RefToGenFrameConverter::convertRefEEPoseRaw(const GaitParam& gaitParam, const cnoid::Position& genFootMidCoords, std::vector<cnoid::Position>& refEEPoseWithOutFK) const{
+  cnoid::Position refFootMidCoords = this->calcRefFootMidCoords(gaitParam.refEEPoseRaw[RLEG], gaitParam.refEEPoseRaw[LLEG], gaitParam);
+  cnoid::Position transform = genFootMidCoords * refFootMidCoords.inverse();
+  for(int i=0;i<gaitParam.eeName.size();i++){
+    refEEPoseWithOutFK[i] = transform * gaitParam.refEEPoseRaw[i];
+  }
+}
+
+cnoid::Position RefToGenFrameConverter::calcRefFootMidCoords(const cnoid::Position& rleg_, const cnoid::Position& lleg_, const GaitParam& gaitParam) const {
+  cnoid::Position rleg = rleg_;
+  rleg.translation() += rleg.linear() * gaitParam.copOffset[RLEG].value();
+  cnoid::Position lleg = lleg_;
   lleg.translation() += lleg.linear() * gaitParam.copOffset[LLEG].value();
 
   cnoid::Position bothmidcoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{rleg, lleg},

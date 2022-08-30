@@ -96,6 +96,16 @@ CORBA::Boolean AutoStabilizerService_impl::stopImpedanceController(const char *i
   return this->comp_->stopImpedanceController(i_name_);
 };
 
+CORBA::Boolean AutoStabilizerService_impl::startWholeBodyMasterSlave(void)
+{
+  return this->comp_->startWholeBodyMasterSlave();
+}
+
+CORBA::Boolean AutoStabilizerService_impl::stopWholeBodyMasterSlave(void)
+{
+  return this->comp_->stopWholeBodyMasterSlave();
+}
+
 void AutoStabilizerService_impl::setComp(AutoStabilizer *i_comp)
 {
   this->comp_ = i_comp;

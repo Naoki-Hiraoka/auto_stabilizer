@@ -30,6 +30,8 @@ public:
   CORBA::Boolean releaseEmergencyStop();
   CORBA::Boolean startImpedanceController(const char *i_name_);
   CORBA::Boolean stopImpedanceController(const char *i_name_);
+  CORBA::Boolean startWholeBodyMasterSlave();
+  CORBA::Boolean stopWholeBodyMasterSlave();
   //
   //
   void setComp(AutoStabilizer *i_comp);

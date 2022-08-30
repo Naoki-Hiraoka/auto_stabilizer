@@ -64,6 +64,8 @@ public:
   bool stopStabilizer(void);
   bool startImpedanceController(const std::string& i_name);
   bool stopImpedanceController(const std::string& i_name);
+  bool startWholeBodyMasterSlave();
+  bool stopWholeBodyMasterSlave();
 
 protected:
   std::mutex mutex_;

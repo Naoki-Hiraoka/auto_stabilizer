@@ -363,6 +363,18 @@ module OpenHRP
     boolean stopImpedanceController(in string name);
 
     /**
+     * @brief start WholeBodyMasterSlave.
+     * @return true if set successfully, false otherwise
+     */
+    boolean startWholeBodyMasterSlave();
+
+    /**
+     * @brief stop WholeBodyMasterSlave.
+     * @return true if set successfully, false otherwise
+     */
+    boolean stopWholeBodyMasterSlave();
+
+    /**
      * @brief Set AutoStabilizer parameters
      * @param i_param is input parameter
      * @return true if set successfully, false otherwise
