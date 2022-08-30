@@ -211,12 +211,12 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
     // add more ports (ロボットモデルやEndEffectorの情報を使って)
 
     // 各EndEffectorにつき、ref<name>WrenchInというInPortをつくる
-    this->ports_.m_refWrenchIn_.resize(this->gaitParam_.eeName.size());
-    this->ports_.m_refWrench_.resize(this->gaitParam_.eeName.size());
+    this->ports_.m_refEEWrenchIn_.resize(this->gaitParam_.eeName.size());
+    this->ports_.m_refEEWrench_.resize(this->gaitParam_.eeName.size());
     for(int i=0;i<this->gaitParam_.eeName.size();i++){
       std::string name = "ref"+this->gaitParam_.eeName[i]+"WrenchIn";
-      this->ports_.m_refWrenchIn_[i] = std::make_unique<RTC::InPort<RTC::TimedDoubleSeq> >(name.c_str(), this->ports_.m_refWrench_[i]);
-      this->addInPort(name.c_str(), *(this->ports_.m_refWrenchIn_[i]));
+      this->ports_.m_refEEWrenchIn_[i] = std::make_unique<RTC::InPort<RTC::TimedDoubleSeq> >(name.c_str(), this->ports_.m_refEEWrench_[i]);
+      this->addInPort(name.c_str(), *(this->ports_.m_refEEWrenchIn_[i]));
     }
 
     // 各ForceSensorにつき、act<name>InというInportをつくる
@@ -227,6 +227,15 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
       std::string name = "act"+forceSensors[i]->name()+"In";
       this->ports_.m_actWrenchIn_[i] = std::make_unique<RTC::InPort<RTC::TimedDoubleSeq> >(name.c_str(), this->ports_.m_actWrench_[i]);
       this->addInPort(name.c_str(), *(this->ports_.m_actWrenchIn_[i]));
+    }
+
+    // 各EndEffectorにつき、ref<name>PoseInというInPortをつくる
+    this->ports_.m_refEEPoseIn_.resize(this->gaitParam_.eeName.size());
+    this->ports_.m_refEEPose_.resize(this->gaitParam_.eeName.size());
+    for(int i=0;i<this->gaitParam_.eeName.size();i++){
+      std::string name = "ref"+this->gaitParam_.eeName[i]+"PoseIn";
+      this->ports_.m_refEEPoseIn_[i] = std::make_unique<RTC::InPort<RTC::TimedPose3D> >(name.c_str(), this->ports_.m_refEEPose_[i]);
+      this->addInPort(name.c_str(), *(this->ports_.m_refEEPoseIn_[i]));
     }
 
     // 各EndEffectorにつき、act<name>PoseOutというOutPortをつくる
@@ -296,7 +305,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
 }
 
 // static function
-bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobotRaw, cnoid::BodyPtr actRobotRaw, std::vector<cnoid::Vector6>& refEEWrenchOrigin){
+bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobotRaw, cnoid::BodyPtr actRobotRaw, std::vector<cnoid::Vector6>& refEEWrenchOrigin, std::vector<cnoid::Position>& refEEPoseRaw){
   bool qRef_updated = false;
   if(ports.m_qRefIn_.isNew()){
     ports.m_qRefIn_.read();
@@ -332,13 +341,26 @@ bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr
   refRobotRaw->calcForwardKinematics();
   refRobotRaw->calcCenterOfMass();
 
-  for(int i=0;i<ports.m_refWrenchIn_.size();i++){
-    if(ports.m_refWrenchIn_[i]->isNew()){
-      ports.m_refWrenchIn_[i]->read();
-      if(ports.m_refWrench_[i].data.length() == 6){
+  for(int i=0;i<ports.m_refEEWrenchIn_.size();i++){
+    if(ports.m_refEEWrenchIn_[i]->isNew()){
+      ports.m_refEEWrenchIn_[i]->read();
+      if(ports.m_refEEWrench_[i].data.length() == 6){
         for(int j=0;j<6;j++){
-          if(std::isfinite(ports.m_refWrench_[i].data[j])) refEEWrenchOrigin[i][j] = ports.m_refWrench_[i].data[j];
+          if(std::isfinite(ports.m_refEEWrench_[i].data[j])) refEEWrenchOrigin[i][j] = ports.m_refEEWrench_[i].data[j];
         }
+      }
+    }
+  }
+
+  for(int i=0;i<ports.m_refEEPoseIn_.size();i++){
+    if(ports.m_refEEPoseIn_[i]->isNew()){
+      ports.m_refEEPoseIn_[i]->read();
+      if(std::isfinite(ports.m_refEEPose_[i].data.position.x) && std::isfinite(ports.m_refEEPose_[i].data.position.y) && std::isfinite(ports.m_refEEPose_[i].data.position.z) &&
+         std::isfinite(ports.m_refEEPose_[i].data.orientation.r) && std::isfinite(ports.m_refEEPose_[i].data.orientation.p) && std::isfinite(ports.m_refEEPose_[i].data.orientation.y)){
+        refEEPoseRaw[i].translation()[0] = ports.m_refEEPose_[i].data.position.x;
+        refEEPoseRaw[i].translation()[1] = ports.m_refEEPose_[i].data.position.y;
+        refEEPoseRaw[i].translation()[2] = ports.m_refEEPose_[i].data.position.z;
+        refEEPoseRaw[i].linear() = cnoid::rotFromRpy(ports.m_refEEPose_[i].data.orientation.r, ports.m_refEEPose_[i].data.orientation.p, ports.m_refEEPose_[i].data.orientation.y);
       }
     }
   }
@@ -379,7 +401,7 @@ bool AutoStabilizer::readInPortData(AutoStabilizer::Ports& ports, cnoid::BodyPtr
       ports.m_actWrenchIn_[i]->read();
       if(ports.m_actWrench_[i].data.length() == 6){
         for(int j=0;j<6;j++){
-          if(std::isfinite(ports.m_refWrench_[i].data[j])) forceSensors[i]->F()[j] = ports.m_actWrench_[i].data[j];
+          if(std::isfinite(ports.m_actWrench_[i].data[j])) forceSensors[i]->F()[j] = ports.m_actWrench_[i].data[j];
         }
       }
     }
@@ -586,8 +608,8 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
     }
   }
 
-  {
-    // only for logger (IDLE時の出力や、モード遷移時の連続性はてきとうで良い)
+  // only for logger or wholebodymasterslave. (IDLE時の出力や、モード遷移時の連続性はてきとうで良い)
+  if(mode.isABCRunning()){
     ports.m_genCog_.tm = ports.m_qRef_.tm;
     ports.m_genCog_.data.x = gaitParam.genCog[0];
     ports.m_genCog_.data.y = gaitParam.genCog[1];
@@ -654,7 +676,7 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
   std::string instance_name = std::string(this->m_profile.instance_name);
   this->loop_++;
 
-  if(!AutoStabilizer::readInPortData(this->ports_, this->gaitParam_.refRobotRaw, this->gaitParam_.actRobotRaw, this->gaitParam_.refEEWrenchOrigin)) return RTC::RTC_OK;  // qRef が届かなければ何もしない
+  if(!AutoStabilizer::readInPortData(this->ports_, this->gaitParam_.refRobotRaw, this->gaitParam_.actRobotRaw, this->gaitParam_.refEEWrenchOrigin, this->gaitParam_.refEEPoseRaw)) return RTC::RTC_OK;  // qRef が届かなければ何もしない
 
   this->mode_.update(this->dt_);
   this->gaitParam_.update(this->dt_);

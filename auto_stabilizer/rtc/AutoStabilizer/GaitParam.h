@@ -37,6 +37,7 @@ public:
   // from reference port
   cnoid::BodyPtr refRobotRaw; // reference. reference world frame
   std::vector<cnoid::Vector6> refEEWrenchOrigin; // 要素数と順序はeeNameと同じ.FootOrigin frame. EndEffector origin. ロボットが受ける力
+  std::vector<cnoid::Position> refEEPoseRaw; // 要素数と順序はeeNameと同じ. reference world frame.
   cnoid::BodyPtr actRobotRaw; // actual. actual imu world frame
 
 public:
@@ -150,6 +151,7 @@ public:
     eeParentLink.push_back(parentLink_);
     eeLocalT.push_back(localT_);
     refEEWrenchOrigin.push_back(cnoid::Vector6::Zero());
+    refEEPoseRaw.push_back(cnoid::Position::Identity());
     refEEPose.push_back(cnoid::Position::Identity());
     refEEWrench.push_back(cnoid::Vector6::Zero());
     actEEPose.push_back(cnoid::Position::Identity());
