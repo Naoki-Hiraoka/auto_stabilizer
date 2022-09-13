@@ -7,7 +7,7 @@
 class ExternalForceHandler{
 public:
   // ExternalForceHandlerだけが使うパラメータ
-  bool useDisturbanceCompensation = true; // 長期的外乱補償を行うかどうか
+  bool useDisturbanceCompensation = false; // 長期的外乱補償を行うかどうか
   double disturbanceCompensationTimeConst = 2.0; // 単位[s].長期的外乱補償の時定数. (外乱が減る方向には0.1倍になる). 0より大きい
   int disturbanceCompensationStepNum = 4; // footstepNodesListsの何ステップぶんを積算するか. 4なら、右脚+左脚ぶんになる. 片足を踏み出す時間だけだと左右方向にかなりずれるので、両足を踏み出す時間だけ積算したほうが良い. 1以上.
   double disturbanceCompensationLimit = 0.05; // 単位[m]. 長期的外乱補償の上限. 0以上
