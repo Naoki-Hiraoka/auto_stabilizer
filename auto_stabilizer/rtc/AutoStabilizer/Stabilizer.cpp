@@ -292,7 +292,7 @@ bool Stabilizer::calcDampingControl(double dt, const GaitParam& gaitParam, const
                                     std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffset /*generate frame, endeffector origin*/, std::vector<cnoid::Position>& o_stEETargetPose) const{
 
   // stEEOffsetを計算
-  if(!useActState){
+  if(!(useActState && !this->isTorqueControlMode)){
     for(int i=0;i<NUM_LEGS;i++){
       o_stEEOffset[i].interpolate(dt);
     }
@@ -313,6 +313,9 @@ bool Stabilizer::calcDampingControl(double dt, const GaitParam& gaitParam, const
       cnoid::Vector3 averageForceError = (wrenchError[RLEG].head<3>() + wrenchError[LLEG].head<3>()) / 2.0;
       wrenchError[RLEG].head<3>() -= averageForceError;
       wrenchError[LLEG].head<3>() -= averageForceError;
+      double averageTorqueYawError = (wrenchError[RLEG][5] + wrenchError[LLEG][5]) / 2.0;
+      wrenchError[RLEG][5] -= averageTorqueYawError;
+      wrenchError[LLEG][5] -= averageTorqueYawError;
     }
 
     for(int i=0;i<NUM_LEGS;i++){ // ManualControlModeであれば行わない

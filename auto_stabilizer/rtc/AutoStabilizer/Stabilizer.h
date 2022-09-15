@@ -29,7 +29,8 @@ public:
   Stabilizer(){
     for(int i=0;i<NUM_LEGS;i++){
       dampingCompensationLimit[i] << 0.08, 0.08, 0.08, 0.523599, 0.523599, 0.523599; // 0.523599rad = 30deg
-      dampingGain[i] << 33600, 33600, 9000, 60, 60, 1e5;
+      //dampingGain[i] << 33600, 33600, 9000, 60, 60, 1e5; // masterのJAXONの値
+      dampingGain[i] << 33600, 33600, 21000, 140, 140, 1e5; // AutoStabilizerでJAXONでぎりぎり歩けた値
       dampingTimeConst[i] << 3.0/1.1, 3.0/1.1, 1.5/1.1, 1.5/1.1, 1.5/1.1, 1.5/1.1;
     }
   }
