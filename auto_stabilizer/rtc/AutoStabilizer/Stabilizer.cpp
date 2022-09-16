@@ -275,6 +275,7 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
     }else{
       int idx = 0;
       for(int i=0;i<NUM_LEGS;i++){
+	tgtEEWrench[i].setZero();
         for(int j=0;j<gaitParam.legHull[i].size();j++){
           tgtEEWrench[i].head<3>() += tgtForce * result[idx];
           tgtEEWrench[i].tail<3>() += (EEPose[i].linear() * gaitParam.legHull[i][j]).cross(tgtForce * result[idx]);
