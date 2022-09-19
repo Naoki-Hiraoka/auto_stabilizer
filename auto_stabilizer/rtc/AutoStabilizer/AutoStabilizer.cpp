@@ -974,7 +974,7 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
       }
     }
   }
-  if(i_param.is_manual_control_mode.length() == NUM_LEGS && (i_param.is_manual_control_mode[RLEG] || i_param.is_manual_control_mode[LLEG])){
+  if(i_param.is_manual_control_mode.length() == NUM_LEGS && (!i_param.is_manual_control_mode[RLEG] || !i_param.is_manual_control_mode[LLEG])){
     for(int i=0;i<NUM_LEGS; i++) {
       if(this->mode_.isABCRunning()) {
         if(i_param.is_manual_control_mode[i] != (this->gaitParam_.isManualControlMode[i].getGoal() == 1.0)){
