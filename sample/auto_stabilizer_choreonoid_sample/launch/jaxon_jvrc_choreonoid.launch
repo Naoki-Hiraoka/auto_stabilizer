@@ -7,8 +7,8 @@
   <arg name="URDF_FILE" value="$(find hrpsys_choreonoid_tutorials)/models/JAXON_JVRC.urdf"/>
   <arg name="MODEL_FILE" value="$(find jvrc_models)/JAXON_JVRC/JAXON_JVRCmain_hrpsys.wrl" />
   <arg name="LOAD_OBJECTS" default="false" />
-  <arg name="PROJECT_FILE" default="$(find hrpsys_choreonoid_tutorials)/config/JAXON_RED_RH_FLAT.cnoid" unless="$(arg LOAD_OBJECTS)"/>
-  <arg name="PROJECT_FILE" default="$(find hrpsys_choreonoid_tutorials)/config/JAXON_RED_RH_LOAD_OBJ.cnoid" if="$(arg LOAD_OBJECTS)"/>
+  <arg name="PROJECT_FILE" default="$(find auto_stabilizer_choreonoid_sample)/config/JAXON_RED_RH_FLAT.cnoid" unless="$(arg LOAD_OBJECTS)"/> <!-- hrpsys_choreonoid_tutorialsのものとほぼ同じだが、ロボットモデルにbushがついていない. torque control modeではbushが無い方が実機に近い挙動をする気がするので -->
+  <arg name="PROJECT_FILE" default="$(find auto_stabilizer_choreonoid_sample)/config/JAXON_RED_RH_LOAD_OBJ.cnoid" if="$(arg LOAD_OBJECTS)"/> <!-- hrpsys_choreonoid_tutorialsのものとほぼ同じだが、ロボットモデルにbushがついていない. torque control modeではbushが無い方が実機に近い挙動をする気がするので -->
   <arg name="ENVIRONMENT_YAML" default="$(find hrpsys_choreonoid_tutorials)/config/flat.yaml" />
   <env name="EXTRA_CHOREONOID_OBJS" value="$(arg ENVIRONMENT_YAML)" />
 

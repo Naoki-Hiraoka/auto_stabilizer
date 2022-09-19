@@ -16,7 +16,7 @@ public:
   std::vector<cnoid::Vector6> dampingGain = std::vector<cnoid::Vector6>(NUM_LEGS); // 要素数2. [rleg. lleg].  EndEffector frame(offset+abcTargetPose). endEffector origin. 0より大きい
   std::vector<cnoid::Vector6> dampingTimeConst = std::vector<cnoid::Vector6>(NUM_LEGS); // 要素数2. [rleg. lleg]. EndEffector frame(offset+abcTargetPose). endEffector origin. 0より大きい
 
-  bool isTorqueControlMode = false; // falseなら位置制御のみ. この値はisSTRunning時には変更されない. trueにするなら事前にself.rh_svc.setServoTorqueGainPercentage("all",100)を呼んでおくこと.
+  bool isTorqueControlMode = true; // falseなら位置制御のみ. この値はisSTRunning時には変更されない. trueにするなら事前にself.rh_svc.setServoTorqueGainPercentage("all",100)を呼んでおくこと.
   std::vector<std::vector<double> > supportPgain = std::vector<std::vector<double> >(2); // 要素数2. [rleg, lleg]. rootLinkから各endeffectorまでの各関節のゲイン. 0~100
   std::vector<std::vector<double> > supportDgain = std::vector<std::vector<double> >(2); // 要素数2. [rleg, lleg]. rootLinkから各endeffectorまでの各関節のゲイン. 0~100
   std::vector<std::vector<double> > landingPgain = std::vector<std::vector<double> >(2); // 要素数2. [rleg, lleg]. rootLinkから各endeffectorまでの各関節のゲイン. 0~100
@@ -38,11 +38,11 @@ public:
     for(int i=0;i<NUM_LEGS;i++){
       cnoid::JointPath jointPath(actRobotTqc->rootLink(), actRobotTqc->link(gaitParam.eeParentLink[i]));
       if(jointPath.numJoints() == 6){
-        supportPgain[i] = {5,30,20,10,0.1,0.1};
+        supportPgain[i] = {5,30,20,10,1,1};
         supportDgain[i] = {10,30,20,20,5,5};
-        landingPgain[i] = {5,30,20,10,0.1,0.1};
+        landingPgain[i] = {5,30,20,10,1,1};
         landingDgain[i] = {10,30,20,20,5,5};
-        swingPgain[i] = {5,30,20,10,0.1,0.1};
+        swingPgain[i] = {5,30,20,10,1,1};
         swingDgain[i] = {10,30,20,20,5,5};
 	// 下はもとのauto_stabilizerの値. ゲインが低すぎて、go-velocity 0 0 0のときに前に進んでいってしまう
         // supportPgain[i] = {5,10,10,5,0.1,0.1};
