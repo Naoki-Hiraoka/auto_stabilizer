@@ -12,11 +12,6 @@ public:
   std::vector<double> bodyAttitudeControlTimeConst=std::vector<double>{1000, 1000}; // 要素数2. gaitParam.footMidCoords座標系X軸, Y軸. 単位は[s]. 0より大きい
   std::vector<double> bodyAttitudeControlCompensationLimit=std::vector<double>{0.7,0.7}; //要素数2. gaitParam.footMidCoords座標系X軸, Y軸. 単位は[rad]. STが動いている間は変更されない. 0以上
 
-  std::vector<cnoid::Vector6> dampingCompensationLimit = std::vector<cnoid::Vector6>(NUM_LEGS); // 要素数2. [rleg, lleg]. generate frame. endEffector origin. STが動いている間は変更されない. 0以上
-  std::vector<cnoid::Vector6> dampingGain = std::vector<cnoid::Vector6>(NUM_LEGS); // 要素数2. [rleg. lleg].  EndEffector frame(offset+abcTargetPose). endEffector origin. 0より大きい
-  std::vector<cnoid::Vector6> dampingTimeConst = std::vector<cnoid::Vector6>(NUM_LEGS); // 要素数2. [rleg. lleg]. EndEffector frame(offset+abcTargetPose). endEffector origin. 0より大きい
-
-  bool isTorqueControlMode = true; // falseなら位置制御のみ. この値はisSTRunning時には変更されない. trueにするなら事前にself.rh_svc.setServoTorqueGainPercentage("all",100)を呼んでおくこと.
   std::vector<std::vector<double> > supportPgain = std::vector<std::vector<double> >(2); // 要素数2. [rleg, lleg]. rootLinkから各endeffectorまでの各関節のゲイン. 0~100
   std::vector<std::vector<double> > supportDgain = std::vector<std::vector<double> >(2); // 要素数2. [rleg, lleg]. rootLinkから各endeffectorまでの各関節のゲイン. 0~100
   std::vector<std::vector<double> > landingPgain = std::vector<std::vector<double> >(2); // 要素数2. [rleg, lleg]. rootLinkから各endeffectorまでの各関節のゲイン. 0~100
@@ -26,14 +21,7 @@ public:
   double swing2LandingTransitionTime = 0.05; // [s]. 0より大きい
   double landing2SupportTransitionTime = 0.1; // [s]. 0より大きい
   double support2SwingTransitionTime = 0.1; // [s]. 0より大きい
-  Stabilizer(){
-    for(int i=0;i<NUM_LEGS;i++){
-      dampingCompensationLimit[i] << 0.08, 0.08, 0.08, 0.523599, 0.523599, 0.523599; // 0.523599rad = 30deg
-      //dampingGain[i] << 33600, 33600, 9000, 60, 60, 1e5; // masterのJAXONの値
-      dampingGain[i] << 33600, 33600, 21000, 140, 140, 1e5; // AutoStabilizerでJAXONでぎりぎり歩けた値
-      dampingTimeConst[i] << 3.0/1.1, 3.0/1.1, 1.5/1.1, 1.5/1.1, 1.5/1.1, 1.5/1.1;
-    }
-  }
+
   void init(const GaitParam& gaitParam, cnoid::BodyPtr& actRobotTqc){
     for(int i=0;i<NUM_LEGS;i++){
       cnoid::JointPath jointPath(actRobotTqc->rootLink(), actRobotTqc->link(gaitParam.eeParentLink[i]));
@@ -68,10 +56,10 @@ protected:
   mutable std::shared_ptr<prioritized_qp::Task> copTask_ = std::make_shared<prioritized_qp::Task>();;
 public:
   void initStabilizerOutput(const GaitParam& gaitParam,
-                            cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffset /*generate frame, endeffector origin*/, cnoid::Vector3& o_stTargetZmp, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage) const;
+                            cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, cnoid::Vector3& o_stTargetZmp, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage) const;
 
   bool execStabilizer(const GaitParam& gaitParam, double dt, bool useActState,
-                      cnoid::BodyPtr& actRobotTqc, cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, cnoid::Position& o_stTargetRootPose, std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffset /*generate frame, endeffector origin*/, std::vector<cnoid::Position>& o_stEETargetPose, cnoid::Vector3& o_stTargetZmp, std::vector<cnoid::Vector6>& o_stEETargetWrench, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPgainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDgainPercentage) const;
+                      cnoid::BodyPtr& actRobotTqc, cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, cnoid::Position& o_stTargetRootPose, cnoid::Vector3& o_stTargetZmp, std::vector<cnoid::Vector6>& o_stEETargetWrench, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPgainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDgainPercentage) const;
 
 protected:
   bool moveBasePosRotForBodyRPYControl(double dt, const GaitParam& gaitParam, bool useActState,
@@ -82,8 +70,6 @@ protected:
                   std::vector<cnoid::Vector6>& o_tgtEEWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/) const;
   bool calcTorque(double dt, const GaitParam& gaitParam, const std::vector<cnoid::Vector6>& tgtEEWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/,
                   cnoid::BodyPtr& actRobotTqc, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage) const;
-  bool calcDampingControl(double dt, const GaitParam& gaitParam, const std::vector<cnoid::Vector6>& tgtEEWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/, bool useActState,
-                          std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> >& o_stEEOffset /*generate frame, endeffector origin*/, std::vector<cnoid::Position>& o_stEETargetPose) const;
 };
 
 #endif

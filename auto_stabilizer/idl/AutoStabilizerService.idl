@@ -119,7 +119,7 @@ module OpenHRP
       sequence<sequence<sequence<double, 2> >, 2> leg_hull;
       /// goPos, goVelocity, setFootSteps等するときの右脚と左脚の中心からの相対位置.(Y[m]) また、reference frameとgenerate frameの対応付けに用いられる.
       sequence<double, 2> leg_default_translate_pos;
-      /// 要素数2. 0: rleg. 1: lleg. 0~1. 1ならicEETargetPoseに従い、refEEWrenchに応じて重心をオフセットする. 0ならImpedanceControlをせず、refEEWrenchを無視し、DampingControlを行わない. 静止状態で無い場合や、支持脚の場合は、勝手に0になる. 両足が同時に1になることはない. 1にするなら、RefToGenFrameConverter.refFootOriginWeightを0にしたほうが良い.
+      /// 要素数2. 0: rleg. 1: lleg. 0~1. 1ならicEETargetPoseに従い、refEEWrenchに応じて重心をオフセットする. 0ならImpedanceControlをせず、refEEWrenchを無視し、GainControlを行わない. 静止状態で無い場合や、支持脚の場合は、勝手に0になる. 両足が同時に1になることはない. 1にするなら、RefToGenFrameConverter.refFootOriginWeightを0にしたほうが良い.
       sequence<boolean, 2> is_manual_control_mode;
 
       // RefToGenFrameConverter
@@ -233,20 +233,6 @@ module OpenHRP
       sequence<double, 2> eefm_body_attitude_control_time_const;
       /// Limit of compensation for difference between ref-act root rot [rad]. stabilierが動いているときは変更不可. 下限0.0
       sequence<double, 2> eefm_body_attitude_control_compensation_limit;
-      /// Sequence of all end-effector rotation damping gain [Nm/(rad/s)] (r,p,y). 下限0.01
-      sequence<sequence<double, 3>, 2 > eefm_rot_damping_gain;
-      /// Sequence of all end-effector rotation damping time constant [s] (r,p,y). 下限0.01
-      sequence<sequence<double, 3>, 2 > eefm_rot_time_const;
-      /// Sequence of all end-effector position damping gain [N/(m/s)] (x,y,z). 下限0.01
-      sequence<sequence<double, 3>, 2 > eefm_pos_damping_gain;
-      /// Sequence of all end-effector position damping time constant for double support phase [s] (x,y,z). 下限0.01
-      sequence<sequence<double, 3>, 2 > eefm_pos_time_const;
-      /// Sequence of all end-effector position compensation limit [m]. stabilierが動いているときは変更不可. 下限0.0
-      sequence<double, 2> eefm_pos_compensation_limit;
-      /// Sequence of all end-effector rot compensation limit [rad]. stabilierが動いているときは変更不可. 下限0.0
-      sequence<double, 2> eefm_rot_compensation_limit;
-      /// falseなら位置制御のみ. この値はisSTRunning時には変更されない. trueにするなら事前にself.rh_svc.setServoTorqueGainPercentage("all",100)を呼んでおくこと.
-      boolean is_torque_control_mode;
       /// 下限0.01[s]
       double swing2landing_transition_time;
       /// 下限0.01[s]

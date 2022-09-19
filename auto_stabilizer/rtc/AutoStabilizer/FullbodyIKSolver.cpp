@@ -22,7 +22,7 @@ bool FullbodyIKSolver::solveFullbodyIK(double dt, const GaitParam& gaitParam,
     this->ikEEPositionConstraint[i]->A_link() = genRobot->link(gaitParam.eeParentLink[i]);
     this->ikEEPositionConstraint[i]->A_localpos() = gaitParam.eeLocalT[i];
     this->ikEEPositionConstraint[i]->B_link() = nullptr;
-    this->ikEEPositionConstraint[i]->B_localpos() = gaitParam.stEETargetPose[i];
+    this->ikEEPositionConstraint[i]->B_localpos() = gaitParam.abcEETargetPose[i];
     this->ikEEPositionConstraint[i]->maxError() << 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt;
     this->ikEEPositionConstraint[i]->precision() << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0; // 強制的にIKをmax loopまで回す
     if(i<NUM_LEGS) this->ikEEPositionConstraint[i]->weight() << 10.0, 10.0, 10.0, 10.0, 10.0, 10.0;
