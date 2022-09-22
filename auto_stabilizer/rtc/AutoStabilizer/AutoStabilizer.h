@@ -86,7 +86,7 @@ protected:
     RTC::InPort<RTC::TimedPoint3D> m_refBasePosIn_;
     RTC::TimedOrientation3D m_refBaseRpy_; // Reference World frame
     RTC::InPort<RTC::TimedOrientation3D> m_refBaseRpyIn_;
-    std::vector<RTC::TimedDoubleSeq> m_refEEWrench_; // Reference FootOrigin frame. EndEffector origin. 要素数及び順番はgaitParam_.eeNameと同じ
+    std::vector<RTC::TimedDoubleSeq> m_refEEWrench_; // Reference FootOrigin frame. EndEffector origin. 要素数及び順番はgaitParam_.eeNameと同じ. ロボットが受ける力
     std::vector<std::unique_ptr<RTC::InPort<RTC::TimedDoubleSeq> > > m_refEEWrenchIn_;
     RTC::TimedDoubleSeq m_qAct_;
     RTC::InPort<RTC::TimedDoubleSeq> m_qActIn_;
@@ -94,7 +94,7 @@ protected:
     RTC::InPort<RTC::TimedDoubleSeq> m_dqActIn_;
     RTC::TimedOrientation3D m_actImu_; // Actual Imu World Frame. robotのgyrometerという名のRateGyroSensorの傾きを表す
     RTC::InPort<RTC::TimedOrientation3D> m_actImuIn_;
-    std::vector<RTC::TimedDoubleSeq> m_actWrench_; // Actual ForceSensor frame. ForceSensor origin. 要素数及び順番はrobot->forceSensorsと同じ
+    std::vector<RTC::TimedDoubleSeq> m_actWrench_; // Actual ForceSensor frame. ForceSensor origin. 要素数及び順番はrobot->forceSensorsと同じ. ロボットが受ける力
     std::vector<std::unique_ptr<RTC::InPort<RTC::TimedDoubleSeq> > > m_actWrenchIn_;
     std::vector<RTC::TimedPose3D> m_refEEPose_; // Reference World frame. 要素数及び順番はgaitParam_.eeNameと同じ
     std::vector<std::unique_ptr<RTC::InPort<RTC::TimedPose3D> > > m_refEEPoseIn_;
@@ -134,9 +134,9 @@ protected:
     RTC::OutPort<RTC::TimedPoint3D> m_actDcmOut_; // for log
     std::vector<RTC::TimedPose3D> m_actEEPose_; // Generate World frame. 要素数及び順番はgaitParam_.eeNameと同じ
     std::vector<std::unique_ptr<RTC::OutPort<RTC::TimedPose3D> > > m_actEEPoseOut_;
-    std::vector<RTC::TimedDoubleSeq> m_tgtEEWrench_; // Generate World frame. EndEffector origin. 要素数及び順番はgaitParam_.eeNameと同じ
+    std::vector<RTC::TimedDoubleSeq> m_tgtEEWrench_; // Generate World frame. EndEffector origin. 要素数及び順番はgaitParam_.eeNameと同じ. ロボットが受ける力
     std::vector<std::unique_ptr<RTC::OutPort<RTC::TimedDoubleSeq> > > m_tgtEEWrenchOut_;
-    std::vector<RTC::TimedDoubleSeq> m_actEEWrench_; // Generate World frame. EndEffector origin. 要素数及び順番はgaitParam_.eeNameと同じ
+    std::vector<RTC::TimedDoubleSeq> m_actEEWrench_; // Generate World frame. EndEffector origin. 要素数及び順番はgaitParam_.eeNameと同じ. ロボットが受ける力
     std::vector<std::unique_ptr<RTC::OutPort<RTC::TimedDoubleSeq> > > m_actEEWrenchOut_;
   };
   Ports ports_;
