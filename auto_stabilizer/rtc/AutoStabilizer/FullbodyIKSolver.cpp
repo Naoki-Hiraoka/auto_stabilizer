@@ -8,6 +8,20 @@ bool FullbodyIKSolver::solveFullbodyIK(double dt, const GaitParam& gaitParam,
     if(!gaitParam.jointControllable[i]) genRobot->joint(i)->q() = gaitParam.refRobot->joint(i)->q();
   }
 
+  // update joint limit
+  for(int i=0;i<gaitParam.refRobot->numJoints();i++){
+    if(!gaitParam.jointControllable[i]) continue;
+    cnoid::LinkPtr joint = genRobot->joint(i);
+    double u = gaitParam.refRobot->joint(i)->q_upper();
+    double l = gaitParam.refRobot->joint(i)->q_lower();
+    for(int j=0;j<gaitParam.jointLimitTables[i].size();j++){
+      u = std::min(u,gaitParam.jointLimitTables[i][j]->getUlimit());
+      l = std::max(l,gaitParam.jointLimitTables[i][j]->getLlimit());
+      }
+    joint->q() = std::min(u, std::max(l, joint->q()));
+    joint->setJointRange(l, u);
+  }
+
   if(this->jlim_avoid_weight.size() != 6+genRobot->numJoints()) this->jlim_avoid_weight = cnoid::VectorX::Zero(6+genRobot->numJoints());
   cnoid::VectorX dq_weight_all = cnoid::VectorX::Zero(6+genRobot->numJoints());
   for(int i=0;i<6;i++) dq_weight_all[i] = 1.0;
@@ -98,17 +112,17 @@ bool FullbodyIKSolver::solveFullbodyIK(double dt, const GaitParam& gaitParam,
                                1e-6, // wn
                                0, //debug
                                dt,
-                               1e2 // we. 1e0だとやや不安定. 1e3だと大きすぎる
+                               1e2, // we. 1e0だとやや不安定. 1e3だと大きすぎる
+                               false // enable_jlim_avnoid.
                                );
 
-  // limit joint angle by joint limit table
-  //   本当はjoint->q_upper()とjoint->q_lower()をjoint limit tableを用いて更新して、fullbodyIKの中で自動的に考慮して解いて欲しい. 解いた後にlimitすると、各周期における各タスクの精度が若干不正確になる. (複数周期を通して見れば目標に収束するのでそこまで問題ではないが).
-  //   joint->q_upper()とjoint->q_lower()をjoint limit tableを用いて更新しない理由:
-  //     fullbodyIKは不等式制約が扱えないので、前回の周期の開始時よりも今回の開始時の方がlimitに近ければ、その関節のdq_weightを大きくして動かしにくくする、というアプローチをとっている.
+  // enable_jlim_avnoidはjoint limit tableと併用不可
+    //     fullbodyIKは不等式制約が扱えないので、前回の周期の開始時よりも今回の開始時の方がlimitに近ければ、その関節のdq_weightを大きくして動かしにくくする、というアプローチをとっている.
   //     これは、各タスクが滑らかに変化していることを前提にしている。そうでなく、limitからの距離が近づいたり離れたりを頻繁にくりかえすような状況では、重みが不連続に変動するのでロボットが振動的になってしまう.
   //     ここまでは、各タスクが滑らかに変化するように作ればよく、実用上のほとんどのケースでは各タスクは滑らかに変化するので、問題ない.
   //     ところが、joint_limit_tableを用いてjoint->q_upper()とjoint->q_lower()を更新すると、limit側が勝手に動くので、タスクに関係なく、limitからの距離が近づいたり離れたりする. すると、ロボットが振動的になってしまうことがある.
   //     不等式制約が扱えるQPベースのIKなら、この問題は発生しない.
+  // (joint->q_upper()とjoint->q_lower()をjoint limit tableを用いて更新するのをやめて、解いた後にtableに基づきlimitするようにする、といった手法を試したが、解消できなかった)
   for(int i=0;i<gaitParam.refRobot->numJoints();i++){
     if(!gaitParam.jointControllable[i]) continue;
     cnoid::LinkPtr joint = genRobot->joint(i);
