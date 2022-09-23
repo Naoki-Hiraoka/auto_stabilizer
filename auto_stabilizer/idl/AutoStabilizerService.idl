@@ -386,6 +386,7 @@ module OpenHRP
       sequence<Footstep, 2> leg_dst_coords;
       // 現在支持脚、または現在遊脚で次支持脚になる脚の、dstCoordsの中間. 水平
       Footstep dst_foot_midcoords;
+      sequence<boolean, 2> is_manual_control_mode;
       sequence<double> joint_angle;
     };
 

@@ -1374,6 +1374,10 @@ bool AutoStabilizer::getFootStepState(OpenHRP::AutoStabilizerService::FootStepSt
   else if(weights[RLEG] == 1.0) i_param.dst_foot_midcoords.leg = "rleg";
   else if(weights[LLEG] == 1.0) i_param.dst_foot_midcoords.leg = "lleg";
   AutoStabilizer::copyEigenCoords2FootStep(mathutil::orientCoordToAxis(mathutil::calcMidCoords(this->gaitParam_.footstepNodesList[0].dstCoords, weights), cnoid::Vector3::UnitZ()), i_param.dst_foot_midcoords);
+  i_param.is_manual_control_mode.length(NUM_LEGS);
+  for(int i=0;i<NUM_LEGS; i++) {
+    i_param.is_manual_control_mode[i] = (this->gaitParam_.isManualControlMode[i].getGoal() == 1.0);
+  }
   i_param.joint_angle.length(this->gaitParam_.genRobot->numJoints());
   for(int i=0;i<this->gaitParam_.genRobot->numJoints();i++){
     i_param.joint_angle[i] = this->gaitParam_.genRobot->joint(i)->q();
