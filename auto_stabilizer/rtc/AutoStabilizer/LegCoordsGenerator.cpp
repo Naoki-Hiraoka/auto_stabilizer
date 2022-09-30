@@ -40,8 +40,7 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
     cnoid::Vector3 refZmp = refZmpTraj[0].getStart(); // for文中の現在のrefzmp
     refZmpTraj.clear();
     // footstepNodesListのサイズが1, footstepNodesList[0].remainTimeが0のときに、copOffsetのパラメータが滑らかに変更になる場合がある. それに対応できるように
-    for(int i=0;i<gaitParam.footstepNodesList.size() && i < this->previewStepNum;i++){
-
+    for(int i=0, stepNum=0; i<gaitParam.footstepNodesList.size() && stepNum < this->previewStepNum; i++){
       if(!gaitParam.footstepNodesList[i].isSupportPhase[RLEG] && !gaitParam.footstepNodesList[i].isSupportPhase[LLEG]){
         // 跳躍についてはひとまず考えない TODO
       }else if(!gaitParam.footstepNodesList[i].isSupportPhase[RLEG] && gaitParam.footstepNodesList[i].isSupportPhase[LLEG]){// 右脚がswing. refzmpは左脚の位置
@@ -73,6 +72,13 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
         }
         refZmpTraj.push_back(footguidedcontroller::LinearTrajectory<cnoid::Vector3>(refZmp,zmpGoalPos,std::max(gaitParam.footstepNodesList[i].remainTime, dt)));
         refZmp = zmpGoalPos;
+      }
+      //stepNumの更新
+      if(i+1<gaitParam.footstepNodesList.size() && //末尾でない
+         //refZmpTraj.size() > 1 &&   //半歩ずらす場合はココをコメントイン
+         gaitParam.footstepNodesList[i].isSupportPhase[RLEG] && gaitParam.footstepNodesList[i].isSupportPhase[LLEG] && //現在両足支持
+         !(gaitParam.footstepNodesList[i+1].isSupportPhase[RLEG] && gaitParam.footstepNodesList[i+1].isSupportPhase[LLEG])) { //次が片足支持(両足支持でない)
+        stepNum++;
       }
     }
 
