@@ -113,6 +113,8 @@ bool Stabilizer::calcZMP(const GaitParam& gaitParam, double dt, bool useActState
   footguidedcontroller::updateState(gaitParam.omega,gaitParam.l,cog,cogVel,tgtZmp,gaitParam.genRobot->mass(),dt,
                                       tgtCog, tgtCogVel, tgtForce);
 
+  // tgtForceにrefEEWrenchのXY成分を足す TODO
+
   o_tgtZmp = tgtZmp;
   o_tgtForce = tgtForce;
   return true;
