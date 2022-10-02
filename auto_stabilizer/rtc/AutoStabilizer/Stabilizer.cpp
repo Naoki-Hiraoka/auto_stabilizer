@@ -20,7 +20,6 @@ bool Stabilizer::execStabilizer(const GaitParam& gaitParam, double dt, bool useA
   // - root attitude control
   // - 現在のactual重心位置から、目標ZMPを計算
   // - 目標ZMPを満たすように目標足裏反力を計算
-  // - 目標足裏反力を満たすようにDamping Control.
   // - 目標反力を満たすように重力補償+仮想仕事の原理
 
   // masterのhrpsysではSwingEEModificationを行っていたが、地面についているときに、time_constでもとの位置に戻るまでの間、足と重心の相対位置が着地位置タイミング修正計算で用いるものとずれることによる着地位置修正パフォーマンスの低下のデメリットの方が大きいので、削除した
