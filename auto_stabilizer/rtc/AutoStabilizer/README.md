@@ -1,3 +1,7 @@
+## ドキュメント
+
+https://docs.google.com/presentation/d/1oJWIUqfYPsNI-mGdanSZhfvkEQ5jZHm7uG4CLNwVyM8/edit?usp=sharing (JSK internal)
+
 ## 妥協点メモ
 
 - コメントは英語が望ましいが、理解の容易さと、英語を書く手間を嫌ってコメントを書かなくなったら本末転倒であることを考え日本語で妥協した

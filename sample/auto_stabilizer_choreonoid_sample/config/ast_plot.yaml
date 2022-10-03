@@ -4,7 +4,7 @@ extend:
 ast_q:
   func: plot_rad2deg
   data:
-    - { log: ast_qOut, column: [0-33] }
+    - { log: ast_q, column: [0-33] }
 
 ast_genCogOut:
   data:
