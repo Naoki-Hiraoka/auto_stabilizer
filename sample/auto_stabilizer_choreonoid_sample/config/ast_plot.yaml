@@ -26,7 +26,10 @@ ast_actDcmOut:
     - { log: ast_actDcmOut, column: [0-2] }
 ast_dstLandingPosOut:
   data:
-    - { log: ast_dstLandingPosOut, column: [0-2] }
+    - { log: ast_dstLandingPosOut, column: [0-5] }
+ast_remainTimeOut:
+  data:
+    - { log: ast_remainTimeOut, column: [0] }
 
 ast_tgtrlegWrenchOut:
   data:

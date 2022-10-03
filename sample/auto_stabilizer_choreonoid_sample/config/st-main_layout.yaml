@@ -8,6 +8,7 @@ main:
       - { key: ast_actCogOut, id: [0]}
       - { key: ast_actDcmOut, id: [0]}
       - { key: ast_dstLandingPosOut, id: [0]}
+      - { key: ast_dstLandingPosOut, id: [3]}
     bottom_label:
 
   cog zmp Y:
@@ -19,6 +20,7 @@ main:
       - { key: ast_actCogOut, id: [1]}
       - { key: ast_actDcmOut, id: [1]}
       - { key: ast_dstLandingPosOut, id: [1]}
+      - { key: ast_dstLandingPosOut, id: [4]}
     bottom_label:
 
   cog zmp Z:
@@ -30,4 +32,10 @@ main:
       - { key: ast_actCogOut, id: [2]}
       - { key: ast_actDcmOut, id: [2]}
       - { key: ast_dstLandingPosOut, id: [2]}
+      - { key: ast_dstLandingPosOut, id: [5]}
+    bottom_label:
+
+  remain time:
+    legends:
+      - { key: ast_remainTimeOut, id: [0]}
     bottom_label:
