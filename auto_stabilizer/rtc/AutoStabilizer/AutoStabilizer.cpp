@@ -44,6 +44,7 @@ AutoStabilizer::Ports::Ports() :
   m_tgtZmpOut_("tgtZmpOut", m_tgtZmp_),
   m_actCogOut_("actCogOut", m_actCog_),
   m_actDcmOut_("actDcmOut", m_actDcm_),
+  m_dstLandingPosOut_("dstLandingPosOut", m_dstLandingPos_),
 
   m_AutoStabilizerServicePort_("AutoStabilizerService"),
 
@@ -79,6 +80,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
   this->addOutPort("tgtZmpOut", this->ports_.m_tgtZmpOut_);
   this->addOutPort("actCogOut", this->ports_.m_actCogOut_);
   this->addOutPort("actDcmOut", this->ports_.m_actDcmOut_);
+  this->addOutPort("dstLandingPosOut", this->ports_.m_dstLandingPosOut_);
   this->ports_.m_AutoStabilizerServicePort_.registerProvider("service0", "AutoStabilizerService", this->ports_.m_service0_);
   this->addPort(this->ports_.m_AutoStabilizerServicePort_);
   this->ports_.m_RobotHardwareServicePort_.registerConsumer("service0", "RobotHardwareService", this->ports_.m_robotHardwareService0_);
@@ -643,6 +645,11 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
     ports.m_actDcm_.data.y = actDcm[1];
     ports.m_actDcm_.data.z = actDcm[2];
     ports.m_actDcmOut_.write();
+    ports.m_dstLandingPos_.tm = ports.m_qRef_.tm;
+    ports.m_dstLandingPos_.data.x = gaitParam.footstepNodesList[0].dstCoords[RLEG].translation()[0];
+    ports.m_dstLandingPos_.data.y = gaitParam.footstepNodesList[0].dstCoords[RLEG].translation()[1];
+    ports.m_dstLandingPos_.data.z = gaitParam.footstepNodesList[0].dstCoords[RLEG].translation()[2];
+    ports.m_dstLandingPosOut_.write();
     for(int i=0;i<gaitParam.eeName.size();i++){
       ports.m_actEEPose_[i].tm = ports.m_qRef_.tm;
       ports.m_actEEPose_[i].data.position.x = gaitParam.actEEPose[i].translation()[0];

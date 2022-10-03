@@ -132,6 +132,8 @@ protected:
     RTC::OutPort<RTC::TimedPoint3D> m_actCogOut_; // for log
     RTC::TimedPoint3D m_actDcm_; // Generate World frame
     RTC::OutPort<RTC::TimedPoint3D> m_actDcmOut_; // for log
+    RTC::TimedPoint3D m_dstLandingPos_; // Generate World frame
+    RTC::OutPort<RTC::TimedPoint3D> m_dstLandingPosOut_; // for log
     std::vector<RTC::TimedPose3D> m_actEEPose_; // Generate World frame. 要素数及び順番はgaitParam_.eeNameと同じ
     std::vector<std::unique_ptr<RTC::OutPort<RTC::TimedPose3D> > > m_actEEPoseOut_;
     std::vector<RTC::TimedDoubleSeq> m_tgtEEWrench_; // Generate World frame. EndEffector origin. 要素数及び順番はgaitParam_.eeNameと同じ. ロボットが受ける力
