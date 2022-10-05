@@ -40,7 +40,7 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
     cnoid::Vector3 refZmp = refZmpTraj[0].getStart(); // for文中の現在のrefzmp
     refZmpTraj.clear();
     // footstepNodesListのサイズが1, footstepNodesList[0].remainTimeが0のときに、copOffsetのパラメータが滑らかに変更になる場合がある. それに対応できるように
-    for(int i=0;i<gaitParam.footstepNodesList.size() && i < this->previewStepNum;i++){
+    for(int i=0;i<gaitParam.footstepNodesList.size();i++){
 
       if(!gaitParam.footstepNodesList[i].isSupportPhase[RLEG] && !gaitParam.footstepNodesList[i].isSupportPhase[LLEG]){
         // 跳躍についてはひとまず考えない TODO
@@ -73,6 +73,12 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
         }
         refZmpTraj.push_back(footguidedcontroller::LinearTrajectory<cnoid::Vector3>(refZmp,zmpGoalPos,std::max(gaitParam.footstepNodesList[i].remainTime, dt)));
         refZmp = zmpGoalPos;
+      }
+
+      if(i >= this->previewStepNum - 1){
+        if(/*NOT*/!(((gaitParam.footstepNodesList[i].isSupportPhase[RLEG] && !gaitParam.footstepNodesList[i].isSupportPhase[LLEG]) || (!gaitParam.footstepNodesList[i].isSupportPhase[RLEG] && gaitParam.footstepNodesList[i].isSupportPhase[LLEG])) && // 片足支持期
+                    ((!(i==gaitParam.footstepNodesList.size()-1)) && gaitParam.footstepNodesList[i+1].isSupportPhase[RLEG] && gaitParam.footstepNodesList[i+1].isSupportPhase[LLEG])) // 次が両足支持期
+           ) break;
       }
     }
 
