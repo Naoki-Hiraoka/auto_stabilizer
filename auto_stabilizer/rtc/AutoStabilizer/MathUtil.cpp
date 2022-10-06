@@ -217,11 +217,11 @@ namespace mathutil {
       Eigen::Vector3d p_ = P[i];
       Eigen::Vector3d q_ = calcNearestPointOfHull(p_, Q);
       double distance = (p_ - q_).head<2>().norm();
-      if(distance < minDistance){
+      if(distance <= minDistance-1e-4){
         minDistance = distance;
         p = std::vector<Eigen::Vector3d>{p_};
         q = std::vector<Eigen::Vector3d>{q_};
-      }else if (distance == minDistance){
+      }else if (minDistance-1e-4 < distance && distance < minDistance+1e+4){
         if(p.size() == 1 && q.size() == 1 && (p[0] != p_ || q[0] != q_)){
           p.push_back(p_);
           q.push_back(q_);
@@ -232,11 +232,11 @@ namespace mathutil {
       Eigen::Vector3d q_ = Q[i];
       Eigen::Vector3d p_ = calcNearestPointOfHull(q_, P);
       double distance = (p_ - q_).head<2>().norm();
-      if(distance < minDistance){
+      if(distance <= minDistance-1e-4){
         minDistance = distance;
         p = std::vector<Eigen::Vector3d>{p_};
         q = std::vector<Eigen::Vector3d>{q_};
-      }else if (distance == minDistance){
+      }else if (minDistance-1e-4 < distance && distance < minDistance+1e-4){
         if(p.size() == 1 && q.size() == 1 && (p[0] != p_ || q[0] != q_)){
           p.push_back(p_);
           q.push_back(q_);
