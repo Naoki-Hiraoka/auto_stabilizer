@@ -30,6 +30,7 @@ AutoStabilizer::Ports::Ports() :
   m_qActIn_("qAct", m_qAct_),
   m_dqActIn_("dqAct", m_dqAct_),
   m_actImuIn_("actImuIn", m_actImu_),
+  m_selfCollisionIn_("selfCollisionIn", m_selfCollision_),
 
   m_qOut_("q", m_q_),
   m_genTauOut_("genTauOut", m_genTau_),
@@ -69,6 +70,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
   this->addInPort("qAct", this->ports_.m_qActIn_);
   this->addInPort("dqAct", this->ports_.m_dqActIn_);
   this->addInPort("actImuIn", this->ports_.m_actImuIn_);
+  this->addInPort("selfCollisionIn", this->ports_.m_selfCollisionIn_);
   this->addOutPort("q", this->ports_.m_qOut_);
   this->addOutPort("genTauOut", this->ports_.m_genTauOut_);
   this->addOutPort("genBasePoseOut", this->ports_.m_genBasePoseOut_);
@@ -309,7 +311,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
 }
 
 // static function
-bool AutoStabilizer::readInPortData(const double& dt, AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobotRaw, cnoid::BodyPtr actRobotRaw, std::vector<cnoid::Vector6>& refEEWrenchOrigin, std::vector<cpp_filters::TwoPointInterpolatorSE3>& refEEPoseRaw){
+bool AutoStabilizer::readInPortData(const double& dt, AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobotRaw, cnoid::BodyPtr actRobotRaw, std::vector<cnoid::Vector6>& refEEWrenchOrigin, std::vector<cpp_filters::TwoPointInterpolatorSE3>& refEEPoseRaw, std::vector<GaitParam::Collision>& selfCollision){
   bool qRef_updated = false;
   if(ports.m_qRefIn_.isNew()){
     ports.m_qRefIn_.read();
@@ -415,6 +417,24 @@ bool AutoStabilizer::readInPortData(const double& dt, AutoStabilizer::Ports& por
     }
   }
 
+  if(ports.m_selfCollisionIn_.isNew()) {
+    ports.m_selfCollisionIn_.read();
+    selfCollision.resize(ports.m_selfCollision_.data.length());
+    for (int i=0; i<selfCollision.size(); i++){
+      selfCollision[i].link1 = ports.m_selfCollision_.data[i].link1;
+      selfCollision[i].point1[0] = ports.m_selfCollision_.data[i].point1.x;
+      selfCollision[i].point1[1] = ports.m_selfCollision_.data[i].point1.y;
+      selfCollision[i].point1[2] = ports.m_selfCollision_.data[i].point1.z;
+      selfCollision[i].link2 = ports.m_selfCollision_.data[i].link2;
+      selfCollision[i].point2[0] = ports.m_selfCollision_.data[i].point2.x;
+      selfCollision[i].point2[1] = ports.m_selfCollision_.data[i].point2.y;
+      selfCollision[i].point2[2] = ports.m_selfCollision_.data[i].point2.z;
+      selfCollision[i].direction21[0] = ports.m_selfCollision_.data[i].direction21.x;
+      selfCollision[i].direction21[1] = ports.m_selfCollision_.data[i].direction21.y;
+      selfCollision[i].direction21[2] = ports.m_selfCollision_.data[i].direction21.z;
+      selfCollision[i].distance = ports.m_selfCollision_.data[i].distance;
+    }
+  }
 
   return qRef_updated;
 }
@@ -694,7 +714,7 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
   std::string instance_name = std::string(this->m_profile.instance_name);
   this->loop_++;
 
-  if(!AutoStabilizer::readInPortData(this->dt_, this->ports_, this->gaitParam_.refRobotRaw, this->gaitParam_.actRobotRaw, this->gaitParam_.refEEWrenchOrigin, this->gaitParam_.refEEPoseRaw)) return RTC::RTC_OK;  // qRef が届かなければ何もしない
+  if(!AutoStabilizer::readInPortData(this->dt_, this->ports_, this->gaitParam_.refRobotRaw, this->gaitParam_.actRobotRaw, this->gaitParam_.refEEWrenchOrigin, this->gaitParam_.refEEPoseRaw, this->gaitParam_.selfCollision)) return RTC::RTC_OK;  // qRef が届かなければ何もしない
 
   this->mode_.update(this->dt_);
   this->gaitParam_.update(this->dt_);

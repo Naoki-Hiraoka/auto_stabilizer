@@ -38,6 +38,24 @@ bool FullbodyIKSolver::solveFullbodyIK(double dt, const GaitParam& gaitParam,
   }
 
   std::vector<std::shared_ptr<IK::IKConstraint> > ikConstraint1;
+  this->selfCollisionConstraint.resize(gaitParam.selfCollision.size());
+  for(size_t i=0;i<this->selfCollisionConstraint.size();i++){
+    if(!this->selfCollisionConstraint[i]) this->selfCollisionConstraint[i] = std::make_shared<IK::ClientCollisionConstraint>();
+    this->selfCollisionConstraint[i]->A_link() = genRobot->link(gaitParam.selfCollision[i].link1);
+    this->selfCollisionConstraint[i]->B_link() = genRobot->link(gaitParam.selfCollision[i].link2);
+    this->selfCollisionConstraint[i]->tolerance() = 0.01;
+    this->selfCollisionConstraint[i]->maxError() = 10.0*dt;
+    this->selfCollisionConstraint[i]->weight() = 1.0;
+    this->selfCollisionConstraint[i]->velocityDamper() = 0.1 / dt;
+    this->selfCollisionConstraint[i]->A_localp() = gaitParam.selfCollision[i].point1;
+    this->selfCollisionConstraint[i]->B_localp() = gaitParam.selfCollision[i].point2;
+    this->selfCollisionConstraint[i]->direction() = gaitParam.selfCollision[i].direction21;
+
+    // 全自己干渉情報を与えると計算コストが膨大になるため、距離が近いもののみ与える
+    if(gaitParam.selfCollision[i].distance < 0.05){
+      ikConstraint1.push_back(this->selfCollisionConstraint[i]);
+    }
+  }
 
   std::vector<std::shared_ptr<IK::IKConstraint> > ikConstraint2;
 

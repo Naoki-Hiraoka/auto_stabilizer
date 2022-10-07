@@ -15,4 +15,5 @@
   <depend>auto_stabilizer</depend>
   <depend>hrpsys_choreonoid_tutorials</depend>
   <depend>vnoid_world</depend>
+  <depend>collision_checker_rtc</depend>
 </package>

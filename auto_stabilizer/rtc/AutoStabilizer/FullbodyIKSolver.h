@@ -8,6 +8,7 @@
 #include <ik_constraint/AngularMomentumConstraint.h>
 #include <ik_constraint_joint_limit_table/JointLimitMinMaxTableConstraint.h>
 #include <ik_constraint/JointVelocityConstraint.h>
+#include <ik_constraint/ClientCollisionConstraint.h>
 #include <prioritized_inverse_kinematics_solver/PrioritizedInverseKinematicsSolver.h>
 
 class FullbodyIKSolver{
@@ -21,6 +22,7 @@ public:
   mutable std::shared_ptr<IK::AngularMomentumConstraint> angularMomentumConstraint = std::make_shared<IK::AngularMomentumConstraint>();
   mutable std::vector<std::shared_ptr<ik_constraint_joint_limit_table::JointLimitMinMaxTableConstraint> > jointLimitConstraint;
   mutable std::vector<std::shared_ptr<IK::JointVelocityConstraint> > jointVelocityConstraint;
+  mutable std::vector<std::shared_ptr<IK::ClientCollisionConstraint> > selfCollisionConstraint;
 protected:
   // クリアしなくても副作用はあまりない
   mutable cnoid::VectorX jlim_avoid_weight;
@@ -35,6 +37,8 @@ public:
     for(int i=0;i<genRobot->numJoints();i++) jointVelocityConstraint.push_back(std::make_shared<IK::JointVelocityConstraint>());
     jointLimitConstraint.clear();
     for(int i=0;i<genRobot->numJoints();i++) jointLimitConstraint.push_back(std::make_shared<ik_constraint_joint_limit_table::JointLimitMinMaxTableConstraint>());
+    selfCollisionConstraint.clear();
+    for(int i=0;i<gaitParam.selfCollision.size();i++) selfCollisionConstraint.push_back(std::make_shared<IK::ClientCollisionConstraint>());
   }
 
   bool solveFullbodyIK(double dt, const GaitParam& gaitParam,

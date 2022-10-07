@@ -4,7 +4,22 @@
 - git: # hrpsys_choreonoid_tutorialsが依存
     uri: https://github.com/start-jsk/rtmros_tutorials
     local-name: rtm-ros-robotics/rtmros_tutorials
+
+# for simulation world model
 - git:
     uri: https://github.com/Naoki-Hiraoka/vnoid_world
     local-name: vnoid_world
 
+# for self collision check
+- git:
+    local-name: collision_check_libraries
+    uri: https://github.com/Naoki-Hiraoka/collision_check_libraries.git
+- git:
+    local-name: qhulleigen
+    uri: https://github.com/Naoki-Hiraoka/qhulleigen.git
+- git:
+    local-name: choreonoid_collision_tools
+    uri: https://github.com/Naoki-Hiraoka/choreonoid_collision_tools.git
+- git:
+    local-name: rtmros_msg_bridge
+    uri: https://github.com/Naoki-Hiraoka/rtmros_msg_bridge.git

@@ -34,12 +34,21 @@ public:
   std::vector<bool> jointControllable; // 要素数と順序はnumJoints()と同じ. falseの場合、qやtauはrefの値をそのまま出力する(writeOutputPort時にref値で上書き). IKでは動かさない(ref値をそのまま). トルク計算では目標トルクを通常通り計算する. このパラメータはMODE_IDLEのときにしか変更されない
 
 public:
-  // from reference port
+  // from data port
   cnoid::BodyPtr refRobotRaw; // reference. reference world frame
   std::vector<cnoid::Vector6> refEEWrenchOrigin; // 要素数と順序はeeNameと同じ.FootOrigin frame. EndEffector origin. ロボットが受ける力
   std::vector<cpp_filters::TwoPointInterpolatorSE3> refEEPoseRaw; // 要素数と順序はeeNameと同じ. reference world frame. EEPoseはjoint angleなどと比べて遅い周期で届くことが多いので、interpolaterで補間する.
   cnoid::BodyPtr actRobotRaw; // actual. actual imu world frame
-
+  class Collision {
+  public:
+    std::string link1 = "";
+    cnoid::Vector3 point1 = cnoid::Vector3::Zero(); // link1 frame
+    std::string link2 = "";
+    cnoid::Vector3 point2 = cnoid::Vector3::Zero(); // link2 frame
+    cnoid::Vector3 direction21 = cnoid::Vector3::UnitX(); // generate frame
+    double distance = 0.0;
+  };
+  std::vector<Collision> selfCollision;
 public:
   // AutoStabilizerの中で計算更新される.
 

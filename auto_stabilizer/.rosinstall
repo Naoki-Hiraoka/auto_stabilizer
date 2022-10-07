@@ -33,3 +33,6 @@
 - git:
     uri: https://github.com/Naoki-Hiraoka/joint_limit_table
     local-name: joint_limit_table
+- git:
+    uri: https://github.com/Naoki-Hiraoka/collision_checker_rtc
+    local-name: collision_checker_rtc

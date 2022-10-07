@@ -44,5 +44,16 @@
         output="screen" args ='-o "corba.master_manager:localhost:2810" -o "corba.nameservers:localhost:15005" -o "naming.formats:%n.rtc" -o "exec_cxt.periodic.type:PeriodicExecutionContext" -o "exec_cxt.periodic.rate:2000" -o "logger.file_name:/tmp/rtc%p.log"' />
   <rtconnect from="AutoStabilizerServiceROSBridge.rtc:AutoStabilizerService" to="ast.rtc:AutoStabilizerService"  subscription_type="new"/>
   <rtactivate component="AutoStabilizerServiceROSBridge.rtc" />
+
+  <!-- self collision BEGIN -->
+  <node pkg="collision_checker_rtc" name="CollisionChecker" type="CollisionCheckerComp"
+        output="screen" args ='-o "corba.master_manager:localhost:2810" -o "corba.nameservers:localhost:15005" -o "naming.formats:%n.rtc" -o "exec_cxt.periodic.rate:50" -o "example.CollisionChecker.config_file:$(arg CONF_FILE)"' />
+  <rtconnect from="ast.rtc:q" to="CollisionChecker0.rtc:qIn" subscription_type="new" push_policy="new" push_rate="50" buffer_length="8"/>
+  <rtconnect from="ast.rtc:genBasePosOut" to="CollisionChecker0.rtc:basePosIn"  subscription_type="new" push_policy="all" push_rate="50" buffer_length="8"/>
+  <rtconnect from="ast.rtc:genBaseRpyOut" to="CollisionChecker0.rtc:baseRpyIn"  subscription_type="new" push_policy="all" push_rate="50" buffer_length="8"/>
+  <rtconnect from="CollisionChecker0.rtc:collisionOut" to="ast.rtc:selfCollisionIn" subscription_type="new" push_policy="new" push_rate="50" buffer_length="8"/>
+  <rtactivate component="CollisionChecker0.rtc" />
+  <!-- self collision END -->
+
   <node name="rtmlaunch_jaxon_jvrc_choreonoid" pkg="openrtm_tools" type="rtmlaunch.py" args="$(find auto_stabilizer_choreonoid_sample)/launch/jaxon_jvrc_choreonoid.launch" output="screen"/>
 </launch>
