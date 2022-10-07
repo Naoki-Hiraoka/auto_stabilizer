@@ -671,6 +671,10 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
 }
 
 // 早づきしたらremainTimeをdtに減らしてすぐに次のnodeへ移る. この機能が無いと少しでもロボットが傾いて早づきするとジャンプするような挙動になる. 遅づきに備えるために、着地位置を下方にオフセットさせる
+// この方法だと、本来の着地位置に着地したときに常に、DCMが次の着地位置まで移動しきっていなくて、かつ、支持脚状態が急激に変化するので、ZMP入力が急激に変化してしまう.
+// しかし、以下のような方法を検討したものの、相対的にこの方法がベターであった
+//    本来の着地時刻になったときにdstCoordsに至り、そのとき遅づきしていたら追加の時間を挿入してgoalOffsetぶん移動するような方法だと、遅づきしたときに着地時刻が遅くなるのでDCMが移動しずぎてしまっていて、坂道で転んでしまった.
+//    早づきしたら今の位置に止めて、本来の着地時刻まで動かないという方法だと、早づきするときは転びそうになっているときなのですぐに次の一歩を踏み出さないと転んでしまうので、坂道でころんでしまった.
 void FootStepGenerator::checkEarlyTouchDown(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const GaitParam& gaitParam, double dt) const{
   for(int i=0;i<NUM_LEGS;i++){
     actLegWrenchFilter[i].passFilter(gaitParam.actEEWrench[i], dt);
@@ -678,6 +682,7 @@ void FootStepGenerator::checkEarlyTouchDown(std::vector<GaitParam::FootStepNodes
 
   // 現在swing期で次support期のLegがあって、
   // そのLegがDOWN_PHASEかつ力センサの値が閾値以上になった場合に、すぐに次のnodeに移る
+
   if(footstepNodesList.size() > 1 &&
      ((!footstepNodesList[0].isSupportPhase[RLEG] && footstepNodesList[1].isSupportPhase[RLEG] && //現在swing期で次support期
        gaitParam.swingState[RLEG] == GaitParam::DOWN_PHASE && // DOWN_PHASE
