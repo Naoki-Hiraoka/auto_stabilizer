@@ -182,7 +182,7 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
 
       this->constraintTask_->w() = cnoid::VectorX::Ones(dim) * 1e-6;
       this->constraintTask_->toSolve() = false;
-      this->constraintTask_->solver().settings()->setVerbosity(0);
+      this->constraintTask_->settings().verbose = 0;
     }
     {
       // 2. ZMPがtgtZmp
@@ -210,7 +210,7 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
 
       this->tgtZmpTask_->w() = cnoid::VectorX::Ones(dim) * 1e-6;
       this->tgtZmpTask_->toSolve() = false; // 常にtgtZmpが支持領域内にあるなら解く必要がないので高速化のためfalseにする. ない場合があるならtrueにする. calcWrenchでtgtZmpをtruncateしているのでfalseでよい
-      this->tgtZmpTask_->solver().settings()->setVerbosity(0);
+      this->tgtZmpTask_->settings().verbose = 0;
     }
     {
       // 3. 各脚の各頂点のノルムの重心がCOPOffsetと一致 (fzの値でスケールされてしまうので、alphaを用いて左右をそろえる)
@@ -254,8 +254,8 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
       this->copTask_->toSolve() = true;
       // this->copTask_->options().setToReliable();
       // this->copTask_->options().printLevel = qpOASES::PL_NONE; // PL_HIGH or PL_NONE
-      this->copTask_->solver().settings()->setCheckTermination(5); // default 25. 高速化
-      this->copTask_->solver().settings()->setVerbosity(0);
+      this->copTask_->settings().check_termination = 5; // default 25. 高速化
+      this->copTask_->settings().verbose = 0;
     }
 
     std::vector<std::shared_ptr<prioritized_qp_base::Task> > tasks{this->constraintTask_,this->tgtZmpTask_,this->copTask_};

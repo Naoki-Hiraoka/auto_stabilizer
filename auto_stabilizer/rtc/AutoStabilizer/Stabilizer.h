@@ -2,7 +2,7 @@
 #define Stabilizer_H
 
 #include "GaitParam.h"
-#include <prioritized_qp/PrioritizedQPSolver.h>
+#include <prioritized_qp_osqp/prioritized_qp_osqp.h>
 #include <cnoid/JointPath>
 
 class Stabilizer{
@@ -51,9 +51,9 @@ public:
   }
 protected:
   // 計算高速化のためのキャッシュ. クリアしなくても別に副作用はない.
-  mutable std::shared_ptr<prioritized_qp::Task> constraintTask_ = std::make_shared<prioritized_qp::Task>();
-  mutable std::shared_ptr<prioritized_qp::Task> tgtZmpTask_ = std::make_shared<prioritized_qp::Task>();;
-  mutable std::shared_ptr<prioritized_qp::Task> copTask_ = std::make_shared<prioritized_qp::Task>();;
+  mutable std::shared_ptr<prioritized_qp_osqp::Task> constraintTask_ = std::make_shared<prioritized_qp_osqp::Task>();
+  mutable std::shared_ptr<prioritized_qp_osqp::Task> tgtZmpTask_ = std::make_shared<prioritized_qp_osqp::Task>();;
+  mutable std::shared_ptr<prioritized_qp_osqp::Task> copTask_ = std::make_shared<prioritized_qp_osqp::Task>();;
 public:
   void initStabilizerOutput(const GaitParam& gaitParam,
                             cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, cnoid::Vector3& o_stTargetZmp, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage) const;

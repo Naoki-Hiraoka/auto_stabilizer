@@ -7,7 +7,7 @@ add_definitions(-Wno-deprecated)
 
 find_package(catkin REQUIRED COMPONENTS
   ik_constraint
-  prioritized_qp
+  prioritized_qp_osqp
   prioritized_inverse_kinematics_solver
   cpp_filters
   ik_constraint_joint_limit_table
