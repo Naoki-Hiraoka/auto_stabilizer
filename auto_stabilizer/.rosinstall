@@ -22,12 +22,11 @@
     uri: https://github.com/Naoki-Hiraoka/ik_solvers
     local-name: ik_solvers
 - git:
+    uri: https://github.com/Naoki-Hiraoka/abseil_catkin.git
+    local-name: abseil_catkin
+- git:
     uri: https://github.com/Naoki-Hiraoka/qp_solvers
     local-name: qp_solvers
-- git:
-    local-name: osqp-eigen
-    uri: https://github.com/robotology/osqp-eigen.git
-    version: v0.7.0
 - git:
     uri: https://github.com/Naoki-Hiraoka/prioritized_qp
     local-name: prioritized_qp
