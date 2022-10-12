@@ -30,6 +30,9 @@ ast_dstLandingPosOut:
 ast_remainTimeOut:
   data:
     - { log: ast_remainTimeOut, column: [0] }
+ast_genCoordsOut:
+  data:
+    - { log: ast_genCoordsOut, column: [0-11] }
 
 ast_tgtrlegWrenchOut:
   data:
