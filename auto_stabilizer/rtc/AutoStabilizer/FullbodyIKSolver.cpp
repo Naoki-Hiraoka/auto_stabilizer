@@ -137,15 +137,18 @@ bool FullbodyIKSolver::solveFullbodyIK(double dt, const GaitParam& gaitParam,
       constraints[i][j]->debuglevel() = 0;//debuglevel
     }
   }
+  prioritized_inverse_kinematics_solver::IKParam param;
+  param.maxIteration = 1;
+  param.wn = 1e-6;
+  param.we = 1e2; // 1e0だとやや不安定. 1e3だと大きすぎる
+  param.debugLevel = 0;
+  param.dt = dt;
   prioritized_inverse_kinematics_solver::solveIKLoop(variables,
                                                      constraints,
                                                      this->tasks,
-                                                     1,//loop
-                                                     1e-6, // wn
-                                                     0, //debug
-                                                     dt
+                                                     param
                                                      );
-  // 1e2, // we. 1e0だとやや不安定. 1e3だと大きすぎる
+
 
   // 念の為limit check
   for(int i=0;i<gaitParam.refRobot->numJoints();i++){
