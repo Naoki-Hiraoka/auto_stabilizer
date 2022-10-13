@@ -17,7 +17,7 @@
   <depend>choreonoid</depend>
   <depend>hrpsys_ros_bridge</depend>
   <depend>ik_constraint</depend>
-  <depend>prioritized_qp</depend>
+  <depend>prioritized_qp_osqp</depend>
   <depend>fullbody_inverse_kinematics_solver</depend>
   <depend>joint_limit_table</depend>
   <depend>prioritized_inverse_kinematics_solver</depend>
