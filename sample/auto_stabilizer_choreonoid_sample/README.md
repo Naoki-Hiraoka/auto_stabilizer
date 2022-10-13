@@ -132,3 +132,22 @@ roseus
         (list 50 50 50 50 50 50)
         (list 2.0 2.0 2.0 2.0 2.0 2.0))
 ```
+
+### memo
+
+シミュレーションでは、次のようなパラメータにした方が性能が良い
+```
+(send *ri* :set-auto-stabilizer-param
+           :footguided-balance-time 0.4
+           :overwritable-min-step-time 0.5
+           )
+```
+
+視覚無しで傾斜のある地面を歩くときは、次のようなパラメータにした方が性能が良い. とはいえ視覚を使うのが正解.
+```
+(send *ri* :set-auto-stabilizer-param
+           :contact-detection-threshold 200
+           :emergency-step-cp-check-margin 0.1
+           :goal-offset -0.05
+           )
+```

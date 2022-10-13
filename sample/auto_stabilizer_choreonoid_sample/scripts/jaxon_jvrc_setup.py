@@ -110,6 +110,9 @@ class JAXON_RED_HrpsysConfigurator(ChoreonoidHrpsysConfigurator):
         super(JAXON_RED_HrpsysConfigurator, self).setupLogger()
 
     def startABSTIMP (self):
+        ### for torque control
+        self.el_svc.setServoErrorLimit("all", sys.float_info.max)
+        self.rh_svc.setServoErrorLimit("all", sys.float_info.max)
         ### not used on hrpsys
         if self.el:
             self.el_svc.setServoErrorLimit("RARM_F_JOINT0", sys.float_info.max)

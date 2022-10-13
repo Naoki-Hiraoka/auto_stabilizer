@@ -82,14 +82,16 @@ bool FootStepGenerator::setFootSteps(const GaitParam& gaitParam, const std::vect
     double beforeHeight = footstepNodesList.back().isSupportPhase[swingLeg] ? stepHeight : 0.0;
     double afterHeight = footsteps[i].swingEnd ? 0.0 : stepHeight;
     fs.stepHeight[swingLeg] = {beforeHeight,afterHeight};
+    fs.touchVel[swingLeg] = footsteps[i].swingEnd ? 0.0 : this->touchVel;
+    fs.goalOffset[swingLeg] = 0.0;
     footstepNodesList.push_back(fs);
 
     if(!footsteps[i].swingEnd) footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), footsteps[i].stepTime * this->defaultDoubleSupportRatio));
   }
 
-  // if(footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG]){
-  //   footstepNodesList.back().remainTime = std::max(footstepNodesList.back().remainTime, this->defaultStepTime); // 末尾の両足支持期を延長. これがないと重心が目標位置に収束する前に返ってしまい, emergencyStepが無限に誘発する? -> footGudedBalanceTimeを0.4程度に小さくするとよい
-  // }
+  if(footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG]){
+    footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime)); // 末尾の両足支持期を延長. これがないと重心が目標位置に収束する前に返ってしまい, emergencyStepが無限に誘発する footGudedBalanceTimeを0.4程度に小さくすると収束が速くなるのでこの処理が不要になるのだが、今度はZ方向に振動しやすい
+  }
 
   o_footstepNodesList = footstepNodesList;
   return true;
@@ -153,7 +155,7 @@ bool FootStepGenerator::goPos(const GaitParam& gaitParam, double x/*m*/, double 
     this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos);
   }
 
-  // footstepNodesList.back().remainTime = std::max(footstepNodesList.back().remainTime, this->defaultStepTime); // 末尾の両足支持期を延長. これがないと重心が目標位置に収束する前に返ってしまい, emergencyStepが無限に誘発する -> footGudedBalanceTimeを0.4程度に小さくするとよい
+  footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime)); // 末尾の両足支持期を延長. これがないと重心が目標位置に収束する前に返ってしまい, emergencyStepが無限に誘発する footGudedBalanceTimeを0.4程度に小さくすると収束が速くなるのでこの処理が不要になるのだが、今度はZ方向に振動しやすい
 
   o_footstepNodesList = footstepNodesList;
   return true;
@@ -176,7 +178,7 @@ bool FootStepGenerator::goStop(const GaitParam& gaitParam,
     this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos);
   }
 
-  // footstepNodesList.back().remainTime = std::max(footstepNodesList.back().remainTime, this->defaultStepTime); // 末尾の両足支持期を延長. これがないと重心が目標位置に収束する前に返ってしまい, emergencyStepが無限に誘発する -> footGudedBalanceTimeを0.4程度に小さくするとよい
+  footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime)); // 末尾の両足支持期を延長. これがないと重心が目標位置に収束する前に返ってしまい, emergencyStepが無限に誘発する footGudedBalanceTimeを0.4程度に小さくすると収束が速くなるのでこの処理が不要になるのだが、今度はZ方向に振動しやすい
 
   o_footstepNodesList = footstepNodesList;
   return true;
@@ -432,6 +434,8 @@ GaitParam::FootStepNodes FootStepGenerator::calcDefaultSwingStep(const int& swin
   fs.remainTime = this->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio);
   if(!startWithSingleSupport) fs.stepHeight[swingLeg] = {this->defaultStepHeight,this->defaultStepHeight};
   else fs.stepHeight[swingLeg] = {0.0,this->defaultStepHeight};
+  fs.touchVel[swingLeg] = this->touchVel;
+  fs.goalOffset[swingLeg] = 0.0;
   return fs;
 }
 
@@ -473,6 +477,9 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
   cnoid::Position swingPose = gaitParam.genCoords[swingLeg].value();
   cnoid::Position supportPose = gaitParam.genCoords[supportLeg].value(); // TODO. 支持脚のgenCoordsとdstCoordsが異なることは想定していない
   cnoid::Position supportPoseHorizontal = mathutil::orientCoordToAxis(supportPose, cnoid::Vector3::UnitZ());
+
+  // stopCurrentPositionが発動しているなら、着地位置時間修正を行っても無駄なので行わない
+  if(footstepNodesList[0].stopCurrentPosition[swingLeg]) return;
 
   // dx = w ( x - z - l)
   cnoid::Vector3 actDCM = gaitParam.actCog + gaitParam.actCogVel.value() / gaitParam.omega;
@@ -670,28 +677,33 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
   footstepNodesList[0].remainTime = candidates[0].second;
 }
 
-// 早づきしたらremainTimeをdtに減らしてすぐに次のnodeへ移る. この機能が無いと少しでもロボットが傾いて早づきするとジャンプするような挙動になる. 遅づきに備えるために、着地位置を下方にオフセットさせる
-// この方法だと、本来の着地位置に着地したときに常に、DCMが次の着地位置まで移動しきっていなくて、かつ、支持脚状態が急激に変化するので、ZMP入力が急激に変化してしまう.
-// しかし、以下のような方法を検討したものの、相対的にこの方法がベターであった
-//    本来の着地時刻になったときにdstCoordsに至り、そのとき遅づきしていたら追加の時間を挿入してgoalOffsetぶん移動するような方法だと、遅づきしたときに着地時刻が遅くなるのでDCMが移動しずぎてしまっていて、坂道で転んでしまった.
-//    早づきしたら今の位置に止めて、本来の着地時刻まで動かないという方法だと、早づきするときは転びそうになっているときなのですぐに次の一歩を踏み出さないと転んでしまうので、坂道でころんでしまった.
+// 早づきしたらremainTimeが0になるまで今の位置で止める.
+//   - この機能が無いと少しでもロボットが傾いて早づきするとジャンプするような挙動になる.
+//   - remainTimeが0になるまで待たないと、本来の着地位置に着地したときに、DCMが次の着地位置まで移動しきっていなくて、かつ、支持脚状態が急激に変化するので、ZMP入力が急激に変化してしまう.
+//   - ただし、この方法だと、早づきするときは転びそうになっているときなのですぐに次の一歩を踏み出さないと転んでしまうので、待つぶん弱い
+// remainTimeが0になっても地面についていなかったら、remainTimeを少しずつ延長し着地位置を下方に少しずつオフセットさせる
+//   - remainTimeが0のときには本来の着地位置に行くようにしないと、着地タイミングがrefZmpよりも常に早すぎ・遅すぎになるので良くない
+//   - ただし、この方法だと、遅づきしたときに着地時刻が遅くなるのでDCMが移動しずぎてしまっているので、転びやすい.
 void FootStepGenerator::checkEarlyTouchDown(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const GaitParam& gaitParam, double dt) const{
   for(int i=0;i<NUM_LEGS;i++){
     actLegWrenchFilter[i].passFilter(gaitParam.actEEWrench[i], dt);
   }
 
-  // 現在swing期で次support期のLegがあって、
-  // そのLegがDOWN_PHASEかつ力センサの値が閾値以上になった場合に、すぐに次のnodeに移る
+  if(footstepNodesList.size() > 1){
+    for(int leg = 0; leg<NUM_LEGS; leg++){
+      if(!footstepNodesList[0].isSupportPhase[leg] && footstepNodesList[1].isSupportPhase[leg] && //現在swing期で次support期
+         gaitParam.swingState[leg] == GaitParam::DOWN_PHASE && // DOWN_PHASE
+         footstepNodesList[0].stopCurrentPosition[leg] == false){ // まだ地面についていない
 
-  if(footstepNodesList.size() > 1 &&
-     ((!footstepNodesList[0].isSupportPhase[RLEG] && footstepNodesList[1].isSupportPhase[RLEG] && //現在swing期で次support期
-       gaitParam.swingState[RLEG] == GaitParam::DOWN_PHASE && // DOWN_PHASE
-       actLegWrenchFilter[RLEG].value()[2] > this->contactDetectionThreshold /*generate frame. ロボットが受ける力*/) // 力センサの値が閾値以上
-      ||
-      (!footstepNodesList[0].isSupportPhase[LLEG] && footstepNodesList[1].isSupportPhase[LLEG] && //現在swing期で次support期
-       gaitParam.swingState[LLEG] == GaitParam::DOWN_PHASE && // DOWN_PHASE
-       actLegWrenchFilter[LLEG].value()[2] > this->contactDetectionThreshold /*generate frame. ロボットが受ける力*/))){ // 力センサの値が閾値以上
-    footstepNodesList[0].remainTime = dt;
+        if(actLegWrenchFilter[leg].value()[2] > this->contactDetectionThreshold /*generate frame. ロボットが受ける力*/) {// 力センサの値が閾値以上
+          footstepNodesList[0].stopCurrentPosition[leg] = true;
+        }else if(footstepNodesList[0].remainTime <= dt && // remainTimeが0になる
+                 footstepNodesList[0].goalOffset[leg] > this->goalOffset){ // まだgoalOffsetまで下ろしていない
+          footstepNodesList[0].remainTime += dt;
+          footstepNodesList[0].goalOffset[leg] = std::max(this->goalOffset, footstepNodesList[0].goalOffset[leg] - footstepNodesList[0].touchVel[leg] * dt);
+        }
+      }
+    }
   }
 }
 
@@ -735,9 +747,17 @@ void FootStepGenerator::checkStableGoStop(std::vector<GaitParam::FootStepNodes>&
   for(int i=0;i<NUM_LEGS; i++){
     if((footstepNodesList[0].dstCoords[i].translation().head<2>() - gaitParam.dstCoordsOrg[i].translation().head<2>()).norm() > 0.01){ // 1cm以上着地位置修正を行ったなら
       while(footstepNodesList.size() < this->emergencyStepNum){
+        if(footstepNodesList.size() >= 2 &&
+           (footstepNodesList[footstepNodesList.size()-2].isSupportPhase[RLEG] && footstepNodesList[footstepNodesList.size()-2].isSupportPhase[LLEG]) &&
+           (footstepNodesList[footstepNodesList.size()-1].isSupportPhase[RLEG] && footstepNodesList[footstepNodesList.size()-1].isSupportPhase[LLEG])){
+          footstepNodesList.pop_back(); // 末尾に両足支持期が2つ連続している場合、後の方を削除
+        }
+
         if(footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG]){
           footstepNodesList.back().remainTime = this->defaultStepTime * this->defaultDoubleSupportRatio; // 末尾の両足支持期を短縮 & 延長
         }
+
+        // 歩を追加
         this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos);
       }
     }
