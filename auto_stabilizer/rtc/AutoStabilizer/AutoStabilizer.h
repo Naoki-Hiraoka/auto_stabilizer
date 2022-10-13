@@ -140,6 +140,8 @@ protected:
     RTC::OutPort<RTC::TimedDoubleSeq> m_dstLandingPosOut_; // for log
     RTC::TimedDoubleSeq m_remainTime_;
     RTC::OutPort<RTC::TimedDoubleSeq> m_remainTimeOut_; // for log
+    RTC::TimedDoubleSeq m_genCoords_;
+    RTC::OutPort<RTC::TimedDoubleSeq> m_genCoordsOut_; // for log
 
     std::vector<RTC::TimedPose3D> m_actEEPose_; // Generate World frame. 要素数及び順番はgaitParam_.eeNameと同じ
     std::vector<std::unique_ptr<RTC::OutPort<RTC::TimedPose3D> > > m_actEEPoseOut_;

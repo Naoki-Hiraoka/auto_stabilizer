@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>auto_stabilizer_ros_bridge</name>
+  <version>0.0.0</version>
+  <description>The auto_stabilizer_ros_bridge package</description>
+
+  <maintainer email="hiraoka@jsk.imi.i.u-tokyo.ac.jp">Naoki-Hiraoka</maintainer>
+
+  <license>BSD</license>
+
+  <author email="t-hiraoka@jsk.imi.i.u-tokyo.ac.jp">Takuma-Hiraoka</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>auto_stabilizer_msgs</depend>
+  <depend>roscpp</depend>
+
+</package>

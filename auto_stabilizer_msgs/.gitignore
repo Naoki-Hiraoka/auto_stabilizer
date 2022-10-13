@@ -1,0 +1,6 @@
+*~
+*.stp
+*#
+msg/auto_stabilizer_msgs_*
+srv/auto_stabilizer_msgs_*
+src_gen/*

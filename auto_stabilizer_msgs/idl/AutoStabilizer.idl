@@ -1,0 +1,37 @@
+#ifndef AutoStabilizer_idl
+#define AutoStabilizer_idl
+
+#include "ExtendedDataTypes.idl"
+
+module auto_stabilizer_msgs
+{
+  struct LandingPositionIdl
+  {
+    double x;
+    double y;
+    double z;
+    double nx;
+    double ny;
+    double nz;
+    long l_r; // 0: right. 1: left.
+  };
+
+  struct SteppableRegionIdl
+  {
+    sequence<sequence<double> > region;
+    long l_r; // 0: right. 1: left.
+  };
+
+  struct TimedLandingPosition
+  {
+    RTC::Time tm;
+    LandingPositionIdl data;
+  };
+  struct TimedSteppableRegion
+  {
+    RTC::Time tm;
+    SteppableRegionIdl data;
+  };
+};
+
+#endif
