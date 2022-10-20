@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   hrpsys_ros_bridge
   joint_limit_table
   collision_checker_msgs
+  auto_stabilizer_msgs
   )
 find_package(choreonoid REQUIRED)
 

@@ -32,11 +32,6 @@ public:
   // FootStepGeneratorでしか使わないパラメータ. startAutoBalancer時に初期化が必要
   bool isGoVelocityMode = false; // 進行方向に向けてfootStepNodesList[1] ~ footStepNodesList[goVelocityStepNum]の要素をfootstepNodesList[0]から機械的に計算してどんどん位置修正&末尾appendしていく.
 
-  std::vector<std::vector<cnoid::Vector2> > steppable_region; // 要素数任意. generate frame. endCoordsが存在できる領域 TODO
-  std::vector<double> steppable_height; // 要素数はsteppable_regionと同じ. generate frame. 各polygonごとのおおよその値. そのpolygonに届くかどうかの判定と、 TODO
-  double relLandingHeight; // generate frame. 現在の遊脚のfootstepNodesList[0]のdstCoordsのZ TODO
-  cnoid::Vector3 relLandingNormal; // generate frame. 現在の遊脚のfootstepNodesList[0]のdstCoordsのZ軸の方向 TODO
-
 protected:
   mutable std::vector<cpp_filters::FirstOrderLowPassFilter<cnoid::Vector6> > actLegWrenchFilter = std::vector<cpp_filters::FirstOrderLowPassFilter<cnoid::Vector6> >(2, cpp_filters::FirstOrderLowPassFilter<cnoid::Vector6>(50.0, cnoid::Vector6::Zero()));  // 要素数2. rleg: 0. lleg: 1. generate frame. endeffector origin. cutoff 50hz. contactDecisionThresholdを用いた接触判定に用いる
 public:
@@ -104,7 +99,7 @@ public:
 
   // FootStepNodesListをdtすすめる
   bool procFootStepNodesList(const GaitParam& gaitParam, const double& dt, bool useActState,
-                             std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<cnoid::Position>& o_dstCoordsOrg, double& o_remainTimeOrg, std::vector<GaitParam::SwingState_enum>& o_swingState, double& o_elapsedTime, std::vector<bool>& o_prevSupportPhase) const;
+                             std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<cnoid::Position>& o_dstCoordsOrg, double& o_remainTimeOrg, std::vector<GaitParam::SwingState_enum>& o_swingState, double& o_elapsedTime, std::vector<bool>& o_prevSupportPhase, double& relLandingHeight) const;
 
   /*
     footstepNodesList[1]開始時のsupport/swingの状態を上書きによって変更する場合は、footstepNodesList[0]の終了時の状態が両脚支持でかつその期間の時間がdefaultDoubleSupportTimeよりも短いなら延長する
@@ -126,7 +121,7 @@ protected:
   void checkStableGoStop(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const GaitParam& gaitParam) const;
   // footstepNodesListをdtだけ進める
   bool goNextFootStepNodesList(const GaitParam& gaitParam, double dt,
-                               std::vector<GaitParam::FootStepNodes>& footstepNodesList, std::vector<cnoid::Position>& srcCoords, std::vector<cnoid::Position>& dstCoordsOrg, double& remainTimeOrg, std::vector<GaitParam::SwingState_enum>& swingState, double& elapsedTime) const;
+                               std::vector<GaitParam::FootStepNodes>& footstepNodesList, std::vector<cnoid::Position>& srcCoords, std::vector<cnoid::Position>& dstCoordsOrg, double& remainTimeOrg, std::vector<GaitParam::SwingState_enum>& swingState, double& elapsedTime, double& relLandingHeight) const;
   // footstepNodesList[1:]の着地位置(XYZ,yaw)をcmdVelに基づき更新する
   void updateGoVelocitySteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >& defaultTranslatePos, const cnoid::Vector3& cmdVel) const;
   // emergengy step.

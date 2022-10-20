@@ -23,4 +23,5 @@
   <depend>prioritized_inverse_kinematics_solver</depend>
   <depend>ik_constraint_joint_limit_table</depend>
   <depend>collision_checker_msgs</depend>
+  <depend>auto_stabilizer_msgs</depend>
 </package>

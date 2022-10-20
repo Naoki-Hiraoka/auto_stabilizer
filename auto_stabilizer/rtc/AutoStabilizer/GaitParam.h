@@ -49,6 +49,10 @@ public:
     double distance = 0.0;
   };
   std::vector<Collision> selfCollision;
+  std::vector<std::vector<cnoid::Vector3> > steppableRegion; // generate frame. 着地可能領域の凸包の集合. 要素数0なら、全ての領域が着地可能として扱われる
+  std::vector<double> steppableHeight; // generate frame. 要素数と順序はsteppableRegionと同じ。steppableRegionの各要素の重心Z.
+  double relLandingHeight = -1e15; // generate frame. 現在の遊脚のfootstepNodesList[0]のdstCoordsのZ. -1e10未満なら、relLandingHeightとrelLandingNormalは無視される. footStepNodesListsの次のnodeに移るたびにFootStepGeneratorによって-1e15に上書きされる.
+  cnoid::Vector3 relLandingNormal = cnoid::Vector3::UnitZ(); // generate frame. 現在の遊脚のfootstepNodesList[0]のdstCoordsのZ軸の方向. ノルムは常に1
 public:
   // AutoStabilizerの中で計算更新される.
 

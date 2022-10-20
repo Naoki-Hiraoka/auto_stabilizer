@@ -26,6 +26,7 @@
 
 #include <hrpsys/idl/RobotHardwareService.hh>
 #include <collision_checker_msgs/idl/Collision.hh>
+#include <auto_stabilizer_msgs/idl/AutoStabilizer.hh>
 
 #include "AutoStabilizerService_impl.h"
 #include "GaitParam.h"
@@ -103,6 +104,11 @@ protected:
     RTC::Time refEEPoseLastUpdateTime_; // m_refEEPoseIn_のどれかに最後にdataが届いたときの、m_qRef_.tmの時刻
     collision_checker_msgs::TimedCollisionSeq m_selfCollision_; // generate frame. genRobotの自己干渉の最近傍点
     RTC::InPort<collision_checker_msgs::TimedCollisionSeq> m_selfCollisionIn_;
+    auto_stabilizer_msgs::TimedSteppableRegion m_steppableRegion_; // 着地可能領域. 支持脚を水平にした座標系
+    RTC::InPort<auto_stabilizer_msgs::TimedSteppableRegion> m_steppableRegionIn_;
+    RTC::Time steppableRegionLastUpdateTime_; // m_steppableRegionIn_に最後にdataが届いたときの、m_qRef_.tmの時刻
+    auto_stabilizer_msgs::TimedLandingPosition m_landingHeight_; // 着地姿勢. 支持脚を水平にした座標系
+    RTC::InPort<auto_stabilizer_msgs::TimedLandingPosition> m_landingHeightIn_;
 
     RTC::TimedDoubleSeq m_q_;
     RTC::OutPort<RTC::TimedDoubleSeq> m_qOut_;
@@ -112,6 +118,8 @@ protected:
     RTC::OutPort<RTC::TimedPose3D> m_genBasePoseOut_;
     RTC::TimedDoubleSeq m_genBaseTform_;  // Generate World frame
     RTC::OutPort<RTC::TimedDoubleSeq> m_genBaseTformOut_; // for HrpsysSeqStateROSBridge
+    auto_stabilizer_msgs::TimedLandingPosition m_landingTarget_; // 着地位置. 支持脚を水平にした座標系
+    RTC::OutPort<auto_stabilizer_msgs::TimedLandingPosition> m_landingTargetOut_;
 
     AutoStabilizerService_impl m_service0_;
     RTC::CorbaPort m_AutoStabilizerServicePort_;
@@ -251,7 +259,7 @@ protected:
   bool getProperty(const std::string& key, std::string& ret);
   static void copyEigenCoords2FootStep(const cnoid::Position& in_fs, OpenHRP::AutoStabilizerService::Footstep& out_fs);
 
-  static bool readInPortData(const double& dt, AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobotRaw, cnoid::BodyPtr actRobotRaw, std::vector<cnoid::Vector6>& refEEWrenchOrigin, std::vector<cpp_filters::TwoPointInterpolatorSE3>& refEEPoseRaw, std::vector<GaitParam::Collision>& selfCollision);
+  static bool readInPortData(const double& dt, const GaitParam& gaitParam, AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobotRaw, cnoid::BodyPtr actRobotRaw, std::vector<cnoid::Vector6>& refEEWrenchOrigin, std::vector<cpp_filters::TwoPointInterpolatorSE3>& refEEPoseRaw, std::vector<GaitParam::Collision>& selfCollision, std::vector<std::vector<cnoid::Vector3> >& steppableRegion, std::vector<double>& steppableHeight, double& relLandingHeight, cnoid::Vector3& relLandingNormal);
   static bool execAutoStabilizer(const AutoStabilizer::ControlMode& mode, GaitParam& gaitParam, double dt, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ActToGenFrameConverter& actToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer, const ExternalForceHandler& externalForceHandler, const FullbodyIKSolver& fullbodyIKSolver, const LegManualController& legManualController, const CmdVelGenerator& cmdVelGenerator);
   static bool writeOutPortData(AutoStabilizer::Ports& ports, const AutoStabilizer::ControlMode& mode, cpp_filters::TwoPointInterpolator<double>& idleToAbcTransitionInterpolator, double dt, const GaitParam& gaitParam);
 };

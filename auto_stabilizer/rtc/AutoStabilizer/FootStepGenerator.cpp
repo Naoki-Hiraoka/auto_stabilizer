@@ -187,7 +187,7 @@ bool FootStepGenerator::goStop(const GaitParam& gaitParam,
 
 // FootStepNodesListをdtすすめる
 bool FootStepGenerator::procFootStepNodesList(const GaitParam& gaitParam, const double& dt, bool useActState,
-                                              std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<cnoid::Position>& o_dstCoordsOrg, double& o_remainTimeOrg, std::vector<GaitParam::SwingState_enum>& o_swingState, double& o_elapsedTime, std::vector<bool>& o_prevSupportPhase) const{
+                                              std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<cnoid::Position>& o_dstCoordsOrg, double& o_remainTimeOrg, std::vector<GaitParam::SwingState_enum>& o_swingState, double& o_elapsedTime, std::vector<bool>& o_prevSupportPhase, double& relLandingHeight) const{
   std::vector<GaitParam::FootStepNodes> footstepNodesList = gaitParam.footstepNodesList;
   std::vector<bool> prevSupportPhase = gaitParam.prevSupportPhase;
   double elapsedTime = gaitParam.elapsedTime;
@@ -214,7 +214,7 @@ bool FootStepGenerator::procFootStepNodesList(const GaitParam& gaitParam, const 
 
     // footstepNodesList[1]へ進む
     this->goNextFootStepNodesList(gaitParam, dt,
-                                  footstepNodesList, srcCoords, dstCoordsOrg, remainTimeOrg, swingState, elapsedTime);
+                                  footstepNodesList, srcCoords, dstCoordsOrg, remainTimeOrg, swingState, elapsedTime, relLandingHeight);
   }
 
   o_footstepNodesList = footstepNodesList;
@@ -266,7 +266,7 @@ bool FootStepGenerator::calcFootSteps(const GaitParam& gaitParam, const double& 
 }
 
 bool FootStepGenerator::goNextFootStepNodesList(const GaitParam& gaitParam, double dt,
-                                                std::vector<GaitParam::FootStepNodes>& footstepNodesList, std::vector<cnoid::Position>& srcCoords, std::vector<cnoid::Position>& dstCoordsOrg, double& remainTimeOrg, std::vector<GaitParam::SwingState_enum>& swingState, double& elapsedTime) const{
+                                                std::vector<GaitParam::FootStepNodes>& footstepNodesList, std::vector<cnoid::Position>& srcCoords, std::vector<cnoid::Position>& dstCoordsOrg, double& remainTimeOrg, std::vector<GaitParam::SwingState_enum>& swingState, double& elapsedTime, double& relLandingHeight) const{
   // 今のgenCoordsとdstCoordsが異なるなら、将来のstepの位置姿勢をそれに合わせてずらす. (特にgoalOffsetがある場合にはこの処理が必要)
   //   footstepNodesList[1:]で一回でも遊脚になった以降は、位置とYawをずらす. footstepNodesList[1:]で最初に遊脚になる脚があるならその反対の脚の偏差にあわせてずらす. そうでないなら両脚の中心(+-defaultTranslatePos)の偏差にあわせてずらす
   //   footstepNodesList[1]が支持脚なら、遊脚になるまで、位置姿勢をその足の今の偏差にあわせてずらす.
@@ -315,6 +315,7 @@ bool FootStepGenerator::goNextFootStepNodesList(const GaitParam& gaitParam, doub
   }
   remainTimeOrg = footstepNodesList[0].remainTime;
   elapsedTime = 0.0;
+  relLandingHeight = -1e15;
 
   return true;
 }

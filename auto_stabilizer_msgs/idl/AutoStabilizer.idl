@@ -5,6 +5,9 @@
 
 module auto_stabilizer_msgs
 {
+  const long RLEG = 0;
+  const long LLEG = 1;
+
   struct LandingPositionIdl
   {
     double x;
@@ -13,13 +16,13 @@ module auto_stabilizer_msgs
     double nx;
     double ny;
     double nz;
-    long l_r; // 0: right. 1: left.
+    long l_r; // 0: right. 1: left. 現在支持脚
   };
 
   struct SteppableRegionIdl
   {
     sequence<sequence<double> > region;
-    long l_r; // 0: right. 1: left.
+    long l_r; // 0: right. 1: left. 現在支持脚
   };
 
   struct TimedLandingPosition

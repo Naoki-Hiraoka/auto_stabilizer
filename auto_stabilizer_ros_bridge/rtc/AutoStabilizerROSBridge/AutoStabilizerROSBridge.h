@@ -23,12 +23,17 @@ protected:
   ros::Subscriber steppable_region_sub_;
   auto_stabilizer_msgs::TimedSteppableRegion m_steppableRegion_;
   RTC::OutPort <auto_stabilizer_msgs::TimedSteppableRegion> m_steppableRegionOut_;
+
+  ros::Subscriber landing_height_sub_;
+  auto_stabilizer_msgs::TimedLandingPosition m_landingHeight_;
+  RTC::OutPort <auto_stabilizer_msgs::TimedLandingPosition> m_landingHeightOut_;
 public:
   AutoStabilizerROSBridge(RTC::Manager* manager);
   virtual RTC::ReturnCode_t onInitialize();
   virtual RTC::ReturnCode_t onExecute(RTC::UniqueId ec_id);
 
   void onSteppableRegionCB(const auto_stabilizer_msgs::SteppableRegion::ConstPtr& msg);
+  void onLandingHeightCB(const auto_stabilizer_msgs::LandingPosition::ConstPtr& msg);
 
 };
 
