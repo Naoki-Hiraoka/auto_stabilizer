@@ -1,3 +1,5 @@
+# この型は safe_footstep_planner/msg/LandingPosition.msg と同一である必要がある
+
 Header header
 
 float64 x

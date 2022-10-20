@@ -567,7 +567,7 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
 
     std::vector<std::pair<std::vector<cnoid::Vector3>, double> > nextCandidates;
     for(int i=0;i<candidates.size();i++){
-      for(int j=0;j<steppableHulls.size();i++){
+      for(int j=0;j<steppableHulls.size();j++){
         std::vector<cnoid::Vector3> hull = mathutil::calcIntersectConvexHull(candidates[i].first, steppableHulls[j]);
         if(hull.size() > 0) nextCandidates.emplace_back(hull, candidates[i].second);
       }

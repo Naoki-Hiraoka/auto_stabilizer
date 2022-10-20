@@ -473,9 +473,9 @@ bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam
       ports.steppableRegionLastUpdateTime_ = ports.m_qRef_.tm;
     }
   }else{ //ports.m_steppableRegionIn_.isNew()
-    if(std::abs((ports.steppableRegionLastUpdateTime_.sec - ports.m_qRef_.tm.sec) + 1e-9 * (ports.steppableRegionLastUpdateTime_.nsec - ports.m_qRef_.tm.nsec)) > 2.0){ // 2秒間steppableRegionが届いていない.
+    if(std::abs(((long long)ports.steppableRegionLastUpdateTime_.sec - (long long)ports.m_qRef_.tm.sec) + 1e-9 * ((long long)ports.steppableRegionLastUpdateTime_.nsec - (long long)ports.m_qRef_.tm.nsec)) > 2.0){ // 2秒間steppableRegionが届いていない.  RTC::Timeはunsigned long型なので、符号付きの型に変換してから引き算
       steppableRegion.clear();
-      steppableHeight.clear();;
+      steppableHeight.clear();
     }
   }
 
@@ -1024,7 +1024,7 @@ bool AutoStabilizer::startWholeBodyMasterSlave(void){
       std::cerr << "[" << this->m_profile.instance_name << "] WholeBodyMasterSlave is already started" << std::endl;
       return false;
     }
-    if(std::abs((this->ports_.refEEPoseLastUpdateTime_.sec - this->ports_.m_qRef_.tm.sec) + 1e-9 * (this->ports_.refEEPoseLastUpdateTime_.nsec - this->ports_.m_qRef_.tm.nsec)) > 1.0) { // 最新のm_refEEPose_が1秒以上前. master sideが立ち上がっていないので、姿勢の急変を引き起こし危険
+    if(std::abs(((long long)this->ports_.refEEPoseLastUpdateTime_.sec - (long long)this->ports_.m_qRef_.tm.sec) + 1e-9 * ((long long)this->ports_.refEEPoseLastUpdateTime_.nsec - (long long)this->ports_.m_qRef_.tm.nsec)) > 1.0) { // 最新のm_refEEPose_が1秒以上前. master sideが立ち上がっていないので、姿勢の急変を引き起こし危険. RTC::Timeはunsigned long型なので、符号付きの型に変換してから引き算
       std::cerr << "[" << this->m_profile.instance_name << "] Please start master side" << std::endl;
       return false;
     }

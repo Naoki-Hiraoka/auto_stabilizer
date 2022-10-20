@@ -1,6 +1,4 @@
-uint32 RLEG = 0
-uint32 LLEG = 1
-
+# この型は safe_footstep_planner/msg/SteppableRegion.msg と同一である必要がある
 
 Header header
 geometry_msgs/PolygonStamped[] polygons
