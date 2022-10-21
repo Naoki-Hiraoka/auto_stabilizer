@@ -734,9 +734,7 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
 
   //landingHeightから受け取った値を用いて着地姿勢を変更
   if (gaitParam.swingState[swingLeg] != GaitParam::DOWN_PHASE && gaitParam.relLandingHeight > -1e+10) {
-    for(int i=0; i<footstepNodesList.size(); i++) {
-      footstepNodesList[i].dstCoords[swingLeg].linear() = mathutil::orientCoordToAxis(gaitParam.dstCoordsOrg[swingLeg].linear(), gaitParam.relLandingNormal); // dstCoordsを毎周期orientCoordToAxisすると計算誤差でだんだん変にずれてくるので、dstCoordsOrgを使う. この処理以外ではdstCoordsの傾きは変更されないという仮定がある.
-    }
+    footstepNodesList[0].dstCoords[swingLeg].linear() = mathutil::orientCoordToAxis(gaitParam.dstCoordsOrg[swingLeg].linear(), gaitParam.relLandingNormal); // dstCoordsを毎周期orientCoordToAxisすると計算誤差でだんだん変にずれてくるので、dstCoordsOrgを使う. この処理以外ではdstCoordsの傾きは変更されないという仮定がある.
   }
 }
 
