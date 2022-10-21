@@ -100,7 +100,7 @@ namespace mathutil {
       while (n_ch >= 2 && (convexHull[n_ch-1] - convexHull[n_ch-2]).cross(tmpVertices[i] - convexHull[n_ch-2])[2] <= 0) n_ch--;
     for (int i = tmpVertices.size()-2, j = n_ch+1; i >= 0; convexHull[n_ch++] = tmpVertices[i--])
       while (n_ch >= j && (convexHull[n_ch-1] - convexHull[n_ch-2]).cross(tmpVertices[i] - convexHull[n_ch-2])[2] <= 0) n_ch--;
-    convexHull.resize(n_ch-1);
+    convexHull.resize(std::max(0,n_ch-1));
     return convexHull;
   }
 

@@ -444,7 +444,6 @@ bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam
     }
   }
 
-
   if(ports.m_steppableRegionIn_.isNew()){
     ports.m_steppableRegionIn_.read();
     //steppableRegionを送るのは片足支持期のみ
@@ -457,18 +456,21 @@ bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam
       steppableRegion.resize(ports.m_steppableRegion_.data.region.length());
       steppableHeight.resize(ports.m_steppableRegion_.data.region.length());
       for (int i=0; i<steppableRegion.size(); i++){
-        steppableRegion[i].resize(ports.m_steppableRegion_.data.region[i].length()/3);
         double heightSum = 0.0;
-        for (int j=0; j<steppableRegion[i].size(); j++){
+        std::vector<cnoid::Vector3> vertices;
+        for (int j=0; j<ports.m_steppableRegion_.data.region[i].length()/3; j++){
           if(!std::isfinite(ports.m_steppableRegion_.data.region[i][3*j]) || !std::isfinite(ports.m_steppableRegion_.data.region[i][3*j+1]) || !std::isfinite(ports.m_steppableRegion_.data.region[i][3*j+2])){
-            steppableRegion[i].clear();
+            vertices.clear();
             break;
           }
-          cnoid::Vector3 p(ports.m_steppableRegion_.data.region[i][3*j],ports.m_steppableRegion_.data.region[i][3*j+1],ports.m_steppableRegion_.data.region[i][3*j+2]);
-          steppableRegion[i][j] = supportPoseHorizontal * p;
-          heightSum += ports.m_steppableRegion_.data.region[i][3*j+2];
+          cnoid::Vector3 p = supportPoseHorizontal * cnoid::Vector3(ports.m_steppableRegion_.data.region[i][3*j],ports.m_steppableRegion_.data.region[i][3*j+1],ports.m_steppableRegion_.data.region[i][3*j+2]);
+          heightSum += p[2];
+          p[2] = 0.0;
+          vertices.push_back(p);
         }
-        steppableHeight[i] = (steppableRegion[i].size()>0) ? heightSum / steppableRegion[i].size() : 0;
+        double heightAverage = (ports.m_steppableRegion_.data.region[i].length()/3>0) ? heightSum / (ports.m_steppableRegion_.data.region[i].length()/3) : 0;
+        steppableRegion[i] = mathutil::calcConvexHull(vertices);
+        steppableHeight[i] = heightAverage;
       }
       ports.steppableRegionLastUpdateTime_ = ports.m_qRef_.tm;
     }

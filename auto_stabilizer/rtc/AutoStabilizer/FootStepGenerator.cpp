@@ -451,13 +451,17 @@ GaitParam::FootStepNodes FootStepGenerator::calcDefaultDoubleSupportStep(const G
   return fs;
 }
 
+inline std::ostream &operator<<(std::ostream &os, const std::vector<cnoid::Vector3>& polygon){
+  for(int j=0;j<polygon.size();j++){
+    os << polygon[j].format(Eigen::IOFormat(Eigen::StreamPrecision, 0, ", ", ", ", "", "", " [", "]"));
+  }
+  return os;
+}
+
 inline std::ostream &operator<<(std::ostream &os, const std::vector<std::pair<std::vector<cnoid::Vector3>, double> >& candidates){
   for(int i=0;i<candidates.size();i++){
     os << "candidates[" << i << "] " << candidates[i].second << "s" << std::endl;
-    for(int j=0;j<candidates[i].first.size();j++){
-      os << candidates[i].first[j].format(Eigen::IOFormat(Eigen::StreamPrecision, 0, ", ", ", ", "", "", " [", "]"));
-    }
-    os << std::endl;
+    os << candidates[i].first << std::endl;
   }
   return os;
 }
@@ -535,6 +539,7 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
       std::vector<cnoid::Vector3> reachableHull; // generate frame. 今の脚の位置からの距離が時刻tに着地することができる範囲. Z成分には0を入れる
       int segment = 8;
       for(int j=0; j < segment; j++){
+        double t = 5.0;
         reachableHull.emplace_back(swingPose.translation()[0] + this->overwritableMaxSwingVelocity * t * std::cos(2 * M_PI / segment * j),
                                    swingPose.translation()[1] + this->overwritableMaxSwingVelocity * t * std::sin(2 * M_PI / segment * j),
                                    0.0);
@@ -575,6 +580,8 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
     if(nextCandidates.size() > 0) candidates = nextCandidates;
     // nextCandidates.size() == 0の場合は、達成不可の場合や、着地可能領域が与えられていない場合なので、candidateの絞り込みを行わない
   }
+  // std::cerr << "steppable" << std::endl;
+  // std::cerr << candidates << std::endl;
 
   // 3. capturable: 達成不可の場合は、時間が速い方優先(次の一歩に期待). 複数ある場合は可能な限り近い位置. (角運動量 TODO)
   // 次の両足支持期終了時に入るケースでもOKにしたい
