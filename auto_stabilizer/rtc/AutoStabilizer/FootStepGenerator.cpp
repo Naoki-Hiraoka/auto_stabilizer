@@ -603,7 +603,7 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
     std::vector<std::vector<cnoid::Vector3> > capturableHulls; // 要素数と順番はcandidatesに対応
     for(int i=0;i<candidates.size();i++){
       std::vector<cnoid::Vector3> capturableVetices; // generate frame. 時刻tに着地すれば転倒しないような着地位置. Z成分には0を入れる
-      for(double t = candidates[i].second; t <= candidates[i].second + footstepNodesList[1].remainTime; t += footstepNodesList[1].remainTime){ // 接地する瞬間と、次の両足支持期の終了時. 片方だけだと特に横歩きのときに厳しすぎる.
+      for(double t = candidates[i].second; t <= candidates[i].second + footstepNodesList[1].remainTime; t += footstepNodesList[1].remainTime){ // 接地する瞬間と、次の両足支持期の終了時. 片方だけだと特に横歩きのときに厳しすぎる. refZmpTrajを考えると本当は次の両足支持期の終了時のみを使うのが望ましい. しかし、位置制御成分が大きいロボットだと、力分配しているつもりがなくても接地している足から力を受けるので、接地する瞬間も含めてしまってそんなに問題はない?
         for(int j=0;j<this->safeLegHull[supportLeg].size();j++){
           cnoid::Vector3 zmp = supportPose * this->safeLegHull[supportLeg][j];// generate frame
           cnoid::Vector3 endDCM = (actDCM - zmp - gaitParam.l) * std::exp(gaitParam.omega * t) + zmp + gaitParam.l; // generate frame. 着地時のDCM
