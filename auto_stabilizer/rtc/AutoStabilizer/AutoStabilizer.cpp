@@ -860,9 +860,8 @@ RTC::ReturnCode_t AutoStabilizer::onFinalize(){ return RTC::RTC_OK; }
 bool AutoStabilizer::goPos(const double& x, const double& y, const double& th){
   std::lock_guard<std::mutex> guard(this->mutex_);
   if(this->mode_.isABCRunning()){
-    this->footStepGenerator_.goPos(this->gaitParam_, x, y, th,
-                                   this->gaitParam_.footstepNodesList);
-    return true;
+    return this->footStepGenerator_.goPos(this->gaitParam_, x, y, th,
+                                          this->gaitParam_.footstepNodesList);
   }else{
     return false;
   }
@@ -930,9 +929,8 @@ bool AutoStabilizer::setFootStepsWithParam(const OpenHRP::AutoStabilizerService:
       stepNode.swingEnd = sps[i].swing_end;
       footsteps.push_back(stepNode);
     }
-    this->footStepGenerator_.setFootSteps(this->gaitParam_, footsteps, // input
-                                          this->gaitParam_.footstepNodesList); // output
-    return true;
+    return this->footStepGenerator_.setFootSteps(this->gaitParam_, footsteps, // input
+                                                 this->gaitParam_.footstepNodesList); // output
   }else{
     return false;
   }

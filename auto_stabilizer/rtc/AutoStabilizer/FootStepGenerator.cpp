@@ -31,14 +31,14 @@ bool FootStepGenerator::initFootStepNodesList(const GaitParam& gaitParam,
 
 bool FootStepGenerator::setFootSteps(const GaitParam& gaitParam, const std::vector<StepNode>& footsteps,
                                      std::vector<GaitParam::FootStepNodes>& o_footstepNodesList) const{
-  if(footsteps.size() <= 1) { // 何もしない
-    o_footstepNodesList = gaitParam.footstepNodesList;
-    return true;
-  }
-
   if(!gaitParam.isStatic()){ // 静止中でないと無効
     o_footstepNodesList = gaitParam.footstepNodesList;
     return false;
+  }
+
+  if(footsteps.size() <= 1) { // 何もしない
+    o_footstepNodesList = gaitParam.footstepNodesList;
+    return true;
   }
 
   std::vector<GaitParam::FootStepNodes> footstepNodesList;
@@ -232,20 +232,22 @@ bool FootStepGenerator::calcFootSteps(const GaitParam& gaitParam, const double& 
                                       std::vector<GaitParam::FootStepNodes>& o_footstepNodesList) const{
   std::vector<GaitParam::FootStepNodes> footstepNodesList = gaitParam.footstepNodesList;
 
-  // goVelocityModeなら、進行方向に向けてfootStepNodesList[1] ~ footStepNodesList[goVelocityStepNum]の要素を機械的に計算してどんどん末尾appendしていく. cmdVelに応じてきまる
+  // goVelocityModeなら、進行方向に向けてfootStepNodesList[2] ~ footStepNodesList[goVelocityStepNum]の要素を機械的に計算してどんどん末尾appendしていく. cmdVelに応じてきまる
   if(this->isGoVelocityMode){
-    if(gaitParam.prevSupportPhase[RLEG] != gaitParam.footstepNodesList[0].isSupportPhase[RLEG] ||
-       gaitParam.prevSupportPhase[LLEG] != gaitParam.footstepNodesList[0].isSupportPhase[LLEG]){ // footstepの切り替わりのタイミング. this->updateGoVelocityStepsを毎周期呼ぶと、数値誤差でだんだん変にずれてくるので.
-      this->updateGoVelocitySteps(footstepNodesList, gaitParam.defaultTranslatePos, gaitParam.cmdVel);
+    // footstepNodesList[0]と[1]は変えない. footstepNodesList[1]以降で次に両足支持期になるときを探し、それ以降のstepを上書きする.
+    for(int i=1;i<footstepNodesList.size();i++){
+      if(footstepNodesList[i].isSupportPhase[RLEG] && footstepNodesList[i].isSupportPhase[LLEG]){
+        footstepNodesList.resize(i+1);
+        break;
+      }
+    }
+    if(footstepNodesList.size() == 1 &&
+       (footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG])){
+      // 現在の時刻から突然refZmpTrajが変化すると、大きなZMP入力変化が必要になる. いまの位置でrefZmpTrajをthis->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio)の間とめて、次にthis->defaultStepTime * this->defaultDoubleSupportRatioの間で次の支持脚側に動かす
+      footstepNodesList.back().remainTime = this->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio);
+      footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * this->defaultDoubleSupportRatio));
     }
     while(footstepNodesList.size() <= this->goVelocityStepNum){
-      if(footstepNodesList.size() == 1 &&
-         footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG]){ // 両足支持期を延長
-        // 現在の時刻から突然refZmpTrajが変化すると、大きなZMP入力変化が必要になる. いまの位置でrefZmpTrajをthis->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio)の間とめて、次にthis->defaultStepTime * this->defaultDoubleSupportRatioの間で次の支持脚側に動かす
-        footstepNodesList.back().remainTime = this->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio);
-        footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * this->defaultDoubleSupportRatio));
-      }
-
       this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos, gaitParam.cmdVel * this->defaultStepTime);
     }
   }
@@ -385,7 +387,7 @@ void FootStepGenerator::transformCurrentSupportSteps(int leg, std::vector<GaitPa
 
 void FootStepGenerator::calcDefaultNextStep(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >& defaultTranslatePos, const cnoid::Vector3& offset /*leg frame*/) const{
   if(footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG]){
-    footstepNodesList.back().remainTime = std::max(footstepNodesList.back().remainTime, this->defaultStepTime * this->defaultDoubleSupportRatio); // 両足支持期を延長
+    footstepNodesList.back().remainTime = this->defaultStepTime * this->defaultDoubleSupportRatio; // 両足支持期を延長 or 短縮
     if(footstepNodesList.size() == 1 ||
        (footstepNodesList[footstepNodesList.size()-2].isSupportPhase[RLEG] && footstepNodesList[footstepNodesList.size()-2].isSupportPhase[LLEG]) ||
        (!footstepNodesList[footstepNodesList.size()-2].isSupportPhase[RLEG] && !footstepNodesList[footstepNodesList.size()-2].isSupportPhase[LLEG]) ){
@@ -808,9 +810,6 @@ void FootStepGenerator::checkEmergencyStep(std::vector<GaitParam::FootStepNodes>
     dir[2] = 0.0;
     if(dir.norm() > 0.0) dir = dir.normalized();
     while(footstepNodesList.size() <= this->emergencyStepNum){
-      if(footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG]){
-        footstepNodesList.back().remainTime = this->defaultStepTime * this->defaultDoubleSupportRatio; // 末尾の両足支持期を短縮 & 延長
-      }
       this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos, 1e-6 * dir); // 現在両足で支持している場合、dirの方向の足を最初にswingする
     }
   }
@@ -826,10 +825,6 @@ void FootStepGenerator::checkStableGoStop(std::vector<GaitParam::FootStepNodes>&
            (footstepNodesList[footstepNodesList.size()-2].isSupportPhase[RLEG] && footstepNodesList[footstepNodesList.size()-2].isSupportPhase[LLEG]) &&
            (footstepNodesList[footstepNodesList.size()-1].isSupportPhase[RLEG] && footstepNodesList[footstepNodesList.size()-1].isSupportPhase[LLEG])){
           footstepNodesList.pop_back(); // 末尾に両足支持期が2つ連続している場合、後の方を削除
-        }
-
-        if(footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG]){
-          footstepNodesList.back().remainTime = this->defaultStepTime * this->defaultDoubleSupportRatio; // 末尾の両足支持期を短縮 & 延長
         }
 
         // 歩を追加
