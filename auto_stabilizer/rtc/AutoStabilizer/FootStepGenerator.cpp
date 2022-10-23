@@ -539,7 +539,6 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
       std::vector<cnoid::Vector3> reachableHull; // generate frame. 今の脚の位置からの距離が時刻tに着地することができる範囲. Z成分には0を入れる
       int segment = 8;
       for(int j=0; j < segment; j++){
-        double t = 5.0;
         reachableHull.emplace_back(swingPose.translation()[0] + this->overwritableMaxSwingVelocity * t * std::cos(2 * M_PI / segment * j),
                                    swingPose.translation()[1] + this->overwritableMaxSwingVelocity * t * std::sin(2 * M_PI / segment * j),
                                    0.0);
@@ -723,12 +722,14 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
   // std::cerr << candidates << std::endl;
 
   // 修正を適用
-  cnoid::Vector3 nextDstCoordsPos = candidates[0].first[0];
+  cnoid::Vector3 nextDstCoordsPos = candidates[0].first[0]; // generate frame
+  // Z高さはrelLandingHeightから受け取った値を用いる. relLandingHeightが届いていなければ、修正しない.
   if (gaitParam.swingState[swingLeg] != GaitParam::DOWN_PHASE && gaitParam.relLandingHeight > -1e+10) {
-    nextDstCoordsPos[2] = gaitParam.relLandingHeight;   //landingHeightから受け取った値を用いて着地高さを変更
+    nextDstCoordsPos[2] = std::min(supportPose.translation()[2] + this->overwritableMaxLandingHeight, std::max(supportPose.translation()[2] + this->overwritableMinLandingHeight, gaitParam.relLandingHeight));   //landingHeightから受け取った値を用いて着地高さを変更
+  }else{
+    nextDstCoordsPos[2] = footstepNodesList[0].dstCoords[swingLeg].translation()[2];
   }
-  cnoid::Vector3 displacement = nextDstCoordsPos - footstepNodesList[0].dstCoords[swingLeg].translation();
-  displacement[2] = 0.0;
+  cnoid::Vector3 displacement = nextDstCoordsPos - footstepNodesList[0].dstCoords[swingLeg].translation(); // generate frame
   this->transformFutureSteps(footstepNodesList, 0, displacement);
   footstepNodesList[0].remainTime = candidates[0].second;
 
