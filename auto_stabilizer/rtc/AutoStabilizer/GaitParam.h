@@ -120,6 +120,7 @@ public:
 
   cnoid::Vector3 genCog; // generate frame. abcで計算された目標COM
   cnoid::Vector3 genCogVel;  // generate frame.  abcで計算された目標COM速度
+  cnoid::Vector3 genCogAcc;  // generate frame.  abcで計算された目標COM加速度
   std::vector<cnoid::Position> abcEETargetPose; // 要素数と順序はeeNameと同じ.generate frame. abcで計算された目標位置姿勢
 
   // Stabilizer

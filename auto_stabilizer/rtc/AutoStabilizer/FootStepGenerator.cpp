@@ -267,7 +267,16 @@ bool FootStepGenerator::calcFootSteps(const GaitParam& gaitParam, const double& 
 
 bool FootStepGenerator::goNextFootStepNodesList(const GaitParam& gaitParam, double dt,
                                                 std::vector<GaitParam::FootStepNodes>& footstepNodesList, std::vector<cnoid::Position>& srcCoords, std::vector<cnoid::Position>& dstCoordsOrg, double& remainTimeOrg, std::vector<GaitParam::SwingState_enum>& swingState, double& elapsedTime, double& relLandingHeight) const{
-  // 今のgenCoordsとdstCoordsが異なるなら、将来のstepの位置姿勢をそれに合わせてずらす. (特にgoalOffsetがある場合にはこの処理が必要)
+  // 今のgenCoordsとdstCoordsが異なるなら、将来のstepの位置姿勢をそれに合わせてずらす.
+  // early touch downまたはlate touch downが発生していると、今のgenCoordsとdstCoordsが異なる.
+  //   今のgenCoordsが正しい地形を表していることが期待されるので、将来のstepの位置姿勢をgenCoordsにあわせてずらしたくなる
+  //   ところが実際には、genCoordsは位置制御指令関節角度から計算されるものなので、実際の地形とは誤差がある. (特に高さ方向に1cmくらい、実際よりも高いと誤認識する)
+  //   そのため、両足支持期のときに、平らな地面を歩いているのに、後から地面についた足の位置がもとから地面についていた足の位置よりも高く逆運動学が解かれて、その結果身体が後から地面についた足の方に傾く. すると、その傾きによる重心位置の誤差を補正するために、特に左右方向に目標ZMPが8cmくらい大きくふれてしまう. これは許容できないので、基本的にはずらしてはいけない.
+  // early touch downまたはlate touch downが発生していると、今のgenCoordsとdstCoordsが異なるが、無視して次のnodeの間にそのnodeのもとのdstCoordsにそのまま補間してゆっくり遷移することにする.
+  // しかし、あまりにもずれが大きい場合は、遷移速度が無視できないほど大きくなるので、将来のstepの位置姿勢をgenCoordsにあわせてずらした方がよい
+  // 触覚を精度良く利用したければ、「指令関節角度」という概念を使うのをやめて、actual angleに基づく手法に変えるべきかと
+  // 基本的に、環境の地形は、触覚からは取得せず、視覚から取得する方針. 転倒等でロボットの身体が大きく傾いてearly touch down, late touch downした場合にのみ、やむを得ず触覚に基づいてずらす、という扱い.
+
   //   footstepNodesList[1:]で一回でも遊脚になった以降は、位置とYawをずらす. footstepNodesList[1:]で最初に遊脚になる脚があるならその反対の脚の偏差にあわせてずらす. そうでないなら両脚の中心(+-defaultTranslatePos)の偏差にあわせてずらす
   //   footstepNodesList[1]が支持脚なら、遊脚になるまで、位置姿勢をその足の今の偏差にあわせてずらす.
   for(int i=1;i<footstepNodesList.size();i++){
@@ -275,12 +284,14 @@ bool FootStepGenerator::goNextFootStepNodesList(const GaitParam& gaitParam, doub
       cnoid::Position origin = mathutil::orientCoordToAxis(footstepNodesList[i-1].dstCoords[RLEG], cnoid::Vector3::UnitZ()); // generate frame. 一つ前のRLEGの位置を基準にずらす
       cnoid::Position offsetedPos = mathutil::orientCoordToAxis(gaitParam.genCoords[RLEG].value() * footstepNodesList[0].dstCoords[RLEG].inverse() * footstepNodesList[i-1].dstCoords[RLEG], cnoid::Vector3::UnitZ()); // generate frame. 一つ前のRLEGはこの位置にずれている
       cnoid::Position transform = offsetedPos * origin.inverse(); // generate frame
+      if(transform.translation().norm() < this->contactModificationThreshold) transform = cnoid::Position::Identity(); // ズレが大きい場合のみずらす
       this->transformFutureSteps(footstepNodesList, i, transform); // footstepNodesList[1:]で一回でも遊脚になった以降の脚の、位置とYawをずらす
       break;
     }else if(footstepNodesList[i].isSupportPhase[LLEG] && !footstepNodesList[i].isSupportPhase[RLEG]){ // RLEGが次に最初に遊脚になる
       cnoid::Position origin = mathutil::orientCoordToAxis(footstepNodesList[i-1].dstCoords[LLEG], cnoid::Vector3::UnitZ()); // generate frame. 一つ前のLLEGの位置を基準にずらす
       cnoid::Position offsetedPos = mathutil::orientCoordToAxis(gaitParam.genCoords[LLEG].value() * footstepNodesList[0].dstCoords[LLEG].inverse() * footstepNodesList[i-1].dstCoords[LLEG], cnoid::Vector3::UnitZ()); // generate frame. 一つ前のLLEGはこの位置にずれている
       cnoid::Position transform = offsetedPos * origin.inverse(); // generate frame
+      if(transform.translation().norm() < this->contactModificationThreshold) transform = cnoid::Position::Identity(); // ズレが大きい場合のみずらす
       this->transformFutureSteps(footstepNodesList, i, transform); // footstepNodesList[1:]で一回でも遊脚になった以降の脚の、位置とYawをずらす
       break;
     }else if(!footstepNodesList[i].isSupportPhase[LLEG] && !footstepNodesList[i].isSupportPhase[RLEG]){ // RLEGとLLEG同時に次に最初に遊脚になる
@@ -295,6 +306,7 @@ bool FootStepGenerator::goNextFootStepNodesList(const GaitParam& gaitParam, doub
       offseted_lleg.translation() -= lleg.linear() * gaitParam.defaultTranslatePos[LLEG].value();
       cnoid::Position offsetedPos = mathutil::orientCoordToAxis(mathutil::calcMidCoords({offseted_rleg, offseted_lleg}, {1.0, 1.0}), cnoid::Vector3::UnitZ());
       cnoid::Position transform = offsetedPos * origin.inverse(); // generate frame
+      if(transform.translation().norm() < this->contactModificationThreshold) transform = cnoid::Position::Identity(); // ズレが大きい場合のみずらす
       this->transformFutureSteps(footstepNodesList, i, transform); // footstepNodesList[1:]で一回でも遊脚になった以降の脚の、位置とYawをずらす
       break;
     }
@@ -302,6 +314,7 @@ bool FootStepGenerator::goNextFootStepNodesList(const GaitParam& gaitParam, doub
   for(int i=0;i<NUM_LEGS;i++){
     if(footstepNodesList[1].isSupportPhase[i]){
       cnoid::Position transform = gaitParam.genCoords[i].value() * footstepNodesList[0].dstCoords[i].inverse(); // generate frame
+      if(transform.translation().norm() < this->contactModificationThreshold) transform = cnoid::Position::Identity(); // ズレが大きい場合のみずらす
       this->transformCurrentSupportSteps(i, footstepNodesList, 1, transform); // 遊脚になるまで、位置姿勢をその足の今の偏差にあわせてずらす.
     }
   }

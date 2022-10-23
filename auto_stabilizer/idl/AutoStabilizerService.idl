@@ -203,6 +203,8 @@ module OpenHRP
       sequence<sequence<sequence<double, 2> >, 2> overwritable_stride_limitation;
       /// [N]. generate frameで遊脚が着地時に鉛直方向にこの大きさ以上の力を受けたら接地とみなして、EarlyTouchDown処理を行う
       double contact_detection_threshold;
+      /// [m]. 早づき・遅づき時に、ずれの大きさがこの値以上の場合に、以降の足の位置をそのぶんだけずらす. 位置制御指令関節角度と実機の角度の差の関係で平らな地面でも常に早づきするため、地面の高さを誤って認識することがないよう、普段はずらさない方が性能が良い. 一方で、ずれが大きい場合には、そのぶんだけずらしたほうが性能が良い. 0以上
+      double contact_modification_threshold;
       /// 現在静止状態で、CapturePointがsafeLegHullの外にあるまたは目標ZMPからemergencyStepCpCheckMargin以上離れているなら、footstepNodesListがemergencyStepNumのサイズになるまで歩くnodeが末尾に入る. (modifyFootSteps=trueのときのみ有効)
       boolean is_emergency_step_mode;
       /// [m]. EmergencyStepの閾値.

@@ -156,7 +156,8 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
         nextCoords.translation() = goal;
         nextCoords.linear() = mathutil::calcMidRot(std::vector<cnoid::Matrix3>{antecedentCoords.linear(),dstCoords.linear()},
                                                    std::vector<double>{std::max(0.0,gaitParam.footstepNodesList[0].remainTime - this->delayTimeOffset - dt), dt}); // dstCoordsについたときにdstCoordsの傾きになるように線形補間
-        genCoords[i].setGoal(nextCoords, this->delayTimeOffset);
+        cnoid::Vector6 goalVel = (cnoid::Vector6() << 0.0, 0.0, -gaitParam.footstepNodesList[0].touchVel[i], 0.0, 0.0, 0.0).finished(); // pはgenerate frame. RはgoalCoords frame.
+        genCoords[i].setGoal(nextCoords, goalVel, this->delayTimeOffset);
         genCoords[i].interpolate(dt);
       }else if(swingState[i] == GaitParam::SWING_PHASE ||
                swingState[i] == GaitParam::DOWN_PHASE){
@@ -195,7 +196,7 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
   o_swingState = swingState;
 }
 
-void LegCoordsGenerator::calcCOMCoords(const GaitParam& gaitParam, double dt, cnoid::Vector3& o_genNextCog, cnoid::Vector3& o_genNextCogVel) const{
+void LegCoordsGenerator::calcCOMCoords(const GaitParam& gaitParam, double dt, cnoid::Vector3& o_genNextCog, cnoid::Vector3& o_genNextCogVel, cnoid::Vector3& o_genNextCogAcc) const{
   cnoid::Vector3 genZmp;
   if(gaitParam.footstepNodesList[0].isSupportPhase[RLEG] || gaitParam.footstepNodesList[0].isSupportPhase[LLEG]){
     cnoid::Vector3 genDCM = gaitParam.genCog + gaitParam.genCogVel / gaitParam.omega;
@@ -227,11 +228,12 @@ void LegCoordsGenerator::calcCOMCoords(const GaitParam& gaitParam, double dt, cn
   }else{ // 跳躍期
     genZmp = gaitParam.genCog;
   }
-  cnoid::Vector3 genNextCog,genNextCogVel,genNextForce;
+  cnoid::Vector3 genNextCog,genNextCogVel,genNextCogAcc,genNextForce;
   footguidedcontroller::updateState(gaitParam.omega,gaitParam.l,gaitParam.genCog,gaitParam.genCogVel,genZmp,gaitParam.genRobot->mass(),dt,
-                                    genNextCog, genNextCogVel, genNextForce);
+                                    genNextCog, genNextCogVel, genNextCogAcc, genNextForce);
   o_genNextCog = genNextCog;
   o_genNextCogVel = genNextCogVel;
+  o_genNextCogAcc = genNextCogAcc;
 
   return;
 }

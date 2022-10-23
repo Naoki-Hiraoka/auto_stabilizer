@@ -38,6 +38,7 @@ AutoStabilizer::Ports::Ports() :
   m_genTauOut_("genTauOut", m_genTau_),
   m_genBasePoseOut_("genBasePoseOut", m_genBasePose_),
   m_genBaseTformOut_("genBaseTformOut", m_genBaseTform_),
+  m_genImuAccOut_("genImuAccOut", m_genImuAcc_),
   m_landingTargetOut_("landingTargetOut", m_landingTarget_),
 
   m_genBasePosOut_("genBasePosOut", m_genBasePos_),
@@ -81,6 +82,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
   this->addOutPort("genTauOut", this->ports_.m_genTauOut_);
   this->addOutPort("genBasePoseOut", this->ports_.m_genBasePoseOut_);
   this->addOutPort("genBaseTformOut", this->ports_.m_genBaseTformOut_);
+  this->addOutPort("genImuAccOut", this->ports_.m_genImuAccOut_);
   this->addOutPort("landingTargetOut", this->ports_.m_landingTargetOut_);
   this->addOutPort("genBasePosOut", this->ports_.m_genBasePosOut_);
   this->addOutPort("genBaseRpyOut", this->ports_.m_genBaseRpyOut_);
@@ -506,7 +508,7 @@ bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam
 bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode, GaitParam& gaitParam, double dt, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ActToGenFrameConverter& actToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer, const ExternalForceHandler& externalForceHandler, const FullbodyIKSolver& fullbodyIKSolver,const LegManualController& legManualController, const CmdVelGenerator& cmdVelGenerator) {
   if(mode.isSyncToABCInit()){ // startAutoBalancer直後の初回. gaitParamのリセット
     refToGenFrameConverter.initGenRobot(gaitParam,
-                                        gaitParam.genRobot, gaitParam.footMidCoords, gaitParam.genCogVel);
+                                        gaitParam.genRobot, gaitParam.footMidCoords, gaitParam.genCogVel, gaitParam.genCogAcc);
     externalForceHandler.initExternalForceHandlerOutput(gaitParam,
                                                         gaitParam.omega, gaitParam.l, gaitParam.sbpOffset, gaitParam.genCog);
     impedanceController.initImpedanceOutput(gaitParam,
@@ -551,7 +553,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
   legCoordsGenerator.calcLegCoords(gaitParam, dt, mode.isSTRunning(),
                                    gaitParam.refZmpTraj, gaitParam.genCoords, gaitParam.swingState);
   legCoordsGenerator.calcCOMCoords(gaitParam, dt,
-                                   gaitParam.genCog, gaitParam.genCogVel);
+                                   gaitParam.genCog, gaitParam.genCogVel, gaitParam.genCogAcc);
   for(int i=0;i<gaitParam.eeName.size();i++){
     if(i<NUM_LEGS) gaitParam.abcEETargetPose[i] = gaitParam.genCoords[i].value();
     else gaitParam.abcEETargetPose[i] = gaitParam.icEETargetPose[i];
@@ -672,6 +674,21 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
     ports.m_genBaseRpy_.data.p = baseRpy[1];
     ports.m_genBaseRpy_.data.y = baseRpy[2];
     ports.m_genBaseRpyOut_.write();
+  }
+
+  // acc ref
+  {
+    cnoid::Vector3 genImuAcc = cnoid::Vector3::Zero(); // imu frame
+    if(mode.isABCRunning()){
+      cnoid::RateGyroSensorPtr imu = gaitParam.genRobot->findDevice<cnoid::RateGyroSensor>("gyrometer"); // genrobot imu
+      cnoid::Matrix3 imuR = imu->link()->R() * imu->R_local(); // generate frame
+      genImuAcc/*imu frame*/ = imuR.transpose() * gaitParam.genCogAcc/*generate frame*/; // 本当は重心の加速ではなく、関節の加速等を考慮したimuセンサの加速を直接与えたいが、関節角度ベースのinverse-kinematicsを使う以上モデルのimuセンサの位置の加速が不連続なものになることは避けられないので、重心の加速を用いている. この出力の主な用途は歩行時の姿勢推定のため、重心の加速が考慮できればだいたい十分.
+    }
+    ports.m_genImuAcc_.tm = ports.m_qRef_.tm;
+    ports.m_genImuAcc_.data.ax = genImuAcc[0];
+    ports.m_genImuAcc_.data.ay = genImuAcc[1];
+    ports.m_genImuAcc_.data.az = genImuAcc[2];
+    ports.m_genImuAccOut_.write();
   }
 
   // Gains
@@ -1236,6 +1253,7 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
     }
   }
   this->footStepGenerator_.contactDetectionThreshold = i_param.contact_detection_threshold;
+  this->footStepGenerator_.contactModificationThreshold = std::max(i_param.contact_modification_threshold, 0.0);
   this->footStepGenerator_.isEmergencyStepMode = i_param.is_emergency_step_mode;
   this->footStepGenerator_.isStableGoStopMode = i_param.is_stable_go_stop_mode;
   this->footStepGenerator_.emergencyStepNum = std::max(i_param.emergency_step_num, 1);
@@ -1421,6 +1439,7 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
     }
   }
   i_param.contact_detection_threshold = this->footStepGenerator_.contactDetectionThreshold;
+  i_param.contact_modification_threshold = this->footStepGenerator_.contactModificationThreshold;
   i_param.is_emergency_step_mode = this->footStepGenerator_.isEmergencyStepMode;
   i_param.is_stable_go_stop_mode = this->footStepGenerator_.isStableGoStopMode;
   i_param.emergency_step_num = this->footStepGenerator_.emergencyStepNum;

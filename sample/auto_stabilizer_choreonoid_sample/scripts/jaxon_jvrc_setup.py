@@ -67,6 +67,8 @@ class JAXON_RED_HrpsysConfigurator(ChoreonoidHrpsysConfigurator):
                     connectPorts(self.rmfo.port("off_" + sen), self.ast.port("act"+sen+"In"))
                 else:
                     connectPorts(self.rh.port(sen), self.ast.port("act"+sen+"In"))
+            if self.kf:
+                connectPorts(self.ast.port("genImuAccOut"), self.kf.port("accRef"))
             connectPorts(self.ast.port("RobotHardwareService"), self.rh.port("RobotHardwareService"))
 
     def defJointGroups (self):

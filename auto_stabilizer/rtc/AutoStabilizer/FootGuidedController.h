@@ -53,9 +53,10 @@ namespace footguidedcontroller{
   };
 
   template <typename T> void updateState(const double& w, const T& l, const T& c, const T& dc, const T& u, double m, double dt,
-                                         T& o_c, T& o_dc, T& o_f/*uから受ける力*/) {
+                                         T& o_c, T& o_dc, T& o_ddc, T& o_f/*uから受ける力*/) {
     o_c = c + dc * dt;
     o_dc = dc + w * w * (c - u - l) * dt;
+    o_ddc = w * w * (c - u - l);
     o_f = m * w * w * (c - u);
     return;
   };

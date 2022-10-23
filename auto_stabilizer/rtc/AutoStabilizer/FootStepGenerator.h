@@ -24,6 +24,7 @@ public:
   double overwritableMaxLandingHeight = 0.25; // [m]. 反対の脚のEndEffector frame(Z軸は鉛直)で表現した着地高さの上限(自己干渉やIKの考慮が含まれる).
   double overwritableMinLandingHeight = -0.25; // [m]. 反対の脚のEndEffector frame(Z軸は鉛直)で表現した着地高さの下限(自己干渉やIKの考慮が含まれる). overwritableMaxLandingHeight以下.
   double contactDetectionThreshold = 25.0; // [N]. generate frameで遊脚が着地時に鉛直方向にこの大きさ以上の力を受けたら接地とみなして、EarlyTouchDown処理を行う. 実機では25N程度がよい?
+  double contactModificationThreshold = 0.02; // [m]. 早づき・遅づき時に、ずれの大きさがこの値以上の場合に、以降の足の位置をそのぶんだけずらす. 位置制御指令関節角度と実機の角度の差の関係で平らな地面でも常に早づきするため、地面の高さを誤って認識することがないよう、普段はずらさない方が性能が良い. 一方で、ずれが大きい場合には、そのぶんだけずらしたほうが性能が良い. 0以上.
   double goalOffset = -0.02; // [m]. 遊脚軌道生成時に、次に着地する場合、generate frameで鉛直方向に, 目標着地位置に対して加えるオフセット. 0以下. 歩行中は急激に変更されない. 遅づきに対応するためのもの. 位置制御だと着地の衝撃が大きいので0がよいが、トルク制御時や、高低差がある地形や、衝撃を気にする必要がないシミュレーションでは-0.05等にした方がよい.
   double touchVel = 0.3; // 0より大きい. 単位[m/s]. この速さで足を下ろした場合に着地までに要する時間をremainTimeが下回るまで、足下げを始めない. 0.5だと実機では少し速すぎるか?
   bool isEmergencyStepMode = true; // 現在静止状態で、CapturePointがsafeLegHullの外にあるまたは目標ZMPからemergencyStepCpCheckMargin以上離れているなら、footstepNodesListがemergencyStepNumのサイズになるまで歩くnodeが末尾に入る. (modifyFootSteps=trueのときのみ有効)

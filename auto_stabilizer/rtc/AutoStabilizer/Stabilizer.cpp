@@ -109,9 +109,9 @@ bool Stabilizer::calcZMP(const GaitParam& gaitParam, double dt, bool useActState
   }else{ // 跳躍期
     tgtZmp = cog - cnoid::Vector3(gaitParam.l[0],gaitParam.l[1], 0.0);
   }
-  cnoid::Vector3 tgtCog,tgtCogVel,tgtForce;
+  cnoid::Vector3 tgtCog,tgtCogVel,tgtCogAcc,tgtForce;
   footguidedcontroller::updateState(gaitParam.omega,gaitParam.l,cog,cogVel,tgtZmp,gaitParam.genRobot->mass(),dt,
-                                      tgtCog, tgtCogVel, tgtForce);
+                                      tgtCog, tgtCogVel, tgtCogAcc, tgtForce);
 
   // tgtForceにrefEEWrenchのXY成分を足す TODO
 
@@ -270,7 +270,7 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
     }else{
       int idx = 0;
       for(int i=0;i<NUM_LEGS;i++){
-	tgtEEWrench[i].setZero();
+        tgtEEWrench[i].setZero();
         for(int j=0;j<gaitParam.legHull[i].size();j++){
           tgtEEWrench[i].head<3>() += tgtForce * result[idx];
           tgtEEWrench[i].tail<3>() += (EEPose[i].linear() * gaitParam.legHull[i][j]).cross(tgtForce * result[idx]);

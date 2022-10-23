@@ -118,6 +118,8 @@ protected:
     RTC::OutPort<RTC::TimedPose3D> m_genBasePoseOut_;
     RTC::TimedDoubleSeq m_genBaseTform_;  // Generate World frame
     RTC::OutPort<RTC::TimedDoubleSeq> m_genBaseTformOut_; // for HrpsysSeqStateROSBridge
+    RTC::TimedAcceleration3D m_genImuAcc_; // acceleration of IMU sensor in generate world frame. represented in sensor frame. これがあったほうが姿勢推定の性能が上がる.
+    RTC::OutPort<RTC::TimedAcceleration3D> m_genImuAccOut_;
     auto_stabilizer_msgs::TimedLandingPosition m_landingTarget_; // 着地位置. 支持脚を水平にした座標系
     RTC::OutPort<auto_stabilizer_msgs::TimedLandingPosition> m_landingTargetOut_;
 
