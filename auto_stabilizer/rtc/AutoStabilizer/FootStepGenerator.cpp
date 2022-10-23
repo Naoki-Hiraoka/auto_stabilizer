@@ -533,11 +533,11 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
   {
     std::vector<double> samplingTimes;
     samplingTimes.push_back(footstepNodesList[0].remainTime);
-    int sample = 10;
     double minTime = std::max(this->overwritableMinTime, this->overwritableMinStepTime - gaitParam.elapsedTime); // 次indexまでの残り時間がthis->overwritableMinTimeを下回るようには着地時間修正を行わない. 現index開始時からの経過時間がthis->overwritableStepMinTimeを下回るようには着地時間修正を行わない.
     minTime = std::min(minTime, footstepNodesList[0].remainTime); // もともと下回っている場合には、その値を下回るようには着地時刻修正を行わない.
     double maxTime = std::max(this->overwritableMaxStepTime - gaitParam.elapsedTime, minTime); // 現index開始時からの経過時間がthis->overwritableStepMaxTimeを上回るようには着地時間修正を行わない.
     maxTime = std::max(maxTime, footstepNodesList[0].remainTime); // もともと上回っている場合には、その値を上回るようには着地時刻修正を行わない.
+    int sample = std::max(10, int((maxTime - minTime) / 0.1));
     for(int i=0;i<=sample;i++) {
       double t = minTime + (maxTime - minTime) / sample * i;
       if(t != footstepNodesList[0].remainTime) samplingTimes.push_back(t);
@@ -570,7 +570,7 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
   // 2. steppable: 達成不可の場合や、着地可能領域が与えられていない場合は、考慮しない
   // TODO. 高低差と時間の関係
   {
-    std::vector<std::vector<cnoid::Vector3> > steppableHulls; // generate frame. visionに基づく着地可能領域. Z成分には0を入れる
+    std::vector<std::pair<std::vector<cnoid::Vector3>, double> > steppableHulls; // generate frame. first: visionに基づく着地可能領域. Z成分には0を入れる.  second: 高さ
     for(int i=0;i<gaitParam.steppableRegion.size();i++){
       // 空のHullは除外
       // overwritableMaxLandingHeightとoverwritableMinLandingHeightを満たさないregionは除外.
@@ -580,14 +580,16 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
         std::vector<cnoid::Vector3> steppableHull;
         steppableHull.reserve(gaitParam.steppableRegion[i].size());
         for(int j=0;j<gaitParam.steppableRegion[i].size();j++) steppableHull.emplace_back(gaitParam.steppableRegion[i][j][0],gaitParam.steppableRegion[i][j][1],0.0);
-        steppableHulls.push_back(steppableHull);
+        steppableHulls.emplace_back(steppableHull, gaitParam.steppableHeight[i]);
       }
     }
 
     std::vector<std::pair<std::vector<cnoid::Vector3>, double> > nextCandidates;
     for(int i=0;i<candidates.size();i++){
       for(int j=0;j<steppableHulls.size();j++){
-        std::vector<cnoid::Vector3> hull = mathutil::calcIntersectConvexHull(candidates[i].first, steppableHulls[j]);
+        // overwritableMaxGroundZVelocityを満たさないregionは除外
+        if(std::abs(steppableHulls[j].second - gaitParam.srcCoords[swingLeg].translation()[2]) > (gaitParam.elapsedTime + candidates[i].second) * this->overwritableMaxGroundZVelocity) continue;
+        std::vector<cnoid::Vector3> hull = mathutil::calcIntersectConvexHull(candidates[i].first, steppableHulls[j].first);
         if(hull.size() > 0) nextCandidates.emplace_back(hull, candidates[i].second);
       }
     }

@@ -1252,6 +1252,7 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
   }
   this->footStepGenerator_.overwritableMaxLandingHeight = i_param.overwritable_max_landing_height;
   this->footStepGenerator_.overwritableMinLandingHeight = std::min(i_param.overwritable_min_landing_height, this->footStepGenerator_.overwritableMaxLandingHeight);
+  this->footStepGenerator_.overwritableMaxGroundZVelocity = std::max(i_param.overwritable_max_ground_z_velocity, 0.01);
   this->footStepGenerator_.contactDetectionThreshold = i_param.contact_detection_threshold;
   this->footStepGenerator_.contactModificationThreshold = std::max(i_param.contact_modification_threshold, 0.0);
   this->footStepGenerator_.isEmergencyStepMode = i_param.is_emergency_step_mode;
@@ -1440,6 +1441,7 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
   }
   i_param.overwritable_max_landing_height = this->footStepGenerator_.overwritableMaxLandingHeight;
   i_param.overwritable_min_landing_height = this->footStepGenerator_.overwritableMinLandingHeight;
+  i_param.overwritable_max_ground_z_velocity = this->footStepGenerator_.overwritableMaxGroundZVelocity;
   i_param.contact_detection_threshold = this->footStepGenerator_.contactDetectionThreshold;
   i_param.contact_modification_threshold = this->footStepGenerator_.contactModificationThreshold;
   i_param.is_emergency_step_mode = this->footStepGenerator_.isEmergencyStepMode;

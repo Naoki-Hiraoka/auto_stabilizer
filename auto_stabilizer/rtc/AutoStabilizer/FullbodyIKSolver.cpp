@@ -67,7 +67,7 @@ bool FullbodyIKSolver::solveFullbodyIK(double dt, const GaitParam& gaitParam,
     this->ikEEPositionConstraint[i]->B_localpos() = gaitParam.abcEETargetPose[i];
     this->ikEEPositionConstraint[i]->maxError() << 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt;
     this->ikEEPositionConstraint[i]->precision() << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0; // 強制的にIKをmax loopまで回す
-    if(i<NUM_LEGS) this->ikEEPositionConstraint[i]->weight() << 10.0, 10.0, 10.0, 10.0, 10.0, 10.0;
+    if(i<NUM_LEGS) this->ikEEPositionConstraint[i]->weight() << 3.0, 3.0, 3.0, 3.0, 3.0, 3.0;
     else this->ikEEPositionConstraint[i]->weight() << 1.0, 1.0, 1.0, 1.0, 1.0, 1.0;
     this->ikEEPositionConstraint[i]->eval_link() = nullptr;
     this->ikEEPositionConstraint[i]->eval_localR() = this->ikEEPositionConstraint[i]->B_localpos().linear();
@@ -82,7 +82,7 @@ bool FullbodyIKSolver::solveFullbodyIK(double dt, const GaitParam& gaitParam,
     this->comConstraint->B_localp() = gaitParam.genCog + gaitParam.sbpOffset;
     this->comConstraint->maxError() << 10.0*dt, 10.0*dt, 10.0*dt;
     this->comConstraint->precision() << 0.0, 0.0, 0.0; // 強制的にIKをmax loopまで回す
-    this->comConstraint->weight() << 3.0, 3.0, 1.0;
+    this->comConstraint->weight() << 10.0, 10.0, 1.0;
     this->comConstraint->eval_R() = cnoid::Matrix3::Identity();
     ikConstraint2.push_back(this->comConstraint);
   }
