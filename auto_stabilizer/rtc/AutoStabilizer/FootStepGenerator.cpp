@@ -335,27 +335,6 @@ bool FootStepGenerator::goNextFootStepNodesList(const GaitParam& gaitParam, doub
   return true;
 }
 
-void FootStepGenerator::updateGoVelocitySteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >& defaultTranslatePos, const cnoid::Vector3& cmdVel) const{
-  for(int i=1;i<footstepNodesList.size()-1;i++){
-    if(((footstepNodesList[i].isSupportPhase[RLEG] && !footstepNodesList[i].isSupportPhase[LLEG]) || (!footstepNodesList[i].isSupportPhase[RLEG] && footstepNodesList[i].isSupportPhase[LLEG])) && // 今が片脚支持期
-       (footstepNodesList[i+1].isSupportPhase[RLEG] && footstepNodesList[i+1].isSupportPhase[LLEG])){ // 次が両足支持期
-      int swingLeg = footstepNodesList[i].isSupportPhase[RLEG] ? LLEG : RLEG;
-      int supportLeg = (swingLeg == RLEG) ? LLEG : RLEG;
-      cnoid::Vector3 offset = cmdVel * (footstepNodesList[i].remainTime + footstepNodesList[i+1].remainTime);
-      cnoid::Position transform = cnoid::Position::Identity(); // supportLeg相対(Z軸は鉛直)での次のswingLegの位置
-      transform.linear() = cnoid::Matrix3(Eigen::AngleAxisd(mathutil::clamp(offset[2],this->defaultStrideLimitationTheta), cnoid::Vector3::UnitZ()));
-      transform.translation() = - defaultTranslatePos[supportLeg].value() + cnoid::Vector3(offset[0], offset[1], 0.0) + transform.linear() * defaultTranslatePos[swingLeg].value();
-      transform.translation() = mathutil::calcNearestPointOfHull(transform.translation(), this->defaultStrideLimitationHull[swingLeg]);
-      cnoid::Position prevOrigin = mathutil::orientCoordToAxis(footstepNodesList[i-1].dstCoords[supportLeg], cnoid::Vector3::UnitZ());
-      cnoid::Position dstCoords = prevOrigin * transform;
-
-      cnoid::Position origin = mathutil::orientCoordToAxis(footstepNodesList[i].dstCoords[swingLeg], cnoid::Vector3::UnitZ());
-      cnoid::Position trans = dstCoords * origin.inverse();
-      this->transformFutureSteps(footstepNodesList, i, trans);
-    }
-  }
-}
-
 void FootStepGenerator::transformFutureSteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, int index, const cnoid::Position& transform/*generate frame*/) const{
   for(int l=0;l<NUM_LEGS;l++){
     bool swinged = false;
