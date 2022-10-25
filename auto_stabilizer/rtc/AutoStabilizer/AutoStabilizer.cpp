@@ -321,13 +321,14 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
 }
 
 // static function
-bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam, AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobotRaw, cnoid::BodyPtr actRobotRaw, std::vector<cnoid::Vector6>& refEEWrenchOrigin, std::vector<cpp_filters::TwoPointInterpolatorSE3>& refEEPoseRaw, std::vector<GaitParam::Collision>& selfCollision, std::vector<std::vector<cnoid::Vector3> >& steppableRegion, std::vector<double>& steppableHeight, double& relLandingHeight, cnoid::Vector3& relLandingNormal){
+bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam, const AutoStabilizer::ControlMode& mode, AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobotRaw, cnoid::BodyPtr actRobotRaw, std::vector<cnoid::Vector6>& refEEWrenchOrigin, std::vector<cpp_filters::TwoPointInterpolatorSE3>& refEEPoseRaw, std::vector<GaitParam::Collision>& selfCollision, std::vector<std::vector<cnoid::Vector3> >& steppableRegion, std::vector<double>& steppableHeight, double& relLandingHeight, cnoid::Vector3& relLandingNormal){
   bool qRef_updated = false;
   if(ports.m_qRefIn_.isNew()){
     ports.m_qRefIn_.read();
     if(ports.m_qRef_.data.length() == refRobotRaw->numJoints()){
       for(int i=0;i<ports.m_qRef_.data.length();i++){
         if(std::isfinite(ports.m_qRef_.data[i])) refRobotRaw->joint(i)->q() = ports.m_qRef_.data[i];
+        else std::cerr << "m_qRef is not finite!" << std::endl;
       }
       qRef_updated = true;
     }
@@ -337,6 +338,7 @@ bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam
     if(ports.m_refTau_.data.length() == refRobotRaw->numJoints()){
       for(int i=0;i<ports.m_refTau_.data.length();i++){
         if(std::isfinite(ports.m_refTau_.data[i])) refRobotRaw->joint(i)->u() = ports.m_refTau_.data[i];
+        else std::cerr << "m_refTau is not finite!" << std::endl;
       }
     }
   }
@@ -346,12 +348,16 @@ bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam
       refRobotRaw->rootLink()->p()[0] = ports.m_refBasePos_.data.x;
       refRobotRaw->rootLink()->p()[1] = ports.m_refBasePos_.data.y;
       refRobotRaw->rootLink()->p()[2] = ports.m_refBasePos_.data.z;
+    } else {
+      std::cerr << "m_refBasePos is not finite!" << std::endl;
     }
   }
   if(ports.m_refBaseRpyIn_.isNew()){
     ports.m_refBaseRpyIn_.read();
     if(std::isfinite(ports.m_refBaseRpy_.data.r) && std::isfinite(ports.m_refBaseRpy_.data.p) && std::isfinite(ports.m_refBaseRpy_.data.y)){
       refRobotRaw->rootLink()->R() = cnoid::rotFromRpy(ports.m_refBaseRpy_.data.r, ports.m_refBaseRpy_.data.p, ports.m_refBaseRpy_.data.y);
+    } else {
+      std::cerr << "m_refBaseRpy is not finite!" << std::endl;
     }
   }
   refRobotRaw->calcForwardKinematics();
@@ -363,6 +369,7 @@ bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam
       if(ports.m_refEEWrench_[i].data.length() == 6){
         for(int j=0;j<6;j++){
           if(std::isfinite(ports.m_refEEWrench_[i].data[j])) refEEWrenchOrigin[i][j] = ports.m_refEEWrench_[i].data[j];
+          else std::cerr << "m_refEEWrench is not finite!" << std::endl;
         }
       }
     }
@@ -380,6 +387,8 @@ bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam
         pose.linear() = cnoid::rotFromRpy(ports.m_refEEPose_[i].data.orientation.r, ports.m_refEEPose_[i].data.orientation.p, ports.m_refEEPose_[i].data.orientation.y);
         refEEPoseRaw[i].setGoal(pose, 0.3); // 0.3秒で補間
         ports.refEEPoseLastUpdateTime_ = ports.m_qRef_.tm;
+      } else {
+        std::cerr << "m_refEEPose is not finite!" << std::endl;
       }
     }
     refEEPoseRaw[i].interpolate(dt);
@@ -390,6 +399,7 @@ bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam
     if(ports.m_qAct_.data.length() == actRobotRaw->numJoints()){
       for(int i=0;i<ports.m_qAct_.data.length();i++){
         if(std::isfinite(ports.m_qAct_.data[i])) actRobotRaw->joint(i)->q() = ports.m_qAct_.data[i];
+        else std::cerr << "m_qAct is not finite!" << std::endl;
       }
     }
   }
@@ -399,6 +409,7 @@ bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam
     if(ports.m_dqAct_.data.length() == actRobotRaw->numJoints()){
       for(int i=0;i<ports.m_dqAct_.data.length();i++){
         if(std::isfinite(ports.m_dqAct_.data[i])) actRobotRaw->joint(i)->dq() = ports.m_dqAct_.data[i];
+        else  std::cerr << "m_dqAct is not finite!" << std::endl;
       }
     }
   }
@@ -410,6 +421,8 @@ bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam
       cnoid::Matrix3 imuR = imu->link()->R() * imu->R_local();
       cnoid::Matrix3 actR = cnoid::rotFromRpy(ports.m_actImu_.data.r, ports.m_actImu_.data.p, ports.m_actImu_.data.y);
       actRobotRaw->rootLink()->R() = Eigen::Matrix3d(Eigen::AngleAxisd(actR) * Eigen::AngleAxisd(imuR.transpose() * actRobotRaw->rootLink()->R())); // 単純に3x3行列の空間でRを積算していると、だんだん数値誤差によって回転行列でなくなってしまう恐れがあるので念の為
+    }else{
+      std::cerr << "m_actImu is not finite!" << std::endl;
     }
   }
   actRobotRaw->calcForwardKinematics();
@@ -422,6 +435,7 @@ bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam
       if(ports.m_actWrench_[i].data.length() == 6){
         for(int j=0;j<6;j++){
           if(std::isfinite(ports.m_actWrench_[i].data[j])) forceSensors[i]->F()[j] = ports.m_actWrench_[i].data[j];
+          else std::cerr << "m_actWrench is not finite!" << std::endl;
         }
       }
     }
@@ -431,26 +445,45 @@ bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam
     ports.m_selfCollisionIn_.read();
     selfCollision.resize(ports.m_selfCollision_.data.length());
     for (int i=0; i<selfCollision.size(); i++){
-      selfCollision[i].link1 = ports.m_selfCollision_.data[i].link1;
-      selfCollision[i].point1[0] = ports.m_selfCollision_.data[i].point1.x;
-      selfCollision[i].point1[1] = ports.m_selfCollision_.data[i].point1.y;
-      selfCollision[i].point1[2] = ports.m_selfCollision_.data[i].point1.z;
-      selfCollision[i].link2 = ports.m_selfCollision_.data[i].link2;
-      selfCollision[i].point2[0] = ports.m_selfCollision_.data[i].point2.x;
-      selfCollision[i].point2[1] = ports.m_selfCollision_.data[i].point2.y;
-      selfCollision[i].point2[2] = ports.m_selfCollision_.data[i].point2.z;
-      selfCollision[i].direction21[0] = ports.m_selfCollision_.data[i].direction21.x;
-      selfCollision[i].direction21[1] = ports.m_selfCollision_.data[i].direction21.y;
-      selfCollision[i].direction21[2] = ports.m_selfCollision_.data[i].direction21.z;
-      selfCollision[i].distance = ports.m_selfCollision_.data[i].distance;
+      if(refRobotRaw->link(std::string(ports.m_selfCollision_.data[i].link1)) &&
+         std::isfinite(ports.m_selfCollision_.data[i].point1.x) &&
+         std::isfinite(ports.m_selfCollision_.data[i].point1.y) &&
+         std::isfinite(ports.m_selfCollision_.data[i].point1.z) &&
+         refRobotRaw->link(std::string(ports.m_selfCollision_.data[i].link2)) &&
+         std::isfinite(ports.m_selfCollision_.data[i].point2.x) &&
+         std::isfinite(ports.m_selfCollision_.data[i].point2.y) &&
+         std::isfinite(ports.m_selfCollision_.data[i].point2.z) &&
+         std::isfinite(ports.m_selfCollision_.data[i].direction21.x) &&
+         std::isfinite(ports.m_selfCollision_.data[i].direction21.y) &&
+         std::isfinite(ports.m_selfCollision_.data[i].direction21.z) &&
+         std::isfinite(ports.m_selfCollision_.data[i].distance)){
+        selfCollision[i].link1 = ports.m_selfCollision_.data[i].link1;
+        selfCollision[i].point1[0] = ports.m_selfCollision_.data[i].point1.x;
+        selfCollision[i].point1[1] = ports.m_selfCollision_.data[i].point1.y;
+        selfCollision[i].point1[2] = ports.m_selfCollision_.data[i].point1.z;
+        selfCollision[i].link2 = ports.m_selfCollision_.data[i].link2;
+        selfCollision[i].point2[0] = ports.m_selfCollision_.data[i].point2.x;
+        selfCollision[i].point2[1] = ports.m_selfCollision_.data[i].point2.y;
+        selfCollision[i].point2[2] = ports.m_selfCollision_.data[i].point2.z;
+        selfCollision[i].direction21[0] = ports.m_selfCollision_.data[i].direction21.x;
+        selfCollision[i].direction21[1] = ports.m_selfCollision_.data[i].direction21.y;
+        selfCollision[i].direction21[2] = ports.m_selfCollision_.data[i].direction21.z;
+        selfCollision[i].distance = ports.m_selfCollision_.data[i].distance;
+      }else{
+        std::cerr << "m_selfCollision is not finite or has unknown link name!" << std::endl;
+        selfCollision.resize(0);
+        break;
+      }
     }
   }
 
   if(ports.m_steppableRegionIn_.isNew()){
     ports.m_steppableRegionIn_.read();
     //steppableRegionを送るのは片足支持期のみ
-    if ((gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && !gaitParam.footstepNodesList[0].isSupportPhase[LLEG] && (ports.m_steppableRegion_.data.l_r == auto_stabilizer_msgs::RLEG)) ||
-        (gaitParam.footstepNodesList[0].isSupportPhase[LLEG] && !gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && (ports.m_steppableRegion_.data.l_r == auto_stabilizer_msgs::LLEG))){//現在支持脚と計算時支持脚が同じ
+    if (mode.isABCRunning() && // ABC起動中でないと現在支持脚という概念が無い
+        ((gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && !gaitParam.footstepNodesList[0].isSupportPhase[LLEG] && (ports.m_steppableRegion_.data.l_r == auto_stabilizer_msgs::RLEG)) ||
+         (gaitParam.footstepNodesList[0].isSupportPhase[LLEG] && !gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && (ports.m_steppableRegion_.data.l_r == auto_stabilizer_msgs::LLEG))) //現在支持脚と計算時支持脚が同じ
+        ){
       int swingLeg = gaitParam.footstepNodesList[0].isSupportPhase[RLEG] ? LLEG : RLEG;
       int supportLeg = (swingLeg == RLEG) ? LLEG : RLEG;
       cnoid::Position supportPose = gaitParam.genCoords[supportLeg].value(); // TODO. 支持脚のgenCoordsとdstCoordsが異なることは想定していない
@@ -462,6 +495,7 @@ bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam
         std::vector<cnoid::Vector3> vertices;
         for (int j=0; j<ports.m_steppableRegion_.data.region[i].length()/3; j++){
           if(!std::isfinite(ports.m_steppableRegion_.data.region[i][3*j]) || !std::isfinite(ports.m_steppableRegion_.data.region[i][3*j+1]) || !std::isfinite(ports.m_steppableRegion_.data.region[i][3*j+2])){
+            std::cerr << "m_steppableRegion is not finite!" << std::endl;
             vertices.clear();
             break;
           }
@@ -488,16 +522,22 @@ bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam
     if(std::isfinite(ports.m_landingHeight_.data.x) && std::isfinite(ports.m_landingHeight_.data.y) && std::isfinite(ports.m_landingHeight_.data.z) && std::isfinite(ports.m_landingHeight_.data.nx) && std::isfinite(ports.m_landingHeight_.data.ny) && std::isfinite(ports.m_landingHeight_.data.nz)){
       cnoid::Vector3 normal = cnoid::Vector3(ports.m_landingHeight_.data.nx, ports.m_landingHeight_.data.ny, ports.m_landingHeight_.data.nz);
       if(normal.norm() > 1.0 - 1e-2 && normal.norm() < 1.0 + 1e-2){ // ノルムがほぼ1
-        if(ports.m_landingHeight_.data.l_r == auto_stabilizer_msgs::RLEG && gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && !gaitParam.footstepNodesList[0].isSupportPhase[LLEG]) { //現在支持脚と計算時支持脚が同じ
-          cnoid::Position supportPoseHorizontal = mathutil::orientCoordToAxis(gaitParam.genCoords[RLEG].value(), cnoid::Vector3::UnitZ());
-          relLandingHeight = supportPoseHorizontal.translation()[2] + ports.m_landingHeight_.data.z;
-          relLandingNormal = supportPoseHorizontal.linear() * normal.normalized();
-        }else if(ports.m_landingHeight_.data.l_r == auto_stabilizer_msgs::LLEG && gaitParam.footstepNodesList[0].isSupportPhase[LLEG] && !gaitParam.footstepNodesList[0].isSupportPhase[RLEG]) { //現在支持脚と計算時支持脚が同じ
-          cnoid::Position supportPoseHorizontal = mathutil::orientCoordToAxis(gaitParam.genCoords[LLEG].value(), cnoid::Vector3::UnitZ());
-          relLandingHeight = supportPoseHorizontal.translation()[2] + ports.m_landingHeight_.data.z;
-          relLandingNormal = supportPoseHorizontal.linear() * normal.normalized();
+        if(mode.isABCRunning()){ // ABC起動中でないと現在支持脚という概念が無い
+          if(ports.m_landingHeight_.data.l_r == auto_stabilizer_msgs::RLEG && gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && !gaitParam.footstepNodesList[0].isSupportPhase[LLEG]) { //現在支持脚と計算時支持脚が同じ
+            cnoid::Position supportPoseHorizontal = mathutil::orientCoordToAxis(gaitParam.genCoords[RLEG].value(), cnoid::Vector3::UnitZ());
+            relLandingHeight = supportPoseHorizontal.translation()[2] + ports.m_landingHeight_.data.z;
+            relLandingNormal = supportPoseHorizontal.linear() * normal.normalized();
+          }else if(ports.m_landingHeight_.data.l_r == auto_stabilizer_msgs::LLEG && gaitParam.footstepNodesList[0].isSupportPhase[LLEG] && !gaitParam.footstepNodesList[0].isSupportPhase[RLEG]) { //現在支持脚と計算時支持脚が同じ
+            cnoid::Position supportPoseHorizontal = mathutil::orientCoordToAxis(gaitParam.genCoords[LLEG].value(), cnoid::Vector3::UnitZ());
+            relLandingHeight = supportPoseHorizontal.translation()[2] + ports.m_landingHeight_.data.z;
+            relLandingNormal = supportPoseHorizontal.linear() * normal.normalized();
+          }
         }
+      }else{
+        std::cerr << "m_landingHeight's norm != 1 !" << std::endl;
       }
+    }else{
+      std::cerr << "m_landingHeight is not finite!" << std::endl;
     }
   }
 
@@ -714,7 +754,8 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
   }
 
   //landngTarget
-  if(gaitParam.footstepNodesList.size() >= 2 &&
+  if(mode.isABCRunning() && // ABC起動中でないと支持脚という概念が無い
+     gaitParam.footstepNodesList.size() >= 2 &&
      ((gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && !gaitParam.footstepNodesList[0].isSupportPhase[LLEG]) ||
       (!gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && gaitParam.footstepNodesList[0].isSupportPhase[LLEG])) && // 今が片足支持
      (gaitParam.footstepNodesList[1].isSupportPhase[RLEG] && gaitParam.footstepNodesList[1].isSupportPhase[LLEG]) // 次が両足支持
@@ -820,7 +861,7 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
   std::string instance_name = std::string(this->m_profile.instance_name);
   this->loop_++;
 
-  if(!AutoStabilizer::readInPortData(this->dt_, this->gaitParam_, this->ports_, this->gaitParam_.refRobotRaw, this->gaitParam_.actRobotRaw, this->gaitParam_.refEEWrenchOrigin, this->gaitParam_.refEEPoseRaw, this->gaitParam_.selfCollision, this->gaitParam_.steppableRegion, this->gaitParam_.steppableHeight, this->gaitParam_.relLandingHeight, this->gaitParam_.relLandingNormal)) return RTC::RTC_OK;  // qRef が届かなければ何もしない
+  if(!AutoStabilizer::readInPortData(this->dt_, this->gaitParam_, this->mode_, this->ports_, this->gaitParam_.refRobotRaw, this->gaitParam_.actRobotRaw, this->gaitParam_.refEEWrenchOrigin, this->gaitParam_.refEEPoseRaw, this->gaitParam_.selfCollision, this->gaitParam_.steppableRegion, this->gaitParam_.steppableHeight, this->gaitParam_.relLandingHeight, this->gaitParam_.relLandingNormal)) return RTC::RTC_OK;  // qRef が届かなければ何もしない
 
   this->mode_.update(this->dt_);
   this->gaitParam_.update(this->dt_);
