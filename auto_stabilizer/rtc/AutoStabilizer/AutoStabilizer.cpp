@@ -639,12 +639,18 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
     ports.m_q_.data.length(gaitParam.genRobot->numJoints());
     for(int i=0;i<gaitParam.genRobot->numJoints();i++){
       if(mode.now() == AutoStabilizer::ControlMode::MODE_IDLE || !gaitParam.jointControllable[i]){
-        ports.m_q_.data[i] = gaitParam.refRobotRaw->joint(i)->q();
+        double value = gaitParam.refRobotRaw->joint(i)->q();
+        if(std::isfinite(value)) ports.m_q_.data[i] = value;
+        else std::cerr << "m_q is not finite!" << std::endl;
       }else if(mode.isSyncToABC() || mode.isSyncToIdle()){
         double ratio = idleToAbcTransitionInterpolator.value();
-        ports.m_q_.data[i] = gaitParam.refRobotRaw->joint(i)->q() * (1.0 - ratio) + gaitParam.genRobot->joint(i)->q() * ratio;
+        double value = gaitParam.refRobotRaw->joint(i)->q() * (1.0 - ratio) + gaitParam.genRobot->joint(i)->q() * ratio;
+        if(std::isfinite(value)) ports.m_q_.data[i] = value;
+        else std::cerr << "m_q is not finite!" << std::endl;
       }else{
-        ports.m_q_.data[i] = gaitParam.genRobot->joint(i)->q();
+        double value = gaitParam.genRobot->joint(i)->q();
+        if(std::isfinite(value)) ports.m_q_.data[i] = value;
+        else std::cerr << "m_q is not finite!" << std::endl;
       }
     }
     ports.m_qOut_.write();
@@ -656,12 +662,18 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
     ports.m_genTau_.data.length(gaitParam.actRobotTqc->numJoints());
     for(int i=0;i<gaitParam.actRobotTqc->numJoints();i++){
       if(mode.now() == AutoStabilizer::ControlMode::MODE_IDLE || !gaitParam.jointControllable[i]){
-        ports.m_genTau_.data[i] = gaitParam.refRobotRaw->joint(i)->u();
+        double value = gaitParam.refRobotRaw->joint(i)->u();
+        if(std::isfinite(value)) ports.m_genTau_.data[i] = value;
+        else std::cerr << "m_genTau is not finite!" << std::endl;
       }else if(mode.isSyncToABC() || mode.isSyncToIdle()){
         double ratio = idleToAbcTransitionInterpolator.value();
-        ports.m_genTau_.data[i] = gaitParam.refRobotRaw->joint(i)->u() * (1.0 - ratio) + gaitParam.actRobotTqc->joint(i)->u() * ratio;
+        double value = gaitParam.refRobotRaw->joint(i)->u() * (1.0 - ratio) + gaitParam.actRobotTqc->joint(i)->u() * ratio;
+        if(std::isfinite(value)) ports.m_genTau_.data[i] = value;
+        else std::cerr << "m_genTau is not finite!" << std::endl;
       }else{
-        ports.m_genTau_.data[i] = gaitParam.actRobotTqc->joint(i)->u();
+        double value = gaitParam.actRobotTqc->joint(i)->u();
+        if(std::isfinite(value)) ports.m_genTau_.data[i] = value;
+        else std::cerr << "m_genTau is not finite!" << std::endl;
       }
     }
     ports.m_genTauOut_.write();
@@ -683,37 +695,43 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
     cnoid::Matrix3 baseR = basePose.linear();
     cnoid::Vector3 baseRpy = cnoid::rpyFromRot(basePose.linear());
 
-    ports.m_genBasePose_.tm = ports.m_qRef_.tm;
-    ports.m_genBasePose_.data.position.x = basePos[0];
-    ports.m_genBasePose_.data.position.y = basePos[1];
-    ports.m_genBasePose_.data.position.z = basePos[2];
-    ports.m_genBasePose_.data.orientation.r = baseRpy[0];
-    ports.m_genBasePose_.data.orientation.p = baseRpy[1];
-    ports.m_genBasePose_.data.orientation.y = baseRpy[2];
-    ports.m_genBasePoseOut_.write();
+    if(std::isfinite(basePos[0]) && std::isfinite(basePos[1]) && std::isfinite(basePos[2]) &&
+       std::isfinite(baseRpy[0]) && std::isfinite(baseRpy[1]) && std::isfinite(baseRpy[2])){
 
-    ports.m_genBaseTform_.tm = ports.m_qRef_.tm;
-    ports.m_genBaseTform_.data.length(12);
-    for(int i=0;i<3;i++){
-      ports.m_genBaseTform_.data[i] = basePos[i];
-    }
-    for(int i=0;i<3;i++){
-      for(int j=0;j<3;j++){
-        ports.m_genBaseTform_.data[3+i*3+j] = baseR(i,j);// row major
+      ports.m_genBasePose_.tm = ports.m_qRef_.tm;
+      ports.m_genBasePose_.data.position.x = basePos[0];
+      ports.m_genBasePose_.data.position.y = basePos[1];
+      ports.m_genBasePose_.data.position.z = basePos[2];
+      ports.m_genBasePose_.data.orientation.r = baseRpy[0];
+      ports.m_genBasePose_.data.orientation.p = baseRpy[1];
+      ports.m_genBasePose_.data.orientation.y = baseRpy[2];
+      ports.m_genBasePoseOut_.write();
+
+      ports.m_genBaseTform_.tm = ports.m_qRef_.tm;
+      ports.m_genBaseTform_.data.length(12);
+      for(int i=0;i<3;i++){
+        ports.m_genBaseTform_.data[i] = basePos[i];
       }
-    }
-    ports.m_genBaseTformOut_.write();
+      for(int i=0;i<3;i++){
+        for(int j=0;j<3;j++){
+          ports.m_genBaseTform_.data[3+i*3+j] = baseR(i,j);// row major
+        }
+      }
+      ports.m_genBaseTformOut_.write();
 
-    ports.m_genBasePos_.tm = ports.m_qRef_.tm;
-    ports.m_genBasePos_.data.x = basePos[0];
-    ports.m_genBasePos_.data.y = basePos[1];
-    ports.m_genBasePos_.data.z = basePos[2];
-    ports.m_genBasePosOut_.write();
-    ports.m_genBaseRpy_.tm = ports.m_qRef_.tm;
-    ports.m_genBaseRpy_.data.r = baseRpy[0];
-    ports.m_genBaseRpy_.data.p = baseRpy[1];
-    ports.m_genBaseRpy_.data.y = baseRpy[2];
-    ports.m_genBaseRpyOut_.write();
+      ports.m_genBasePos_.tm = ports.m_qRef_.tm;
+      ports.m_genBasePos_.data.x = basePos[0];
+      ports.m_genBasePos_.data.y = basePos[1];
+      ports.m_genBasePos_.data.z = basePos[2];
+      ports.m_genBasePosOut_.write();
+      ports.m_genBaseRpy_.tm = ports.m_qRef_.tm;
+      ports.m_genBaseRpy_.data.r = baseRpy[0];
+      ports.m_genBaseRpy_.data.p = baseRpy[1];
+      ports.m_genBaseRpy_.data.y = baseRpy[2];
+      ports.m_genBaseRpyOut_.write();
+    }else{
+      std::cerr << "m_genBasePose is not finite!" << std::endl;
+    }
   }
 
   // acc ref
@@ -724,11 +742,15 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
       cnoid::Matrix3 imuR = imu->link()->R() * imu->R_local(); // generate frame
       genImuAcc/*imu frame*/ = imuR.transpose() * gaitParam.genCogAcc/*generate frame*/; // 本当は重心の加速ではなく、関節の加速等を考慮したimuセンサの加速を直接与えたいが、関節角度ベースのinverse-kinematicsを使う以上モデルのimuセンサの位置の加速が不連続なものになることは避けられないので、重心の加速を用いている. この出力の主な用途は歩行時の姿勢推定のため、重心の加速が考慮できればだいたい十分.
     }
-    ports.m_genImuAcc_.tm = ports.m_qRef_.tm;
-    ports.m_genImuAcc_.data.ax = genImuAcc[0];
-    ports.m_genImuAcc_.data.ay = genImuAcc[1];
-    ports.m_genImuAcc_.data.az = genImuAcc[2];
-    ports.m_genImuAccOut_.write();
+    if(std::isfinite(genImuAcc[0]) && std::isfinite(genImuAcc[1]) && std::isfinite(genImuAcc[2])){
+      ports.m_genImuAcc_.tm = ports.m_qRef_.tm;
+      ports.m_genImuAcc_.data.ax = genImuAcc[0];
+      ports.m_genImuAcc_.data.ay = genImuAcc[1];
+      ports.m_genImuAcc_.data.az = genImuAcc[2];
+      ports.m_genImuAccOut_.write();
+    }else{
+      std::cerr << "m_genImuAcc is not finite!" << std::endl;
+    }
   }
 
   // Gains
@@ -744,10 +766,18 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
       }else{
         // Stabilizerが動いている間にonDeactivated()->onActivated()が呼ばれると、ゲインがもとに戻らない. onDeactivated()->onActivated()が呼ばれるのはサーボオン直前で、通常、サーボオン時にゲインを指令するので、問題ない.
         if(gaitParam.stServoPGainPercentage[i].remain_time() > 0.0 && gaitParam.stServoPGainPercentage[i].current_time() <= dt) { // 補間が始まった初回
-          ports.m_robotHardwareService0_->setServoPGainPercentageWithTime(gaitParam.actRobotTqc->joint(i)->name().c_str(),gaitParam.stServoPGainPercentage[i].getGoal(),gaitParam.stServoPGainPercentage[i].goal_time());
+          if(std::isfinite(gaitParam.stServoPGainPercentage[i].getGoal()) && std::isfinite(gaitParam.stServoPGainPercentage[i].goal_time())){
+            ports.m_robotHardwareService0_->setServoPGainPercentageWithTime(gaitParam.actRobotTqc->joint(i)->name().c_str(),gaitParam.stServoPGainPercentage[i].getGoal(),gaitParam.stServoPGainPercentage[i].goal_time());
+          }else{
+            std::cerr << "setServoPGainPercentageWithTime is not finite!" << std::endl;
+          }
         }
         if(gaitParam.stServoDGainPercentage[i].remain_time() > 0.0 && gaitParam.stServoDGainPercentage[i].current_time() <= dt) { // 補間が始まった初回
-          ports.m_robotHardwareService0_->setServoDGainPercentageWithTime(gaitParam.actRobotTqc->joint(i)->name().c_str(),gaitParam.stServoDGainPercentage[i].getGoal(),gaitParam.stServoDGainPercentage[i].goal_time());
+          if(std::isfinite(gaitParam.stServoDGainPercentage[i].getGoal()) && std::isfinite(gaitParam.stServoDGainPercentage[i].goal_time())){
+            ports.m_robotHardwareService0_->setServoDGainPercentageWithTime(gaitParam.actRobotTqc->joint(i)->name().c_str(),gaitParam.stServoDGainPercentage[i].getGoal(),gaitParam.stServoDGainPercentage[i].goal_time());
+          }else{
+            std::cerr << "setServoDGainPercentageWithTime is not finite!" << std::endl;
+          }
         }
       }
     }
