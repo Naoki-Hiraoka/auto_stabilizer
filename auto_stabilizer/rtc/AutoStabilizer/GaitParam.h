@@ -184,6 +184,12 @@ public:
       defaultTranslatePos[i].reset(defaultTranslatePos[i].getGoal());
       isManualControlMode[i].reset(isManualControlMode[i].getGoal());
     }
+
+    // 現在の支持脚からの..という性質のportなので、リセットする必要がある
+    steppableRegion.clear();
+    steppableHeight.clear();
+    relLandingHeight = -1e15;
+    relLandingNormal = cnoid::Vector3::UnitZ();
   }
 
   // 毎周期呼ばれる. 内部の補間器をdtだけ進める

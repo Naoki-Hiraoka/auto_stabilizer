@@ -3,7 +3,7 @@
 #include <cnoid/EigenUtil>
 
 bool FootStepGenerator::initFootStepNodesList(const GaitParam& gaitParam,
-                                              std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<cnoid::Position>& o_dstCoordsOrg, double& o_remainTimeOrg, std::vector<bool>& o_prevSupportPhase) const{
+                                              std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<cnoid::Position>& o_dstCoordsOrg, double& o_remainTimeOrg, std::vector<GaitParam::SwingState_enum>& o_swingState, double& o_elapsedTime, std::vector<bool>& o_prevSupportPhase) const{
   // footStepNodesListを初期化する
   std::vector<GaitParam::FootStepNodes> footstepNodesList(1);
   cnoid::Position rlegCoords = gaitParam.genRobot->link(gaitParam.eeParentLink[RLEG])->T()*gaitParam.eeLocalT[RLEG];
@@ -14,17 +14,19 @@ bool FootStepGenerator::initFootStepNodesList(const GaitParam& gaitParam,
   std::vector<cnoid::Position> srcCoords = footstepNodesList[0].dstCoords;
   std::vector<cnoid::Position> dstCoordsOrg = footstepNodesList[0].dstCoords;
   double remainTimeOrg = footstepNodesList[0].remainTime;
-
+  std::vector<GaitParam::SwingState_enum> swingState(NUM_LEGS);
+  for(int i=0;i<NUM_LEGS;i++) swingState[i] = GaitParam::LIFT_PHASE;
   std::vector<bool> prevSupportPhase(NUM_LEGS);
-  for(int i=0;i<NUM_LEGS;i++){
-    prevSupportPhase[i] = footstepNodesList[0].isSupportPhase[i];
-  }
+  for(int i=0;i<NUM_LEGS;i++) prevSupportPhase[i] = footstepNodesList[0].isSupportPhase[i];
+  double elapsedTime = 0.0;
 
   o_prevSupportPhase = prevSupportPhase;
   o_footstepNodesList = footstepNodesList;
   o_srcCoords = srcCoords;
   o_dstCoordsOrg = dstCoordsOrg;
   o_remainTimeOrg = remainTimeOrg;
+  o_swingState = swingState;
+  o_elapsedTime = elapsedTime;
 
   return true;
 }
