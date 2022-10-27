@@ -961,7 +961,7 @@ bool AutoStabilizer::goVelocity(const double& vx, const double& vy, const double
 }
 bool AutoStabilizer::goStop(){
   std::lock_guard<std::mutex> guard(this->mutex_);
-  if(this->mode_.isABCRunning()){
+  if(this->mode_.isABCRunning() && this->footStepGenerator_.isGoVelocityMode){ // this->footStepGenerator_.isGoVelocityMode時のみ行う. goStopが呼ばれて、staticになる前にgoStopが再度呼ばれることが繰り返されると、止まらないので
     this->cmdVelGenerator_.refCmdVel.setZero();
     this->footStepGenerator_.isGoVelocityMode = false;
     this->footStepGenerator_.goStop(this->gaitParam_,

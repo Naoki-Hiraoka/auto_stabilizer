@@ -173,7 +173,13 @@ bool FootStepGenerator::goStop(const GaitParam& gaitParam,
 
   std::vector<GaitParam::FootStepNodes> footstepNodesList = gaitParam.footstepNodesList;
 
-  if(footstepNodesList.size()>2) footstepNodesList.erase(footstepNodesList.begin()+2,footstepNodesList.end());
+  // footstepNodesList[0]と[1]は変えない. footstepNodesList[1]以降で次に両足支持期になるときを探し、それ以降のstepを上書きする. 片足支持期の状態が末尾の要素になると、片足立ちで止まるという状態を意味することに注意
+  for(int i=1;i<footstepNodesList.size();i++){
+    if(footstepNodesList[i].isSupportPhase[RLEG] && footstepNodesList[i].isSupportPhase[LLEG]){
+      footstepNodesList.resize(i+1);
+      break;
+    }
+  }
 
   // 両脚が横に並ぶ位置に2歩歩く.
   for(int i=0;i<2;i++){
@@ -236,7 +242,7 @@ bool FootStepGenerator::calcFootSteps(const GaitParam& gaitParam, const double& 
 
   // goVelocityModeなら、進行方向に向けてfootStepNodesList[2] ~ footStepNodesList[goVelocityStepNum]の要素を機械的に計算してどんどん末尾appendしていく. cmdVelに応じてきまる
   if(this->isGoVelocityMode){
-    // footstepNodesList[0]と[1]は変えない. footstepNodesList[1]以降で次に両足支持期になるときを探し、それ以降のstepを上書きする.
+    // footstepNodesList[0]と[1]は変えない. footstepNodesList[1]以降で次に両足支持期になるときを探し、それ以降のstepを上書きする. 片足支持期の状態が末尾の要素になると、片足立ちで止まるという状態を意味することに注意
     for(int i=1;i<footstepNodesList.size();i++){
       if(footstepNodesList[i].isSupportPhase[RLEG] && footstepNodesList[i].isSupportPhase[LLEG]){
         footstepNodesList.resize(i+1);
