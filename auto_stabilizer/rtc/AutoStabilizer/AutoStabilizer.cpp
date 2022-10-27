@@ -931,8 +931,13 @@ RTC::ReturnCode_t AutoStabilizer::onFinalize(){ return RTC::RTC_OK; }
 bool AutoStabilizer::goPos(const double& x, const double& y, const double& th){
   std::lock_guard<std::mutex> guard(this->mutex_);
   if(this->mode_.isABCRunning()){
-    return this->footStepGenerator_.goPos(this->gaitParam_, x, y, th,
-                                          this->gaitParam_.footstepNodesList);
+    if(std::isfinite(x) && std::isfinite(y) && std::isfinite(th)){
+      return this->footStepGenerator_.goPos(this->gaitParam_, x, y, th,
+                                            this->gaitParam_.footstepNodesList);
+    }else{
+      std::cerr << "goPos is not finite!" << std::endl;
+      return false;
+    }
   }else{
     return false;
   }
@@ -940,11 +945,16 @@ bool AutoStabilizer::goPos(const double& x, const double& y, const double& th){
 bool AutoStabilizer::goVelocity(const double& vx, const double& vy, const double& vth){
   std::lock_guard<std::mutex> guard(this->mutex_);
   if(this->mode_.isABCRunning()){
-    this->cmdVelGenerator_.refCmdVel[0] = vx;
-    this->cmdVelGenerator_.refCmdVel[1] = vy;
-    this->cmdVelGenerator_.refCmdVel[2] = vth / 180.0 * M_PI;
-    this->footStepGenerator_.isGoVelocityMode = true;
-    return true;
+    if(std::isfinite(vx) && std::isfinite(vy) && std::isfinite(vth)){
+      this->cmdVelGenerator_.refCmdVel[0] = vx;
+      this->cmdVelGenerator_.refCmdVel[1] = vy;
+      this->cmdVelGenerator_.refCmdVel[2] = vth / 180.0 * M_PI;
+      this->footStepGenerator_.isGoVelocityMode = true;
+      return true;
+    }else{
+      std::cerr << "goVelocity is not finite!" << std::endl;
+      return false;
+    }
   }else{
     return false;
   }
@@ -991,6 +1001,12 @@ bool AutoStabilizer::setFootStepsWithParam(const OpenHRP::AutoStabilizerService:
       else if(std::string(fs[i].leg) == "lleg") stepNode.l_r = LLEG;
       else {
         std::cerr << "\x1b[31m[" << this->m_profile.instance_name << "] leg name [" << fs[i].leg << "] is invalid" << "\x1b[39m" << std::endl;
+        return false;
+      }
+      if(!std::isfinite(fs[i].pos[0]) || !std::isfinite(fs[i].pos[1]) || !std::isfinite(fs[i].pos[2]) ||
+         !std::isfinite(fs[i].rot[0]) || !std::isfinite(fs[i].rot[1]) || !std::isfinite(fs[i].rot[2]) || !std::isfinite(fs[i].rot[3]) ||
+         !std::isfinite(sps[i].step_height) || !std::isfinite(sps[i].step_time)){
+        std::cerr << "setFootStepsWithParam is not finite!" << std::endl;
         return false;
       }
       stepNode.coords.translation() = cnoid::Vector3(fs[i].pos[0],fs[i].pos[1],fs[i].pos[2]);
