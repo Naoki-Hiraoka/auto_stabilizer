@@ -49,6 +49,11 @@ namespace footguidedcontroller{
       u += exp(- w * Tj) * (ur.at(j).getGoal() - ur.at(j+1).getStart() + (ur.at(j).getSlope() - ur.at(j+1).getSlope()) / w);
     }
 
+    if((1 - exp(-2 * w * Tj)) == 0.0) { // ゼロ除算チェック
+      std::cerr << "[calcFootGuidedControl] (1 - exp(-2 * w * Tj))==0 !" << std::endl;
+      return ur[1].getStart();
+    }
+
     return ur[1].getStart() + 2 / (1 - exp(-2 * w * Tj)) * u;
   };
 

@@ -264,9 +264,9 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
                                    result,
                                    0 // debuglevel
                                    )){
-      // QP fail. 目標力を何も入れないよりはマシなので適当に入れる.
-      tgtEEWrench[RLEG].head<3>() = tgtForce / 2;
-      tgtEEWrench[LLEG].head<3>() = tgtForce / 2;
+      // QP fail. 適当に1/2 tgtForceずつ分配してもよいが、QPがfailするのはだいたい転んでいるときなので、ゼロを入れたほうが安全
+      tgtEEWrench[RLEG].setZero();
+      tgtEEWrench[LLEG].setZero();
     }else{
       int idx = 0;
       for(int i=0;i<NUM_LEGS;i++){
