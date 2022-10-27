@@ -764,6 +764,7 @@ void FootStepGenerator::checkEarlyTouchDown(std::vector<GaitParam::FootStepNodes
         if(actLegWrenchFilter[leg].value()[2] > this->contactDetectionThreshold /*generate frame. ロボットが受ける力*/) {// 力センサの値が閾値以上
           footstepNodesList[0].stopCurrentPosition[leg] = true;
         }else if(footstepNodesList[0].remainTime <= dt && // remainTimeが0になる
+                 footstepNodesList[0].touchVel[leg] > 0.0 && // touchVelが0ならいつまでもつかないのでgoaloffsetを適用しない
                  footstepNodesList[0].goalOffset[leg] > this->goalOffset){ // まだgoalOffsetまで下ろしていない
           footstepNodesList[0].remainTime += dt;
           footstepNodesList[0].goalOffset[leg] = std::max(this->goalOffset, footstepNodesList[0].goalOffset[leg] - footstepNodesList[0].touchVel[leg] * dt);

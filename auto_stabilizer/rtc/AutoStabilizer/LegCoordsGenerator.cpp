@@ -142,14 +142,17 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
         double dp = ratio * totalLength;
         cnoid::Vector3 goal;
         if(dp < length0){
-          goal = antecedentCoords.translation() + dp * (viaPos0 - antecedentCoords.translation()).normalized();
+          cnoid::Vector3 dir = ((viaPos0 - antecedentCoords.translation()).norm() > 0) ? (viaPos0 - antecedentCoords.translation()).normalized() : cnoid::Vector3::Zero();
+            goal = antecedentCoords.translation() + dp * dir;
         }else{
           dp -= length0;
           if(dp < length1){
-            goal = viaPos0 + dp * (viaPos1 - viaPos0).normalized();
+            cnoid::Vector3 dir = ((viaPos1 - viaPos0).norm() > 0) ? (viaPos1 - viaPos0).normalized() : cnoid::Vector3::Zero();
+            goal = viaPos0 + dp * dir;
           }else{
             dp -= length1; dp /= this->finalDistanceWeight;
-            goal = viaPos1 + dp * (dstCoords.translation() - viaPos1).normalized();
+            cnoid::Vector3 dir = ((dstCoords.translation() - viaPos1).norm() > 0) ? (dstCoords.translation() - viaPos1).normalized() : cnoid::Vector3::Zero();
+            goal = viaPos1 + dp * dir;
           }
         }
         cnoid::Position nextCoords;
@@ -174,10 +177,12 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
           cnoid::Vector3 goal;
           double dp = ratio * totalLength;
           if(dp < length1){
-            goal = antecedentCoords.translation() + dp * (viaPos1 - antecedentCoords.translation()).normalized();
+            cnoid::Vector3 dir = ((viaPos1 - antecedentCoords.translation()).norm() > 0) ? (viaPos1 - antecedentCoords.translation()).normalized() : cnoid::Vector3::Zero();
+            goal = antecedentCoords.translation() + dp * dir;
           }else{
             dp -= length1; dp /= this->finalDistanceWeight;
-            goal = viaPos1 + dp * (dstCoords.translation() - viaPos1).normalized();
+            cnoid::Vector3 dir = ((dstCoords.translation() - viaPos1).norm() > 0) ? (dstCoords.translation() - viaPos1).normalized() : cnoid::Vector3::Zero();
+            goal = viaPos1 + dp * dir;
           }
           cnoid::Position nextCoords;
           nextCoords.translation() = goal;
