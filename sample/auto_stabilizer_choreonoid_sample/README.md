@@ -157,7 +157,7 @@ roseus
 (send *ri* :set-auto-stabilizer-param :contact-detection-threshold 300.0)
 ;;(send *ri* :set-auto-stabilizer-param :is-stable-go-stop-mode nil)
 (send *robot* :reset-pose)
-(send *robot* :legs :move-end-pos #F(0 0 100))
+(send *robot* :legs :move-end-pos #F(0 0 150))
 (send *robot* :move-centroid-on-foot :both '(:rleg :lleg))
 (send *ri* :angle-vector (send *robot* :angle-vector) 3000)
 ```
