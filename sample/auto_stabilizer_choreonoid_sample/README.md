@@ -98,6 +98,7 @@ roseus
 ;; stair. 階段の前に移動させてから行う
 (send *robot* :reset-pose)
 (send *robot* :legs :move-end-pos #F(0 0 150))
+(send *robot* :move-centroid-on-foot :both '(:rleg :lleg))
 (send *ri* :angle-vector (send *robot* :angle-vector) 3000)
 (send *ri* :wait-interpolation)
 (send *ri* :set-auto-stabilizer-param
@@ -150,4 +151,13 @@ roseus
            :emergency-step-cp-check-margin 0.1
            :goal-offset -0.05
            )
+```
+
+```
+(send *ri* :set-auto-stabilizer-param :contact-detection-threshold 300.0)
+;;(send *ri* :set-auto-stabilizer-param :is-stable-go-stop-mode nil)
+(send *robot* :reset-pose)
+(send *robot* :legs :move-end-pos #F(0 0 100))
+(send *robot* :move-centroid-on-foot :both '(:rleg :lleg))
+(send *ri* :angle-vector (send *robot* :angle-vector) 3000)
 ```

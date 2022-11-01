@@ -575,7 +575,8 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
     for(int i=0;i<candidates.size();i++){
       for(int j=0;j<steppableHulls.size();j++){
         // overwritableMaxGroundZVelocityを満たさないregionは除外
-        if(std::abs(steppableHulls[j].second - gaitParam.srcCoords[swingLeg].translation()[2]) > (gaitParam.elapsedTime + candidates[i].second) * this->overwritableMaxGroundZVelocity) continue;
+        if(std::abs(steppableHulls[j].second - gaitParam.genCoords[swingLeg].getGoal().translation()[2]) > candidates[i].second * this->overwritableMaxGenGroundZVelocity) continue;
+        if(std::abs(steppableHulls[j].second - gaitParam.srcCoords[swingLeg].translation()[2]) > (gaitParam.elapsedTime + candidates[i].second) * this->overwritableMaxSrcGroundZVelocity) continue;
         std::vector<cnoid::Vector3> hull = mathutil::calcIntersectConvexHull(candidates[i].first, steppableHulls[j].first);
         if(hull.size() > 0) nextCandidates.emplace_back(hull, candidates[i].second);
       }

@@ -205,8 +205,10 @@ module OpenHRP
       double overwritable_max_landing_height;
       /// [m]. 反対の脚のEndEffector frame(Z軸は鉛直)で表現した着地高さの下限(自己干渉やIKの考慮が含まれる). overwritable_max_landing_height以下.
       double overwritable_min_landing_height;
+      /// [m/s]. genCoords(のgoal)からdstCoordsまでの高さの差がこの速度を超えないように、remainTimeを長くする. 0より大きい. touchVelと同じくらい?
+      double overwritable_max_gen_ground_z_velocity;
       /// [m/s]. srcCoordsからdstCoordsまでの高さの差がこの速度を超えないように、一歩の時間(現index開始時からの経過時間)を長くする. 0より大きい. 0.2m登るときに一歩あたり1.4sくらい?
-      double overwritable_max_ground_z_velocity;
+      double overwritable_max_src_ground_z_velocity;
       /// [N]. generate frameで遊脚が着地時に鉛直方向にこの大きさ以上の力を受けたら接地とみなして、EarlyTouchDown処理を行う
       double contact_detection_threshold;
       /// [m]. 早づき・遅づき時に、ずれの大きさがこの値以上の場合に、以降の足の位置をそのぶんだけずらす. 位置制御指令関節角度と実機の角度の差の関係で平らな地面でも常に早づきするため、地面の高さを誤って認識することがないよう、普段はずらさない方が性能が良い. 一方で、ずれが大きい場合には、そのぶんだけずらしたほうが性能が良い. 0以上
