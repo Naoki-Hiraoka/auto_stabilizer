@@ -20,7 +20,7 @@ public:
   std::vector<std::vector<double> > swingDgain = std::vector<std::vector<double> >(2); // 要素数2. [rleg, lleg]. rootLinkから各endeffectorまでの各関節のゲイン. 0~100
   double swing2LandingTransitionTime = 0.05; // [s]. 0より大きい
   double landing2SupportTransitionTime = 0.1; // [s]. 0より大きい
-  double support2SwingTransitionTime = 0.1; // [s]. 0より大きい
+  double support2SwingTransitionTime = 0.2; // [s]. 0より大きい
 
   void init(const GaitParam& gaitParam, cnoid::BodyPtr& actRobotTqc){
     for(int i=0;i<NUM_LEGS;i++){

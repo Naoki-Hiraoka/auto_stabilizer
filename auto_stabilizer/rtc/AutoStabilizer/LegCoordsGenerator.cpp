@@ -90,13 +90,11 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
       refZmpTraj[0] = footguidedcontroller::LinearTrajectory<cnoid::Vector3>(refZmpTraj[0].getStart()+refZmpTraj[0].getSlope()*dt,refZmpTraj[0].getGoal(),refZmpTraj[0].getTime()-dt);
     }
 
-    if(gaitParam.footstepNodesList.size() == 1){
-      // footGuidedBalanceTime[s]に満たない場合、満たないぶんだけ末尾に加える. そうしないと終端条件が厳しすぎる. 一方で、常に末尾にfootGuidedBalanceTime[s]だけ加えると、終端条件がゆるすぎて重心を動かすのが遅すぎる.
-      double totalTime = 0;
-      for(int i=0;i<refZmpTraj.size();i++) totalTime += refZmpTraj[i].getTime();
-      if(totalTime < this->footGuidedBalanceTime){
-        refZmpTraj.push_back(footguidedcontroller::LinearTrajectory<cnoid::Vector3>(refZmp,refZmp, std::max(this->footGuidedBalanceTime - totalTime, dt)));
-      }
+    // footGuidedBalanceTime[s]に満たない場合、満たないぶんだけ末尾に加える. そうしないと終端条件が厳しすぎる. 一方で、常に末尾にfootGuidedBalanceTime[s]だけ加えると、終端条件がゆるすぎて重心を動かすのが遅すぎる?
+    double totalTime = 0;
+    for(int i=0;i<refZmpTraj.size();i++) totalTime += refZmpTraj[i].getTime();
+    if(totalTime < this->footGuidedBalanceTime){
+      refZmpTraj.push_back(footguidedcontroller::LinearTrajectory<cnoid::Vector3>(refZmp,refZmp, std::max(this->footGuidedBalanceTime - totalTime, dt)));
     }
   }
 
