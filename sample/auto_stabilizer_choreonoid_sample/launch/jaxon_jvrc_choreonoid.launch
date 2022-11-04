@@ -4,7 +4,7 @@
   <env name="CHOREONOID_ROBOT" value="JAXON_RED" /> <!-- for JAXONCustomizer -->
 
   <arg name="CONF_FILE" value="$(find hrpsys_choreonoid_tutorials)/models/JAXON_JVRC.conf"/>
-  <arg name="URDF_FILE" value="$(find hrpsys_choreonoid_tutorials)/models/JAXON_JVRC.urdf"/>
+  <arg name="URDF_FILE" value="$(find hrpsys_choreonoid_tutorials)/models/JAXON_JVRC_SENSORS.urdf"/>
   <arg name="MODEL_FILE" value="$(find jvrc_models)/JAXON_JVRC/JAXON_JVRCmain_hrpsys.wrl" />
   <arg name="LOAD_OBJECTS" default="false" />
   <arg name="PROJECT_FILE" default="$(find auto_stabilizer_choreonoid_sample)/config/JAXON_RED_RH_FLAT.cnoid" unless="$(arg LOAD_OBJECTS)"/> <!-- hrpsys_choreonoid_tutorialsのものとほぼ同じだが、ロボットモデルにbushがついていない. torque control modeではbushが無い方が実機に近い挙動をする気がするので -->
