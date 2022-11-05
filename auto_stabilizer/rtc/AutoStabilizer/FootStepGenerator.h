@@ -117,6 +117,7 @@ public:
 
   */
   bool calcFootSteps(const GaitParam& gaitParam, const double& dt, bool useActState,
+                     std::vector<cnoid::Vector3>& strideLimitationHull, std::vector<std::vector<cnoid::Vector3> >& capturableHulls, std::vector<double>& cpViewerLog, //for Log
                      std::vector<GaitParam::FootStepNodes>& o_footstepNodesList) const;
 
 protected:
@@ -130,7 +131,7 @@ protected:
   // emergengy step.
   void checkEmergencyStep(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const GaitParam& gaitParam) const;
   // 着地位置・タイミング修正
-  void modifyFootSteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const GaitParam& gaitParam) const;
+  void modifyFootSteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, std::vector<cnoid::Vector3>& strideLimitationHull, std::vector<std::vector<cnoid::Vector3> >& capturableHulls, std::vector<double>& cpViewerLog, const GaitParam& gaitParam) const;
 
   // footstepNodesList[idx:] idxより先のstepの位置をgenerate frameで(左から)transformだけ動かす
   void transformFutureSteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, int index, const cnoid::Position& transform/*generate frame*/) const;

@@ -52,6 +52,11 @@ AutoStabilizer::Ports::Ports() :
   m_dstLandingPosOut_("dstLandingPosOut", m_dstLandingPos_),
   m_remainTimeOut_("remainTimeOut", m_remainTime_),
   m_genCoordsOut_("genCoordsOut", m_genCoords_),
+  m_captureRegionOut_("captureRegionOut", m_captureRegion_),
+  m_steppableRegionLogOut_("steppableRegionLogOut", m_steppableRegionLog_),
+  m_steppableRegionNumLogOut_("steppableRegionNumLogOut", m_steppableRegionNumLog_),
+  m_strideLimitationHullOut_("strideLimitationHullOut", m_strideLimitationHull_),
+  m_cpViewerLogOut_("cpViewerLogOut", m_cpViewerLog_),
 
   m_AutoStabilizerServicePort_("AutoStabilizerService"),
 
@@ -95,6 +100,11 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
   this->addOutPort("dstLandingPosOut", this->ports_.m_dstLandingPosOut_);
   this->addOutPort("remainTimeOut", this->ports_.m_remainTimeOut_);
   this->addOutPort("genCoordsOut", this->ports_.m_genCoordsOut_);
+  this->addOutPort("captureRegionOut", this->ports_.m_captureRegionOut_);
+  this->addOutPort("steppableRegionLogOut", this->ports_.m_steppableRegionLogOut_);
+  this->addOutPort("steppableRegionNumLogOut", this->ports_.m_steppableRegionNumLogOut_);
+  this->addOutPort("strideLimitationHullOut", this->ports_.m_strideLimitationHullOut_);
+  this->addOutPort("cpViewerLogOut", this->ports_.m_cpViewerLogOut_);
   this->ports_.m_AutoStabilizerServicePort_.registerProvider("service0", "AutoStabilizerService", this->ports_.m_service0_);
   this->addPort(this->ports_.m_AutoStabilizerServicePort_);
   this->ports_.m_RobotHardwareServicePort_.registerConsumer("service0", "RobotHardwareService", this->ports_.m_robotHardwareService0_);
@@ -589,6 +599,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
   footStepGenerator.procFootStepNodesList(gaitParam, dt, mode.isSTRunning(),
                                           gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.dstCoordsOrg, gaitParam.remainTimeOrg, gaitParam.swingState, gaitParam.elapsedTime, gaitParam.prevSupportPhase, gaitParam.relLandingHeight);
   footStepGenerator.calcFootSteps(gaitParam, dt, mode.isSTRunning(),
+                                  gaitParam.strideLimitationHull, gaitParam.capturableHulls, gaitParam.cpViewerLog, //for log
                                   gaitParam.footstepNodesList);
   legCoordsGenerator.calcLegCoords(gaitParam, dt, mode.isSTRunning(),
                                    gaitParam.refZmpTraj, gaitParam.genCoords, gaitParam.swingState);
@@ -857,6 +868,53 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
       ports.m_genCoords_.data[9+i] = gaitParam.genCoords[LLEG].getGoal().translation()[i];
     }
     ports.m_genCoordsOut_.write();
+    {
+      ports.m_captureRegion_.tm = ports.m_qRef_.tm;
+      int sum = 0;
+      for (int i=0; i<gaitParam.capturableHulls.size(); i++) sum+=gaitParam.capturableHulls[i].size();
+      ports.m_captureRegion_.data.length(sum*2);
+      int index = 0;
+      for (int i=0; i<gaitParam.capturableHulls.size(); i++) {
+        for (int j=0; j<gaitParam.capturableHulls[i].size(); j++) {
+          ports.m_captureRegion_.data[index+0] = gaitParam.capturableHulls[i][j][0];
+          ports.m_captureRegion_.data[index+1] = gaitParam.capturableHulls[i][j][1];
+          index+=2;
+        }
+      }
+      ports.m_captureRegionOut_.write();
+    }
+    {
+      ports.m_steppableRegionLog_.tm = ports.m_qRef_.tm;
+      ports.m_steppableRegionNumLog_.tm = ports.m_qRef_.tm;
+      int sum = 0;
+      for (int i=0; i<gaitParam.steppableRegion.size(); i++) sum+=gaitParam.steppableRegion[i].size();
+      ports.m_steppableRegionLog_.data.length(sum*2);
+      ports.m_steppableRegionNumLog_.data.length(gaitParam.steppableRegion.size());
+      int index=0;
+      for (int i=0; i<gaitParam.steppableRegion.size(); i++) {
+        for (int j=0; j<gaitParam.steppableRegion[i].size(); j++) {
+          ports.m_steppableRegionLog_.data[index+0] = gaitParam.steppableRegion[i][j][0];
+          ports.m_steppableRegionLog_.data[index+1] = gaitParam.steppableRegion[i][j][1];
+          index+=2;
+        }
+        ports.m_steppableRegionNumLog_.data[i] = gaitParam.steppableRegion[i].size();
+      }
+      ports.m_steppableRegionLogOut_.write();
+      ports.m_steppableRegionNumLogOut_.write();
+    }
+    ports.m_strideLimitationHull_.tm = ports.m_qRef_.tm;
+    ports.m_strideLimitationHull_.data.length(gaitParam.strideLimitationHull.size()*2);
+    for (int i=0; i<gaitParam.strideLimitationHull.size(); i++) {
+      ports.m_strideLimitationHull_.data[i*2+0] = gaitParam.strideLimitationHull[i][0];
+      ports.m_strideLimitationHull_.data[i*2+1] = gaitParam.strideLimitationHull[i][1];
+    }
+    ports.m_strideLimitationHullOut_.write();
+    ports.m_cpViewerLog_.tm = ports.m_qRef_.tm;
+    ports.m_cpViewerLog_.data.length(gaitParam.cpViewerLog.size());
+    for (int i=0; i<gaitParam.cpViewerLog.size(); i++) {
+      ports.m_cpViewerLog_.data[i] = gaitParam.cpViewerLog[i];
+    }
+    ports.m_cpViewerLogOut_.write();
     for(int i=0;i<gaitParam.eeName.size();i++){
       ports.m_actEEPose_[i].tm = ports.m_qRef_.tm;
       ports.m_actEEPose_[i].data.position.x = gaitParam.actEEPose[i].translation()[0];

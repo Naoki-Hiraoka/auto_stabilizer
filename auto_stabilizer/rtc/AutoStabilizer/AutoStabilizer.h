@@ -152,6 +152,16 @@ protected:
     RTC::OutPort<RTC::TimedDoubleSeq> m_remainTimeOut_; // for log
     RTC::TimedDoubleSeq m_genCoords_;
     RTC::OutPort<RTC::TimedDoubleSeq> m_genCoordsOut_; // for log
+    RTC::TimedDoubleSeq m_captureRegion_;
+    RTC::OutPort<RTC::TimedDoubleSeq> m_captureRegionOut_; // for log
+    RTC::TimedDoubleSeq m_steppableRegionLog_;
+    RTC::OutPort<RTC::TimedDoubleSeq> m_steppableRegionLogOut_; // for log
+    RTC::TimedDoubleSeq m_steppableRegionNumLog_;
+    RTC::OutPort<RTC::TimedDoubleSeq> m_steppableRegionNumLogOut_; // for log
+    RTC::TimedDoubleSeq m_strideLimitationHull_;
+    RTC::OutPort<RTC::TimedDoubleSeq> m_strideLimitationHullOut_; // for log
+    RTC::TimedDoubleSeq m_cpViewerLog_;
+    RTC::OutPort<RTC::TimedDoubleSeq> m_cpViewerLogOut_; // for log
 
     std::vector<RTC::TimedPose3D> m_actEEPose_; // Generate World frame. 要素数及び順番はgaitParam_.eeNameと同じ
     std::vector<std::unique_ptr<RTC::OutPort<RTC::TimedPose3D> > > m_actEEPoseOut_;

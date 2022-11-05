@@ -237,6 +237,7 @@ bool FootStepGenerator::procFootStepNodesList(const GaitParam& gaitParam, const 
 }
 
 bool FootStepGenerator::calcFootSteps(const GaitParam& gaitParam, const double& dt, bool useActState,
+                                      std::vector<cnoid::Vector3>& strideLimitationHull, std::vector<std::vector<cnoid::Vector3> >& capturableHulls, std::vector<double>& cpViewerLog, //for Log
                                       std::vector<GaitParam::FootStepNodes>& o_footstepNodesList) const{
   std::vector<GaitParam::FootStepNodes> footstepNodesList = gaitParam.footstepNodesList;
 
@@ -266,7 +267,7 @@ bool FootStepGenerator::calcFootSteps(const GaitParam& gaitParam, const double& 
     }
 
     if(this->isModifyFootSteps){
-      this->modifyFootSteps(footstepNodesList, gaitParam);
+      this->modifyFootSteps(footstepNodesList, strideLimitationHull, capturableHulls, cpViewerLog, gaitParam);
     }
   }
 
@@ -468,7 +469,7 @@ inline std::ostream &operator<<(std::ostream &os, const std::vector<std::pair<st
   return os;
 }
 
-void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const GaitParam& gaitParam) const{
+void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, std::vector<cnoid::Vector3>& strideLimitationHull, std::vector<std::vector<cnoid::Vector3> >& capturableHulls, std::vector<double>& cpViewerLog, const GaitParam& gaitParam) const{
   // 現在片足支持期で、次が両足支持期であるときのみ、行う
   if(!(footstepNodesList.size() > 1 &&
        (footstepNodesList[1].isSupportPhase[RLEG] && footstepNodesList[1].isSupportPhase[LLEG]) &&
@@ -530,7 +531,7 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
       if(t != footstepNodesList[0].remainTime) samplingTimes.push_back(t);
     }
 
-    std::vector<cnoid::Vector3> strideLimitationHull; // generate frame. overwritableStrideLimitationHullの範囲内の着地位置(自己干渉・IKの考慮が含まれる). Z成分には0を入れる
+    strideLimitationHull.resize(0);
     for(int i=0;i<this->overwritableStrideLimitationHull[swingLeg].size();i++){
       cnoid::Vector3 p = supportPoseHorizontal * this->overwritableStrideLimitationHull[swingLeg][i];
       strideLimitationHull.emplace_back(p[0],p[1],0.0);
@@ -589,8 +590,15 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
 
   // 3. capturable: 達成不可の場合は、時間が速い方優先(次の一歩に期待). 複数ある場合は可能な限り近い位置. (角運動量 TODO)
   // 次の両足支持期終了時に入るケースでもOKにしたい
+  if (this->safeLegHull[supportLeg].size() == 4) { // for log
+    for(int i=0;i<this->safeLegHull[supportLeg].size();i++){
+      cnoid::Vector3 zmp = supportPose * this->safeLegHull[supportLeg][i];// generate frame
+      cpViewerLog[i*2+0] = zmp[0];
+      cpViewerLog[i*2+1] = zmp[1];
+    }
+  }
   {
-    std::vector<std::vector<cnoid::Vector3> > capturableHulls; // 要素数と順番はcandidatesに対応
+    capturableHulls.resize(0);
     for(int i=0;i<candidates.size();i++){
       std::vector<cnoid::Vector3> capturableVetices; // generate frame. 時刻tに着地すれば転倒しないような着地位置. Z成分には0を入れる
       for(double t = candidates[i].second; t <= candidates[i].second + footstepNodesList[1].remainTime; t += footstepNodesList[1].remainTime){ // 接地する瞬間と、次の両足支持期の終了時. 片方だけだと特に横歩きのときに厳しすぎる. refZmpTrajを考えると本当は次の両足支持期の終了時のみを使うのが望ましい. しかし、位置制御成分が大きいロボットだと、力分配しているつもりがなくても接地している足から力を受けるので、接地する瞬間も含めてしまってそんなに問題はない?
@@ -643,6 +651,8 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
   // std::cerr << candidates << std::endl;
 
   // 4. もとの着地位置: 達成不可の場合は、もとの着地位置よりも着地位置修正前の進行方向(遊脚のsrcCoordsからの方向)に進むなかで、もとの着地位置に最も近いもの. それがなければもとの着地位置の最も近いもの. (支持脚からの方向にすると、横歩き時に後ろ足の方向が逆になってしまう)
+  cpViewerLog[8] = gaitParam.dstCoordsOrg[swingLeg].translation()[0]; //for log もとの目標着地位置
+  cpViewerLog[9] = gaitParam.dstCoordsOrg[swingLeg].translation()[1]; //for log もとの目標着地位置
   {
     std::vector<std::pair<std::vector<cnoid::Vector3>, double> > nextCandidates;
     for(int i=0;i<candidates.size();i++){
