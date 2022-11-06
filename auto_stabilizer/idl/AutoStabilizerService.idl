@@ -177,9 +177,11 @@ module OpenHRP
       double leg_collision_margin;
       /// [s]. goPosやgoVelocityのときに自動生成されるfootstepの一歩の時間. 下限0.01[s]
       double default_step_time;
-      /// [rad]. goPosやgoVelocityのときに自動生成されるfootstepの上下限. 支持脚相対. 下限0[rad]
-      double default_stride_limitation_theta;
-      /// 要素数2. 0: rleg用, 1: lleg用. 単位[m]. goPosやgoVelocityのときに自動生成されるfootstepの、遊脚のエンドエフェクタの着地位置の範囲の凸包. 反対の脚のEndEffector frame(Z軸は鉛直)で表現した着地可能領域(自己干渉やIKの考慮が含まれる). 凸形状で,上から見て半時計回り. thetaとは独立に評価されるので、defaultStrideLimitationThetaだけ傾いていても大丈夫なようにせよ
+      /// 要素数2. rleg: 0. lleg: 1. leg frame. [rad]. goPosやgoVelocityのときに自動生成されるfootstepの上限. 支持脚相対. default 15,45[deg]. 0以上. 足裏同士の干渉は自動で回避できるが、膝同士の干渉はIK以外では回避できないので、内股方向には小さくすること.
+      sequence<double, 2> default_stride_limitation_max_theta;
+      /// 要素数2. rleg: 0. lleg: 1. leg frame. [rad]. goPosやgoVelocityのときに自動生成されるfootstepの下限. 支持脚相対. default 15,45[deg]. 0以下. 足裏同士の干渉は自動で回避できるが、膝同士の干渉はIK以外では回避できないので、内股方向には小さくすること.
+      sequence<double, 2> default_stride_limitation_min_theta;
+      /// 要素数2. 0: rleg用, 1: lleg用. 単位[m]. goPosやgoVelocityのときに自動生成されるfootstepの、遊脚のエンドエフェクタの着地位置の範囲の凸包. 反対の脚のEndEffector frame(Z軸は鉛直)で表現した着地可能領域(自己干渉やIKの考慮が含まれる). あったほうが扱いやすいのでZ成分があるが、Z成分は0でないといけない. 凸形状で,上から見て半時計回り. thetaの影響はlegHullとlegCollisionMarginを用いて別で評価されるので、defaultStrideLimitationHullでは考慮しなくて良い
       sequence<sequence<sequence<double, 2> >, 2> default_stride_limitation;
       /// defaultStepTimeのうちの、両足支持期の時間の割合. 下限0.01. 上限0.99
       double default_double_support_ratio;
@@ -201,9 +203,11 @@ module OpenHRP
       double overwritable_max_swing_velocity;
       /// 要素数2. rleg: 0. lleg: 1. leg frame. 単位[m]. 凸形状で,上から見て半時計回り. 大きさはleg_hull以下にすること
       sequence<sequence<sequence<double, 2> >, 2> safe_leg_hull;
-      /// [rad]. 着地位置修正時に自動生成されるfootstepの上下限. 支持脚相対. 下限0[rad]
-      double overwritable_stride_limitation_theta;
-      /// 要素数2. 0: rleg用, 1: lleg用. 単位[m. 着地位置修正時に自動生成されるfootstepの上下限の凸包. 反対の脚のEndEffector frame(Z軸は鉛直)で表現した着地可能領域(自己干渉やIKの考慮が含まれる). 凸形状で,上から見て半時計回り. thetaとは独立に評価されるので、defaultStrideLimitationThetaだけ傾いていても大丈夫なようにせよ. 斜め方向の角を削るなどして、IKが解けるようにせよ. 歩行中は変更不可
+      /// 要素数2. rleg: 0. lleg: 1. leg frame. [rad]. 着地位置修正時に自動生成されるfootstepの上限. 支持脚相対. default 15,90[deg]. 0以上. 現状ではsetFootStepsのリミットとしてしか使われていない. 足裏同士の干渉は自動で回避できるが、膝同士の干渉はIK以外では回避できないので、内股方向には小さくすること.
+      sequence<double, 2>  overwritable_stride_limitation_max_theta;
+      /// 要素数2. rleg: 0. lleg: 1. leg frame. [rad]. 着地位置修正時に自動生成されるfootstepの下限. 支持脚相対. default 15,90[deg]. 0以下. 現状ではsetFootStepsのリミットとしてしか使われていない. 足裏同士の干渉は自動で回避できるが、膝同士の干渉はIK以外では回避できないので、内股方向には小さくすること.
+      sequence<double, 2>  overwritable_stride_limitation_min_theta;
+      /// 要素数2. 0: rleg用, 1: lleg用. 着地位置修正時に自動生成されるfootstepの上下限の凸包. 反対の脚のEndEffector frame(Z軸は鉛直)で表現した着地可能領域(自己干渉やIKの考慮が含まれる). あったほうが扱いやすいのでZ成分があるが、Z成分は0でないといけない. 凸形状で,上から見て半時計回り. thetaの影響はlegHullとlegCollisionMarginを用いて別で評価されるので、defaultStrideLimitationHullでは考慮しなくて良い. 斜め方向の角を削るなどして、IKが解けるようにせよ. 歩行中は急激に変更されない
       sequence<sequence<sequence<double, 2> >, 2> overwritable_stride_limitation;
       /// [m]. 反対の脚のEndEffector frame(Z軸は鉛直)で表現した着地高さの上限(自己干渉やIKの考慮が含まれる).
       double overwritable_max_landing_height;

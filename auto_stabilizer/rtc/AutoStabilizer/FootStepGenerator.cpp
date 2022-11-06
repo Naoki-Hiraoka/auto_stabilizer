@@ -92,16 +92,13 @@ bool FootStepGenerator::setFootSteps(const GaitParam& gaitParam, const std::vect
     fs.dstCoords[supportLeg] = footstepNodesList.back().dstCoords[supportLeg];
     {
       cnoid::Position transform = legPoseInFootSteps[supportLeg].inverse() * footsteps[i].coords; // supportLeg相対(Z軸は鉛直)での次のswingLegの位置
-      if(!footsteps[i].swingEnd){ // 着地位置をoverwritableStrideLimitationでリミット.
-        cnoid::Vector3 localZ = transform.linear() * cnoid::Vector3::Zero();
-        double theta = cnoid::rpyFromRot(mathutil::orientCoordToAxis(transform.linear(), cnoid::Vector3::Zero()))[2];
-        theta = mathutil::clamp(theta, this->overwritableStrideLimitationTheta);
-        transform.linear() = mathutil::orientCoordToAxis(cnoid::AngleAxis(theta, cnoid::Vector3::UnitZ()).toRotationMatrix(), localZ);
-        std::vector<cnoid::Vector3> strideLimitationHull = this->calcRealStrideLimitationHull(swingLeg, theta, gaitParam.legHull, gaitParam.defaultTranslatePos, this->overwritableStrideLimitationHull);
-        std::cerr << transform.translation().transpose() << std::endl;
-        transform.translation() = mathutil::calcNearestPointOfHull(transform.translation(), strideLimitationHull);
-        std::cerr << transform.translation().transpose() << std::endl;
-      }
+      // 着地位置をoverwritableStrideLimitationでリミット. swingEndのときでもリミットしたほうが良い
+      cnoid::Vector3 localZ = transform.linear() * cnoid::Vector3::Zero();
+      double theta = cnoid::rpyFromRot(mathutil::orientCoordToAxis(transform.linear(), cnoid::Vector3::Zero()))[2];
+      theta = mathutil::clamp(theta, this->overwritableStrideLimitationMinTheta[swingLeg], this->overwritableStrideLimitationMaxTheta[swingLeg]);
+      transform.linear() = mathutil::orientCoordToAxis(cnoid::AngleAxis(theta, cnoid::Vector3::UnitZ()).toRotationMatrix(), localZ);
+      std::vector<cnoid::Vector3> strideLimitationHull = this->calcRealStrideLimitationHull(swingLeg, theta, gaitParam.legHull, gaitParam.defaultTranslatePos, this->overwritableStrideLimitationHull);
+      transform.translation().head<2>() = mathutil::calcNearestPointOfHull(transform.translation(), strideLimitationHull).head<2>();
       fs.dstCoords[swingLeg] = mathutil::orientCoordToAxis(footstepNodesList.back().dstCoords[supportLeg], cnoid::Vector3::UnitZ()) * transform;
     }
     legPoseInFootSteps[swingLeg] = mathutil::orientCoordToAxis(footsteps[i].coords, cnoid::Vector3::UnitZ());
@@ -469,7 +466,7 @@ GaitParam::FootStepNodes FootStepGenerator::calcDefaultSwingStep(const int& swin
   int supportLeg = (swingLeg == RLEG) ? LLEG : RLEG;
 
   cnoid::Position transform = cnoid::Position::Identity(); // supportLeg相対(Z軸は鉛直)での次のswingLegの位置
-  double theta = mathutil::clamp(offset[2],this->defaultStrideLimitationTheta);
+  double theta = mathutil::clamp(offset[2],this->defaultStrideLimitationMinTheta[swingLeg],this->defaultStrideLimitationMaxTheta[swingLeg]);
   transform.linear() = cnoid::Matrix3(Eigen::AngleAxisd(theta, cnoid::Vector3::UnitZ()));
   transform.translation() = - gaitParam.defaultTranslatePos[supportLeg].value() + cnoid::Vector3(offset[0], offset[1], 0.0) + transform.linear() * gaitParam.defaultTranslatePos[swingLeg].value();
   std::vector<cnoid::Vector3> strideLimitationHull = this->calcRealStrideLimitationHull(swingLeg, theta, gaitParam.legHull, gaitParam.defaultTranslatePos, this->defaultStrideLimitationHull);

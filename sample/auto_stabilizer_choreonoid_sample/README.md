@@ -60,6 +60,9 @@ roseus
               (make-coords :pos (float-vector 0 100 0) :name :lleg)
               (make-coords :pos (float-vector 0 100 0) :name :lleg)
               (make-coords :pos (float-vector 0 100 0) :name :lleg)))
+(send *ri* :set-foot-steps
+        (list (make-coords :pos (float-vector 0 -100 0) :name :rleg)
+              (make-coords :pos (float-vector 0 100 0) :rpy (float-vector pi/2 0 0) :name :lleg)))
 (send *ri* :start-impedance :arms)
 (send *ri* :stop-impedance :arms)
 (print-ros-msg (send *ri* :get-auto-stabilizer-param))
