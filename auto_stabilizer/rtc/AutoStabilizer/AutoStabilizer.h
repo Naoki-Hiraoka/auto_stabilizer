@@ -122,12 +122,17 @@ protected:
     RTC::OutPort<RTC::TimedAcceleration3D> m_genImuAccOut_;
     auto_stabilizer_msgs::TimedLandingPosition m_landingTarget_; // 着地位置. 支持脚を水平にした座標系
     RTC::OutPort<auto_stabilizer_msgs::TimedLandingPosition> m_landingTargetOut_;
+    std::vector<RTC::TimedPose3D> m_actEEPose_; // Generate World frame. 要素数及び順番はgaitParam_.eeNameと同じ
+    std::vector<std::unique_ptr<RTC::OutPort<RTC::TimedPose3D> > > m_actEEPoseOut_;
+    std::vector<RTC::TimedDoubleSeq> m_actEEWrench_; // Generate World frame. EndEffector origin. 要素数及び順番はgaitParam_.eeNameと同じ. ロボットが受ける力
+    std::vector<std::unique_ptr<RTC::OutPort<RTC::TimedDoubleSeq> > > m_actEEWrenchOut_;
 
     AutoStabilizerService_impl m_service0_;
     RTC::CorbaPort m_AutoStabilizerServicePort_;
 
     RTC::CorbaConsumer<OpenHRP::RobotHardwareService> m_robotHardwareService0_;
     RTC::CorbaPort m_RobotHardwareServicePort_;
+
 
     // only for log
     RTC::TimedPoint3D m_genBasePos_; // Generate World frame
@@ -162,13 +167,8 @@ protected:
     RTC::OutPort<RTC::TimedDoubleSeq> m_strideLimitationHullOut_; // for log
     RTC::TimedDoubleSeq m_cpViewerLog_;
     RTC::OutPort<RTC::TimedDoubleSeq> m_cpViewerLogOut_; // for log
-
-    std::vector<RTC::TimedPose3D> m_actEEPose_; // Generate World frame. 要素数及び順番はgaitParam_.eeNameと同じ
-    std::vector<std::unique_ptr<RTC::OutPort<RTC::TimedPose3D> > > m_actEEPoseOut_;
     std::vector<RTC::TimedDoubleSeq> m_tgtEEWrench_; // Generate World frame. EndEffector origin. 要素数及び順番はgaitParam_.eeNameと同じ. ロボットが受ける力
     std::vector<std::unique_ptr<RTC::OutPort<RTC::TimedDoubleSeq> > > m_tgtEEWrenchOut_;
-    std::vector<RTC::TimedDoubleSeq> m_actEEWrench_; // Generate World frame. EndEffector origin. 要素数及び順番はgaitParam_.eeNameと同じ. ロボットが受ける力
-    std::vector<std::unique_ptr<RTC::OutPort<RTC::TimedDoubleSeq> > > m_actEEWrenchOut_;
   };
   Ports ports_;
 

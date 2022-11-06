@@ -119,9 +119,6 @@ public:
   std::vector<SwingState_enum> swingState = std::vector<SwingState_enum>(NUM_LEGS,LIFT_PHASE); // 要素数2. rleg: 0. lleg: 0. isSupportPhase = falseの脚は、footstep開始時はLIFT_PHASEで、LIFT_PHASE->SWING_PHASE->DOWN_PHASEと遷移する. 一度DOWN_PHASEになったら次のfootstepが始まるまで別のPHASEになることはない. DOWN_PHASEのときはfootstepNodesList[0]のdstCoordsはgenCoordsよりも高い位置に変更されることはない. isSupportPhase = trueの脚は、swingStateは参照されない(常にLIFT_PHASEとなる).
   double elapsedTime = 0.0; // 現在のfootstep開始時からの経過時間
   std::vector<bool> prevSupportPhase = std::vector<bool>{true, true}; // 要素数2. rleg: 0. lleg: 1. 一つ前の周期でSupportPhaseだったかどうか
-  std::vector<cnoid::Vector3> strideLimitationHull = std::vector<cnoid::Vector3>(); // generate frame. overwritableStrideLimitationHullの範囲内の着地位置(自己干渉・IKの考慮が含まれる). Z成分には0を入れる
-  std::vector<std::vector<cnoid::Vector3> > capturableHulls = std::vector<std::vector<cnoid::Vector3> >(); // 要素数と順番はcandidatesに対応
-  std::vector<double> cpViewerLog = std::vector<double>();
 
   // LegCoordsGenerator
   std::vector<cpp_filters::TwoPointInterpolatorSE3> genCoords = std::vector<cpp_filters::TwoPointInterpolatorSE3>(NUM_LEGS, cpp_filters::TwoPointInterpolatorSE3(cnoid::Position::Identity(),cnoid::Vector6::Zero(),cnoid::Vector6::Zero(),cpp_filters::HOFFARBIB)); // 要素数2. rleg: 0. lleg: 1. generate frame. 現在の位置
@@ -144,6 +141,15 @@ public:
   // FullbodyIKSolver
   cnoid::BodyPtr genRobot; // output. 関節位置制御用
 
+  // for debug data
+  class DebugData {
+  public:
+    std::vector<cnoid::Vector3> strideLimitationHull = std::vector<cnoid::Vector3>(); // generate frame. overwritableStrideLimitationHullの範囲内の着地位置(自己干渉・IKの考慮が含まれる). Z成分には0を入れる
+    std::vector<std::vector<cnoid::Vector3> > capturableHulls = std::vector<std::vector<cnoid::Vector3> >(); // generate frame. 要素数と順番はcandidatesに対応
+    std::vector<double> cpViewerLog = std::vector<double>(37, 0.0);
+  };
+  DebugData debugData; // デバッグ用のOutPortから出力するためのデータ. AutoStabilizer内の制御処理では使われることは無い. そのため、モード遷移や初期化等の処理にはあまり注意を払わなくて良い
+
 public:
   bool isStatic() const{ // 現在static状態かどうか
     return this->footstepNodesList.size() == 1 && this->footstepNodesList[0].remainTime == 0.0;
@@ -154,7 +160,6 @@ public:
     maxTorque.resize(robot->numJoints(), std::numeric_limits<double>::max());
     jointLimitTables.resize(robot->numJoints());
     jointControllable.resize(robot->numJoints(), true);
-    cpViewerLog.resize(37, 0.0);
     refRobotRaw = robot->clone();
     refRobotRaw->calcForwardKinematics(); refRobotRaw->calcCenterOfMass();
     actRobotRaw = robot->clone();

@@ -12,6 +12,17 @@
 # Escで終了
 ################
 
+#####表示内容#####
+# 水色の丸: genCoords
+# 青色の丸: dstCoords
+# 紫色の丸: 遊脚dstCoordsOrg
+# 赤色の丸: actDCM
+# 緑色の領域: 支持脚 safeLegHull
+# 水色の領域: capturableHull
+# 黄色の領域: strideLimitationHull
+# 深緑の領域: steppableRegion
+##################
+
 import cv2
 import numpy as np
 import math

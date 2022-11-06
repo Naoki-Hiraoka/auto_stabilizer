@@ -599,7 +599,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
   footStepGenerator.procFootStepNodesList(gaitParam, dt, mode.isSTRunning(),
                                           gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.dstCoordsOrg, gaitParam.remainTimeOrg, gaitParam.swingState, gaitParam.elapsedTime, gaitParam.prevSupportPhase, gaitParam.relLandingHeight);
   footStepGenerator.calcFootSteps(gaitParam, dt, mode.isSTRunning(),
-                                  gaitParam.strideLimitationHull, gaitParam.capturableHulls, gaitParam.cpViewerLog, //for log
+                                  gaitParam.debugData, //for log
                                   gaitParam.footstepNodesList);
   legCoordsGenerator.calcLegCoords(gaitParam, dt, mode.isSTRunning(),
                                    gaitParam.refZmpTraj, gaitParam.genCoords, gaitParam.swingState);
@@ -812,7 +812,28 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
     ports.m_landingTargetOut_.write();
   }
 
-  // only for logger or wholebodymasterslave. (IDLE時の出力や、モード遷移時の連続性はてきとうで良い)
+  // actEEPose actEEWrench (for wholebodymasterslave)
+  if(mode.isABCRunning()){
+    for(int i=0;i<gaitParam.eeName.size();i++){
+      ports.m_actEEPose_[i].tm = ports.m_qRef_.tm;
+      ports.m_actEEPose_[i].data.position.x = gaitParam.actEEPose[i].translation()[0];
+      ports.m_actEEPose_[i].data.position.y = gaitParam.actEEPose[i].translation()[1];
+      ports.m_actEEPose_[i].data.position.z = gaitParam.actEEPose[i].translation()[2];
+      cnoid::Vector3 rpy = cnoid::rpyFromRot(gaitParam.actEEPose[i].linear());
+      ports.m_actEEPose_[i].data.orientation.r = rpy[0];
+      ports.m_actEEPose_[i].data.orientation.p = rpy[1];
+      ports.m_actEEPose_[i].data.orientation.y = rpy[2];
+      ports.m_actEEPoseOut_[i]->write();
+    }
+    for(int i=0;i<gaitParam.eeName.size();i++){
+      ports.m_actEEWrench_[i].tm = ports.m_qRef_.tm;
+      ports.m_actEEWrench_[i].data.length(6);
+      for(int j=0;j<6;j++) ports.m_actEEWrench_[i].data[j] = gaitParam.actEEWrench[i][j];
+      ports.m_actEEWrenchOut_[i]->write();
+    }
+  }
+
+  // only for logger. (IDLE時の出力や、モード遷移時の連続性はてきとうで良い)
   if(mode.isABCRunning()){
     ports.m_genCog_.tm = ports.m_qRef_.tm;
     ports.m_genCog_.data.x = gaitParam.genCog[0];
@@ -871,13 +892,13 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
     {
       ports.m_captureRegion_.tm = ports.m_qRef_.tm;
       int sum = 0;
-      for (int i=0; i<gaitParam.capturableHulls.size(); i++) sum+=gaitParam.capturableHulls[i].size();
+      for (int i=0; i<gaitParam.debugData.capturableHulls.size(); i++) sum+=gaitParam.debugData.capturableHulls[i].size();
       ports.m_captureRegion_.data.length(sum*2);
       int index = 0;
-      for (int i=0; i<gaitParam.capturableHulls.size(); i++) {
-        for (int j=0; j<gaitParam.capturableHulls[i].size(); j++) {
-          ports.m_captureRegion_.data[index+0] = gaitParam.capturableHulls[i][j][0];
-          ports.m_captureRegion_.data[index+1] = gaitParam.capturableHulls[i][j][1];
+      for (int i=0; i<gaitParam.debugData.capturableHulls.size(); i++) {
+        for (int j=0; j<gaitParam.debugData.capturableHulls[i].size(); j++) {
+          ports.m_captureRegion_.data[index+0] = gaitParam.debugData.capturableHulls[i][j][0];
+          ports.m_captureRegion_.data[index+1] = gaitParam.debugData.capturableHulls[i][j][1];
           index+=2;
         }
       }
@@ -903,35 +924,18 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
       ports.m_steppableRegionNumLogOut_.write();
     }
     ports.m_strideLimitationHull_.tm = ports.m_qRef_.tm;
-    ports.m_strideLimitationHull_.data.length(gaitParam.strideLimitationHull.size()*2);
-    for (int i=0; i<gaitParam.strideLimitationHull.size(); i++) {
-      ports.m_strideLimitationHull_.data[i*2+0] = gaitParam.strideLimitationHull[i][0];
-      ports.m_strideLimitationHull_.data[i*2+1] = gaitParam.strideLimitationHull[i][1];
+    ports.m_strideLimitationHull_.data.length(gaitParam.debugData.strideLimitationHull.size()*2);
+    for (int i=0; i<gaitParam.debugData.strideLimitationHull.size(); i++) {
+      ports.m_strideLimitationHull_.data[i*2+0] = gaitParam.debugData.strideLimitationHull[i][0];
+      ports.m_strideLimitationHull_.data[i*2+1] = gaitParam.debugData.strideLimitationHull[i][1];
     }
     ports.m_strideLimitationHullOut_.write();
     ports.m_cpViewerLog_.tm = ports.m_qRef_.tm;
-    ports.m_cpViewerLog_.data.length(gaitParam.cpViewerLog.size());
-    for (int i=0; i<gaitParam.cpViewerLog.size(); i++) {
-      ports.m_cpViewerLog_.data[i] = gaitParam.cpViewerLog[i];
+    ports.m_cpViewerLog_.data.length(gaitParam.debugData.cpViewerLog.size());
+    for (int i=0; i<gaitParam.debugData.cpViewerLog.size(); i++) {
+      ports.m_cpViewerLog_.data[i] = gaitParam.debugData.cpViewerLog[i];
     }
     ports.m_cpViewerLogOut_.write();
-    for(int i=0;i<gaitParam.eeName.size();i++){
-      ports.m_actEEPose_[i].tm = ports.m_qRef_.tm;
-      ports.m_actEEPose_[i].data.position.x = gaitParam.actEEPose[i].translation()[0];
-      ports.m_actEEPose_[i].data.position.y = gaitParam.actEEPose[i].translation()[1];
-      ports.m_actEEPose_[i].data.position.z = gaitParam.actEEPose[i].translation()[2];
-      cnoid::Vector3 rpy = cnoid::rpyFromRot(gaitParam.actEEPose[i].linear());
-      ports.m_actEEPose_[i].data.orientation.r = rpy[0];
-      ports.m_actEEPose_[i].data.orientation.p = rpy[1];
-      ports.m_actEEPose_[i].data.orientation.y = rpy[2];
-      ports.m_actEEPoseOut_[i]->write();
-    }
-    for(int i=0;i<gaitParam.eeName.size();i++){
-      ports.m_actEEWrench_[i].tm = ports.m_qRef_.tm;
-      ports.m_actEEWrench_[i].data.length(6);
-      for(int j=0;j<6;j++) ports.m_actEEWrench_[i].data[j] = gaitParam.actEEWrench[i][j];
-      ports.m_actEEWrenchOut_[i]->write();
-    }
     for(int i=0;i<gaitParam.eeName.size();i++){
       ports.m_tgtEEWrench_[i].tm = ports.m_qRef_.tm;
       ports.m_tgtEEWrench_[i].data.length(6);
