@@ -143,7 +143,7 @@ protected:
   // indexのsupportLegが次にswingするまでの間の位置を、generate frameで(左から)transformだけ動かす
   void transformCurrentSupportSteps(int leg, std::vector<GaitParam::FootStepNodes>& footstepNodesList, int index, const cnoid::Position& transform/*generate frame*/) const;
   // footstepNodesの次の一歩を作る. RLEGとLLEGどちらをswingすべきかも決める
-  void calcDefaultNextStep(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >& defaultTranslatePos, bool lastStep, const cnoid::Vector3& offset = cnoid::Vector3::Zero() /*leg frame*/) const;
+  void calcDefaultNextStep(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >& defaultTranslatePos, const cnoid::Vector3& offset = cnoid::Vector3::Zero() /*leg frame*/, bool stableStart = true) const;
   // footstepNodesの次の一歩を作る.
   GaitParam::FootStepNodes calcDefaultSwingStep(const int& swingLeg, const GaitParam::FootStepNodes& footstepNodes, const std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >& defaultTranslatePos, const cnoid::Vector3& offset = cnoid::Vector3::Zero(), bool startWithSingleSupport = false) const;
   GaitParam::FootStepNodes calcDefaultDoubleSupportStep(const GaitParam::FootStepNodes& footstepNodes, double doubleSupportTime, GaitParam::FootStepNodes::refZmpState_enum endRefZmpState) const;
