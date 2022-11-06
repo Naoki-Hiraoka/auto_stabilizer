@@ -98,10 +98,21 @@ public:
       それ以外には、footstepNodesList[0]のremainTimeが突然0になることはない
       footstepNodesList[1]のisSupportPhaseは、footstepNodesListのサイズが1である場合を除いて変更されない.
       両足支持期の次のstepのisSupportPhaseを変えたり、後ろに新たにfootstepNodesを追加する場合、必ず両足支持期のremainTimeをそれなりに長い時間にする(片足に重心やrefZmpを移す補間の時間のため)
+
+      右脚支持期の直前のnodeのendRefZmpStateはRLEGでなければならない
+      右脚支持期のnodeのendRefZmpStateはRLEGでなければならない
+      左脚支持期の直前のnodeのendRefZmpStateはLLEGでなければならない
+      左脚支持期のnodeのendRefZmpStateはLLEGでなければならない
+      両脚支持期の直前のnodeのendRefZmpStateはRLEG or LLEG or MIDDLEでなければならない.
+      両脚支持期のnodeのendRefZmpStateはRLEG or LLEG or MIDDLEでなければならない.
+      footstepNodesList[0]のendRefZmpStateは変更されない.
+      footstepNodesList[0]のendRefZmpStateは、isStatic()である場合を除いて変更されない.
     */
     std::vector<cnoid::Position> dstCoords = std::vector<cnoid::Position>(NUM_LEGS,cnoid::Position::Identity()); // 要素数2. rleg: 0. lleg: 1. generate frame.
     std::vector<bool> isSupportPhase = std::vector<bool>(NUM_LEGS, true); // 要素数2. rleg: 0. lleg: 1. footstepNodesListの末尾の要素が両方falseであることは無い
     double remainTime = 0.0;
+    enum class refZmpState_enum{RLEG, LLEG, MIDDLE};
+    refZmpState_enum endRefZmpState = refZmpState_enum::MIDDLE; // このnode終了時のrefZmpの位置.
 
     // 遊脚軌道用パラメータ
     std::vector<std::vector<double> > stepHeight = std::vector<std::vector<double> >(NUM_LEGS,std::vector<double>(2,0)); // 要素数2. rleg: 0. lleg: 1. swing期には、srcCoordsの高さ+[0]とdstCoordsの高さ+[1]の高い方に上げるような軌道を生成する

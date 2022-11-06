@@ -199,6 +199,8 @@ module OpenHRP
       double overwritable_max_swing_velocity;
       /// 要素数2. rleg: 0. lleg: 1. leg frame. 単位[m]. 凸形状で,上から見て半時計回り. 大きさはleg_hull以下にすること
       sequence<sequence<sequence<double, 2> >, 2> safe_leg_hull;
+      /// [rad]. 着地位置修正時に自動生成されるfootstepの上下限. 支持脚相対. 下限0[rad]
+      double overwritable_stride_limitation_theta;
       /// 要素数2. 0: rleg用, 1: lleg用. 単位[m. 着地位置修正時に自動生成されるfootstepの上下限の凸包. 反対の脚のEndEffector frame(Z軸は鉛直)で表現した着地可能領域(自己干渉やIKの考慮が含まれる). 凸形状で,上から見て半時計回り. thetaとは独立に評価されるので、defaultStrideLimitationThetaだけ傾いていても大丈夫なようにせよ. 斜め方向の角を削るなどして、IKが解けるようにせよ. 歩行中は変更不可
       sequence<sequence<sequence<double, 2> >, 2> overwritable_stride_limitation;
       /// [m]. 反対の脚のEndEffector frame(Z軸は鉛直)で表現した着地高さの上限(自己干渉やIKの考慮が含まれる).

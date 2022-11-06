@@ -1389,6 +1389,7 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
       if(vertices.size() > 0) this->footStepGenerator_.safeLegHull[i] = vertices;
     }
   }
+  this->footStepGenerator_.overwritableStrideLimitationTheta = std::max(i_param.overwritable_stride_limitation_theta, 0.0);
   if(!this->mode_.isABCRunning() || this->gaitParam_.isStatic()){
     if(i_param.overwritable_stride_limitation.length() == NUM_LEGS){
       for(int i=0;i<NUM_LEGS;i++){
@@ -1581,6 +1582,7 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
       for(int k=0;k<2;k++) i_param.safe_leg_hull[i][j][k] = this->footStepGenerator_.safeLegHull[i][j][k];
     }
   }
+  i_param.overwritable_stride_limitation_theta = this->footStepGenerator_.overwritableStrideLimitationTheta;
   i_param.overwritable_stride_limitation.length(NUM_LEGS);
   for(int i=0;i<NUM_LEGS;i++){
     i_param.overwritable_stride_limitation[i].length(this->footStepGenerator_.overwritableStrideLimitationHull[i].size());
