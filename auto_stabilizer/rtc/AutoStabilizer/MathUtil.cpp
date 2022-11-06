@@ -283,4 +283,20 @@ namespace mathutil {
     Eigen::Vector3d nearestPoint =  calcNearestPointOfHull(Eigen::Vector3d::Zero(),hull);
     return frame * nearestPoint;
   }
+
+  double findExtreams(const std::vector<Eigen::Vector3d>& vertices, const Eigen::Vector3d& dir, std::vector<Eigen::Vector3d>& ret){
+    ret.clear();
+    double maxValue = - std::numeric_limits<double>::max();
+    for(int i=0;i<vertices.size();i++){
+      double value = vertices[i].dot(dir);
+      if(value > maxValue + 1e-4){
+        ret.clear();
+        ret.push_back(vertices[i]);
+        maxValue = value;
+      }else if(value >= maxValue - 1e-4 && value <= maxValue + 1e-4){
+        ret.push_back(vertices[i]);
+      }
+    }
+    return maxValue;
+  }
 };

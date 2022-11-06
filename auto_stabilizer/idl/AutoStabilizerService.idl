@@ -173,6 +173,8 @@ module OpenHRP
       sequence<double, 3> graspless_manip_time_const;
 
       // FootStepGenerator
+      /// [m]. 左右の足のlegHullがこの距離以上離れるようにする. 0以上.
+      double leg_collision_margin;
       /// [s]. goPosやgoVelocityのときに自動生成されるfootstepの一歩の時間. 下限0.01[s]
       double default_step_time;
       /// [rad]. goPosやgoVelocityのときに自動生成されるfootstepの上下限. 支持脚相対. 下限0[rad]

@@ -1362,6 +1362,7 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
     }
   }
 
+  this->footStepGenerator_.legCollisionMargin = std::max(i_param.leg_collision_margin, 0.0);
   this->footStepGenerator_.defaultStepTime = std::max(i_param.default_step_time, 0.01);
   this->footStepGenerator_.defaultStrideLimitationTheta = std::max(i_param.default_stride_limitation_theta, 0.0);
   if(i_param.default_stride_limitation.length() == NUM_LEGS){
@@ -1555,6 +1556,7 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
     i_param.graspless_manip_time_const[i] = this->cmdVelGenerator_.graspLessManipTimeConst[i];
   }
 
+  i_param.leg_collision_margin = this->footStepGenerator_.legCollisionMargin;
   i_param.default_step_time = this->footStepGenerator_.defaultStepTime;
   i_param.default_stride_limitation_theta = this->footStepGenerator_.defaultStrideLimitationTheta;
   i_param.default_stride_limitation.length(NUM_LEGS);

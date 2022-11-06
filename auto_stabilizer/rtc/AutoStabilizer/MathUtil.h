@@ -57,6 +57,8 @@ namespace mathutil {
   // originから見て、pがverticesの内部に入るようにする. pの高さのXY平面で考える
   Eigen::Vector3d calcInsidePointOfPolygon3D(const Eigen::Vector3d& p, const std::vector<Eigen::Vector3d>& vertices, const Eigen::Vector3d& origin);
 
+  // dir方向に最も遠いverticesと、その距離を返す. dirのノルムは1.
+  double findExtreams(const std::vector<Eigen::Vector3d>& vertices, const Eigen::Vector3d& dir, std::vector<Eigen::Vector3d>& ret);
 };
 
 

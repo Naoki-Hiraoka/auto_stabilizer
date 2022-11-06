@@ -92,6 +92,7 @@ roseus
 (send *ri* :go-pos 0 0 0)
 (send *robot* :reset-pose)
 (send *ri* :angle-vector (send *robot* :angle-vector) 3000)
+(send *ri* :wait-interpolation)
 (send *ri* :set-auto-stabilizer-param
       :reference-frame (list t t)
       :is-hand-fix-mode nil
