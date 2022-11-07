@@ -1609,6 +1609,7 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
       for(int k=0;k<2;k++) i_param.safe_leg_hull[i][j][k] = this->footStepGenerator_.safeLegHull[i][j][k];
     }
   }
+  i_param.overwritable_stride_limitation_max_theta.length(NUM_LEGS);
   for(int i=0;i<NUM_LEGS;i++){
     i_param.overwritable_stride_limitation_max_theta[i] = this->footStepGenerator_.overwritableStrideLimitationMaxTheta[i];
   }
