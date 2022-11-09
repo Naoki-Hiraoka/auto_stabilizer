@@ -92,8 +92,12 @@ namespace mathutil {
     // Z成分は無視する.
     std::vector<Eigen::Vector3d> tmpVertices(vertices.size());
     for (int i = 0; i < vertices.size(); i++) tmpVertices[i] = Eigen::Vector3d(vertices[i][0],vertices[i][1],0.0);
+    if(tmpVertices.size() == 1) return tmpVertices;
+    if(tmpVertices.size() == 2) {
+      if(tmpVertices[0] != tmpVertices[1]) return tmpVertices;
+      else return std::vector<Eigen::Vector3d>{tmpVertices[0]};
+    }
     std::sort(tmpVertices.begin(), tmpVertices.end(), [](const Eigen::Vector3d& lv, const Eigen::Vector3d& rv){ return lv(0) < rv(0) || (lv(0) == rv(0) && lv(1) < rv(1));});
-
     std::vector<Eigen::Vector3d> convexHull(2*tmpVertices.size());
     int n_ch = 0;
     for (int i = 0; i < tmpVertices.size(); convexHull[n_ch++] = tmpVertices[i++])
