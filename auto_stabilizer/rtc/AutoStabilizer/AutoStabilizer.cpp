@@ -958,6 +958,7 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
   this->mode_.update(this->dt_);
   this->gaitParam_.update(this->dt_);
   this->refToGenFrameConverter_.update(this->dt_);
+  this->fullbodyIKSolver_.update(this->dt_);
 
   if(this->mode_.isABCRunning()) {
     if(this->mode_.isSyncToABCInit()){ // startAutoBalancer直後の初回. 内部パラメータのリセット
@@ -967,6 +968,7 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
       this->externalForceHandler_.reset();
       this->footStepGenerator_.reset();
       this->impedanceController_.reset();
+      this->fullbodyIKSolver_.reset();
     }
     AutoStabilizer::execAutoStabilizer(this->mode_, this->gaitParam_, this->dt_, this->footStepGenerator_, this->legCoordsGenerator_, this->refToGenFrameConverter_, this->actToGenFrameConverter_, this->impedanceController_, this->stabilizer_,this->externalForceHandler_, this->fullbodyIKSolver_, this->legManualController_, this->cmdVelGenerator_);
   }
@@ -1475,6 +1477,13 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
     }
   }
 
+  if(i_param.dq_weight.length() == this->fullbodyIKSolver_.dqWeight.size()){
+    for(int i=0;i<this->fullbodyIKSolver_.dqWeight.size();i++){
+      double value = std::max(0.01, i_param.dq_weight[i]);
+      if(value != this->fullbodyIKSolver_.dqWeight[i].getGoal()) this->fullbodyIKSolver_.dqWeight[i].setGoal(value, 2.0); // 2秒で遷移
+    }
+  }
+
   return true;
 }
 bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::AutoStabilizerParam& i_param) {
@@ -1675,6 +1684,11 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
       i_param.swing_pgain[i][j] = this->stabilizer_.swingPgain[i][j];
       i_param.swing_dgain[i][j] = this->stabilizer_.swingDgain[i][j];
     }
+  }
+
+  i_param.dq_weight.length(this->fullbodyIKSolver_.dqWeight.size());
+  for(int i=0;i<this->fullbodyIKSolver_.dqWeight.size();i++){
+    i_param.dq_weight[i] = this->fullbodyIKSolver_.dqWeight[i].getGoal();
   }
 
   return true;
