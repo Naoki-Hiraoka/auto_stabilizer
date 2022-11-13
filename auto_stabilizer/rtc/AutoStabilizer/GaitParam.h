@@ -15,6 +15,7 @@ enum leg_enum{RLEG=0, LLEG=1, NUM_LEGS=2};
 class GaitParam {
   // このクラスのメンバ変数は、全てfiniteである(nanやinfが無い)ことが仮定されている. 外部から値をセットするときには、finiteでない値を入れないようにすること
 
+  // robotは、rootLinkがFreeJointでなければならない
 public:
   // constant parameter
   std::vector<std::string> eeName; // constant. 要素数2以上. 0番目がrleg, 1番目がllegという名前である必要がある
