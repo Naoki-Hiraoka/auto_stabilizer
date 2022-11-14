@@ -60,6 +60,9 @@ roseus
               (make-coords :pos (float-vector 0 100 0) :name :lleg)
               (make-coords :pos (float-vector 0 100 0) :name :lleg)
               (make-coords :pos (float-vector 0 100 0) :name :lleg)))
+(send *ri* :set-foot-steps
+        (list (make-coords :pos (float-vector 0 -100 0) :name :rleg)
+              (make-coords :pos (float-vector 0 100 0) :rpy (float-vector pi/2 0 0) :name :lleg)))
 (send *ri* :start-impedance :arms)
 (send *ri* :stop-impedance :arms)
 (print-ros-msg (send *ri* :get-auto-stabilizer-param))
@@ -88,7 +91,11 @@ roseus
 (send *robot* :rleg :move-end-pos #F(0 -50 50))
 (send *robot* :rleg :move-end-rot 15 :y :local)
 (send *ri* :angle-vector (send *robot* :angle-vector) 3000)
+(send *ri* :wait-interpolation)
 (send *ri* :go-pos 0 0 0)
+(send *robot* :reset-pose)
+(send *ri* :angle-vector (send *robot* :angle-vector) 3000)
+(send *ri* :wait-interpolation)
 (send *ri* :set-auto-stabilizer-param
       :reference-frame (list t t)
       :is-hand-fix-mode nil

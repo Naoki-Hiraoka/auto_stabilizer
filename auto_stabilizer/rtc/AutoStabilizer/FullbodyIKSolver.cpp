@@ -9,10 +9,15 @@ bool FullbodyIKSolver::solveFullbodyIK(double dt, const GaitParam& gaitParam,
   }
 
   // jointControllableの関節のみ、探索変数にする
-  std::vector<cnoid::LinkPtr> variables;
+  std::vector<cnoid::LinkPtr> variables; variables.reserve(1+genRobot->numJoints());
+  std::vector<double> dqWeight; dqWeight.reserve(6+genRobot->numJoints());
   variables.push_back(genRobot->rootLink());
+  for(int i=0;i<6;i++) dqWeight.push_back(1.0);
   for(size_t i=0;i<genRobot->numJoints();i++){
-    if(gaitParam.jointControllable[i]) variables.push_back(genRobot->joint(i));
+    if(gaitParam.jointControllable[i]) {
+      variables.push_back(genRobot->joint(i));
+      dqWeight.push_back(this->dqWeight[i].value());
+    }
   }
 
   std::vector<std::shared_ptr<IK::IKConstraint> > ikConstraint0;
@@ -139,6 +144,7 @@ bool FullbodyIKSolver::solveFullbodyIK(double dt, const GaitParam& gaitParam,
   }
   prioritized_inverse_kinematics_solver::IKParam param;
   param.maxIteration = 1;
+  param.dqWeight = dqWeight;
   param.wn = 1e-6;
   param.we = 1e2; // 1e0だとやや不安定. 1e3だと大きすぎる
   param.debugLevel = 0;

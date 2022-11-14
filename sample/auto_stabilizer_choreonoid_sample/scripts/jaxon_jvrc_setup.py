@@ -134,6 +134,11 @@ class JAXON_RED_HrpsysConfigurator(ChoreonoidHrpsysConfigurator):
         ###
         self.rh_svc.setJointControlMode("all",OpenHRP.RobotHardwareService.TORQUE)
         self.rh_svc.setServoTorqueGainPercentage("all",100)
+        # ast setting
+        astp=self.ast_svc.getAutoStabilizerParam()[1]
+        astp.controllable_joints = self.Groups[0][1] + self.Groups[1][1] + self.Groups[2][1] + self.Groups[3][1] + self.Groups[4][1] + self.Groups[5][1] # remove hand joints
+        astp.dq_weight[12:15] = [1e2]*3 # reduce chest joint move
+        self.ast_svc.setAutoStabilizerParam(astp)
         self.ast_svc.startAutoBalancer()
         # Suppress limit over message and behave like real robot that always angle-vector is in seq.
         # Latter four 0.0 are for hands.

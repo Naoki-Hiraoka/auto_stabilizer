@@ -11,6 +11,9 @@ bool FootStepGenerator::initFootStepNodesList(const GaitParam& gaitParam,
   footstepNodesList[0].dstCoords = {rlegCoords, llegCoords};
   footstepNodesList[0].isSupportPhase = {(gaitParam.isManualControlMode[RLEG].getGoal() == 0.0), (gaitParam.isManualControlMode[LLEG].getGoal() == 0.0)};
   footstepNodesList[0].remainTime = 0.0;
+  if(footstepNodesList[0].isSupportPhase[RLEG] && !footstepNodesList[0].isSupportPhase[LLEG]) footstepNodesList[0].endRefZmpState = GaitParam::FootStepNodes::refZmpState_enum::RLEG;
+  else if(!footstepNodesList[0].isSupportPhase[RLEG] && footstepNodesList[0].isSupportPhase[LLEG]) footstepNodesList[0].endRefZmpState = GaitParam::FootStepNodes::refZmpState_enum::LLEG;
+  else footstepNodesList[0].endRefZmpState = GaitParam::FootStepNodes::refZmpState_enum::MIDDLE;
   std::vector<cnoid::Position> srcCoords = footstepNodesList[0].dstCoords;
   std::vector<cnoid::Position> dstCoordsOrg = footstepNodesList[0].dstCoords;
   double remainTimeOrg = footstepNodesList[0].remainTime;
@@ -43,43 +46,66 @@ bool FootStepGenerator::setFootSteps(const GaitParam& gaitParam, const std::vect
     return true;
   }
 
+  if(footsteps[0].l_r == footsteps[1].l_r){ // 基準が無い. 無効
+    o_footstepNodesList = gaitParam.footstepNodesList;
+    return false;
+  }
+
+  if((!gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && footsteps[1].l_r == LLEG) ||
+     (!gaitParam.footstepNodesList[0].isSupportPhase[LLEG] && footsteps[1].l_r == RLEG)){ // 空中の足を支持脚にしようとしている. 無効
+    o_footstepNodesList = gaitParam.footstepNodesList;
+    return false;
+  }
+
+  for(int i=1;i<footsteps.size();i++){
+    if((footsteps[i-1].l_r == RLEG && footsteps[i-1].swingEnd == true && footsteps[i].l_r == LLEG) ||
+       (footsteps[i-1].l_r == LLEG && footsteps[i-1].swingEnd == true && footsteps[i].l_r == RLEG)){ // 空中の足を支持脚にしようとしている. 無効
+      o_footstepNodesList = gaitParam.footstepNodesList;
+      return false;
+    }
+  }
+
   std::vector<GaitParam::FootStepNodes> footstepNodesList;
   footstepNodesList.push_back(gaitParam.footstepNodesList[0]);
 
   if(footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG]){ // 両足支持期を延長
     // 現在の時刻から突然refZmpTrajが変化すると、大きなZMP入力変化が必要になる. いまの位置でrefZmpTrajをthis->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio)の間とめて、次にthis->defaultStepTime * this->defaultDoubleSupportRatioの間で次の支持脚側に動かす
     footstepNodesList.back().remainTime = this->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio);
-    footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * this->defaultDoubleSupportRatio));
+    footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * this->defaultDoubleSupportRatio, GaitParam::FootStepNodes::refZmpState_enum::MIDDLE));
   }
 
-
-  // footstepsの0番目の要素は、実際には歩かず、基準座標としてのみ使われる. footstepNodesList[0].dstCoordsのZ軸を鉛直に直した座標系と、footstepsの0番目の要素のZ軸を鉛直に直した座標系が一致するように座標変換する.
-  if(!footstepNodesList.back().isSupportPhase[RLEG] && footsteps[0].l_r == RLEG){ // RLEGを下ろす必要がある
-    this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos);
-  }else if(!footstepNodesList.back().isSupportPhase[LLEG] && footsteps[0].l_r == LLEG){ // LLEGを下ろす必要がある
-    this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos);
-  }
-  cnoid::Position trans;
-  {
-    cnoid::Position genCoords = mathutil::orientCoordToAxis(footstepNodesList.back().dstCoords[footsteps[0].l_r], cnoid::Vector3::UnitZ());
-    cnoid::Position refCoords = mathutil::orientCoordToAxis(footsteps[0].coords, cnoid::Vector3::UnitZ());
-    trans = genCoords * refCoords.inverse();
-  }
-
+  // footstepsの0番目の要素は、実際には歩かず、基準座標としてのみ使われる.
+  // footstepsの反対側の足が最後についた位置姿勢のZ軸を鉛直に直した座標系からみたfootstepsのi番目の要素の位置姿勢に、
+  // footstepNodesList.back().dstCoordsのZ軸を鉛直に直した座標系から見た次の一歩の着地位置がなるように、座標変換する.
+  std::vector<cnoid::Position> legPoseInFootSteps(2); // footStepsの足が最後についた位置姿勢. footSteps frame
+  for(int i=0;i<2;i++) legPoseInFootSteps[footsteps[i].l_r] = mathutil::orientCoordToAxis(footsteps[i].coords, cnoid::Vector3::UnitZ());
   for(int i=1;i<footsteps.size();i++){
-    if(!footstepNodesList.back().isSupportPhase[RLEG] && footsteps[i].l_r == LLEG){ // RLEGを下ろす必要がある
-      this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos);
-    }else if(!footstepNodesList.back().isSupportPhase[LLEG] && footsteps[i].l_r == RLEG){ // LLEGを下ろす必要がある
-      this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos);
+    if(footstepNodesList.back().endRefZmpState != GaitParam::FootStepNodes::refZmpState_enum::RLEG && footsteps[i].l_r == LLEG){ // 両足支持期
+      footstepNodesList.back().endRefZmpState = GaitParam::FootStepNodes::refZmpState_enum::RLEG;
+    }else if(footstepNodesList.back().endRefZmpState != GaitParam::FootStepNodes::refZmpState_enum::LLEG && footsteps[i].l_r == RLEG){ // 両足支持期
+      footstepNodesList.back().endRefZmpState = GaitParam::FootStepNodes::refZmpState_enum::LLEG;
     }
+
     GaitParam::FootStepNodes fs;
     int swingLeg = footsteps[i].l_r;
     int supportLeg = swingLeg == RLEG ? LLEG: RLEG;
     fs.dstCoords[supportLeg] = footstepNodesList.back().dstCoords[supportLeg];
-    fs.dstCoords[swingLeg] = trans * footsteps[i].coords;
+    {
+      cnoid::Position transform = legPoseInFootSteps[supportLeg].inverse() * footsteps[i].coords; // supportLeg相対(Z軸は鉛直)での次のswingLegの位置
+      // 着地位置をoverwritableStrideLimitationでリミット. swingEndのときでもリミットしたほうが良い
+      cnoid::Vector3 localZ = transform.linear() * cnoid::Vector3::Zero();
+      double theta = cnoid::rpyFromRot(mathutil::orientCoordToAxis(transform.linear(), cnoid::Vector3::Zero()))[2];
+      theta = mathutil::clamp(theta, this->overwritableStrideLimitationMinTheta[swingLeg], this->overwritableStrideLimitationMaxTheta[swingLeg]);
+      transform.linear() = mathutil::orientCoordToAxis(cnoid::AngleAxis(theta, cnoid::Vector3::UnitZ()).toRotationMatrix(), localZ);
+      std::vector<cnoid::Vector3> strideLimitationHull = this->calcRealStrideLimitationHull(swingLeg, theta, gaitParam.legHull, gaitParam.defaultTranslatePos, this->overwritableStrideLimitationHull);
+      transform.translation().head<2>() = mathutil::calcNearestPointOfHull(transform.translation(), strideLimitationHull).head<2>();
+      fs.dstCoords[swingLeg] = mathutil::orientCoordToAxis(footstepNodesList.back().dstCoords[supportLeg], cnoid::Vector3::UnitZ()) * transform;
+    }
+    legPoseInFootSteps[swingLeg] = mathutil::orientCoordToAxis(footsteps[i].coords, cnoid::Vector3::UnitZ());
     fs.isSupportPhase[supportLeg] = true;
     fs.isSupportPhase[swingLeg] = false;
     fs.remainTime = footsteps[i].stepTime * (1 - this->defaultDoubleSupportRatio);
+    fs.endRefZmpState = supportLeg == RLEG ? GaitParam::FootStepNodes::refZmpState_enum::RLEG : GaitParam::FootStepNodes::refZmpState_enum::LLEG;
     double stepHeight = std::max(0.0, footsteps[i].stepHeight);
     double beforeHeight = footstepNodesList.back().isSupportPhase[swingLeg] ? stepHeight : 0.0;
     double afterHeight = footsteps[i].swingEnd ? 0.0 : stepHeight;
@@ -88,11 +114,14 @@ bool FootStepGenerator::setFootSteps(const GaitParam& gaitParam, const std::vect
     fs.goalOffset[swingLeg] = 0.0;
     footstepNodesList.push_back(fs);
 
-    if(!footsteps[i].swingEnd) footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), footsteps[i].stepTime * this->defaultDoubleSupportRatio));
+    if(!footsteps[i].swingEnd) footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), footsteps[i].stepTime * this->defaultDoubleSupportRatio, swingLeg == RLEG ? GaitParam::FootStepNodes::refZmpState_enum::RLEG : GaitParam::FootStepNodes::refZmpState_enum::LLEG));
   }
 
   if(footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG]){
-    footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime)); // 末尾の両足支持期を延長. これがないと重心が目標位置に収束する前に返ってしまい, emergencyStepが無限に誘発する footGudedBalanceTimeを0.4程度に小さくすると収束が速くなるのでこの処理が不要になるのだが、今度はZ方向に振動しやすい
+    // refZmpを両足の中心へ戻す
+    footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio), footstepNodesList.back().endRefZmpState));
+    footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * this->defaultDoubleSupportRatio, GaitParam::FootStepNodes::refZmpState_enum::MIDDLE));
+    footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio), GaitParam::FootStepNodes::refZmpState_enum::MIDDLE)); // 末尾の両足支持期を延長. これがないと重心が目標位置に収束する前に返ってしまい, emergencyStepが無限に誘発する footGudedBalanceTimeを0.4程度に小さくすると収束が速くなるのでこの処理が不要になるのだが、今度はZ方向に振動しやすい
   }
 
   o_footstepNodesList = footstepNodesList;
@@ -108,12 +137,6 @@ bool FootStepGenerator::goPos(const GaitParam& gaitParam, double x/*m*/, double 
 
   std::vector<GaitParam::FootStepNodes> footstepNodesList;
   footstepNodesList.push_back(gaitParam.footstepNodesList[0]);
-
-  if(footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG]){ // 両足支持期を延長
-    // 現在の時刻から突然refZmpTrajが変化すると、大きなZMP入力変化が必要になる. いまの位置でrefZmpTrajをthis->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio)の間とめて、次にthis->defaultStepTime * this->defaultDoubleSupportRatioの間で次の支持脚側に動かす
-    footstepNodesList.back().remainTime = this->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio);
-    footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * this->defaultDoubleSupportRatio));
-  }
 
   cnoid::Position currentPose;
   {
@@ -136,7 +159,7 @@ bool FootStepGenerator::goPos(const GaitParam& gaitParam, double x/*m*/, double 
     diff[2] = cnoid::rpyFromRot(trans.linear())[2]; // currentPose frame. [rad]
     if(steps >= 1 && // 最低1歩は歩く. (そうしないと、両脚がdefaultTranslatePosとは違う開き方をしているときにgoPos(0,0,0)すると、defaultTranslatePosに戻れない)
        (diff.head<2>().norm() < 1e-3 * 0.1) && (std::abs(diff[2]) < 0.5 * M_PI / 180.0)) break;
-    this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos, diff);
+    this->calcDefaultNextStep(footstepNodesList, gaitParam, diff);
     steps++;
     {
       cnoid::Position rleg = mathutil::orientCoordToAxis(footstepNodesList.back().dstCoords[RLEG], cnoid::Vector3::UnitZ());
@@ -154,10 +177,13 @@ bool FootStepGenerator::goPos(const GaitParam& gaitParam, double x/*m*/, double 
 
   // 両脚が横に並ぶ位置に1歩歩く.
   for(int i=0;i<1;i++){
-    this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos);
+    this->calcDefaultNextStep(footstepNodesList, gaitParam);
   }
 
-  footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime)); // 末尾の両足支持期を延長. これがないと重心が目標位置に収束する前に返ってしまい, emergencyStepが無限に誘発する footGudedBalanceTimeを0.4程度に小さくすると収束が速くなるのでこの処理が不要になるのだが、今度はZ方向に振動しやすい
+  // refZmpを両足の中心へ戻す
+  footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio), footstepNodesList.back().endRefZmpState));
+  footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * this->defaultDoubleSupportRatio, GaitParam::FootStepNodes::refZmpState_enum::MIDDLE));
+  footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio), GaitParam::FootStepNodes::refZmpState_enum::MIDDLE)); // 末尾の両足支持期を延長. これがないと重心が目標位置に収束する前に返ってしまい, emergencyStepが無限に誘発する footGudedBalanceTimeを0.4程度に小さくすると収束が速くなるのでこの処理が不要になるのだが、今度はZ方向に振動しやすい
 
   o_footstepNodesList = footstepNodesList;
   return true;
@@ -181,12 +207,15 @@ bool FootStepGenerator::goStop(const GaitParam& gaitParam,
     }
   }
 
-  // 両脚が横に並ぶ位置に2歩歩く.
-  for(int i=0;i<2;i++){
-    this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos);
+  // 両脚が横に並ぶ位置に1歩歩く.
+  for(int i=0;i<1;i++){
+    this->calcDefaultNextStep(footstepNodesList, gaitParam);
   }
 
-  footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime)); // 末尾の両足支持期を延長. これがないと重心が目標位置に収束する前に返ってしまい, emergencyStepが無限に誘発する footGudedBalanceTimeを0.4程度に小さくすると収束が速くなるのでこの処理が不要になるのだが、今度はZ方向に振動しやすい
+  // refZmpを両足の中心へ戻す
+  footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio), footstepNodesList.back().endRefZmpState));
+  footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * this->defaultDoubleSupportRatio, GaitParam::FootStepNodes::refZmpState_enum::MIDDLE));
+  footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio), GaitParam::FootStepNodes::refZmpState_enum::MIDDLE)); // 末尾の両足支持期を延長. これがないと重心が目標位置に収束する前に返ってしまい, emergencyStepが無限に誘発する footGudedBalanceTimeを0.4程度に小さくすると収束が速くなるのでこの処理が不要になるのだが、今度はZ方向に振動しやすい
 
   o_footstepNodesList = footstepNodesList;
   return true;
@@ -250,14 +279,8 @@ bool FootStepGenerator::calcFootSteps(const GaitParam& gaitParam, const double& 
         break;
       }
     }
-    if(footstepNodesList.size() == 1 &&
-       (footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG])){
-      // 現在の時刻から突然refZmpTrajが変化すると、大きなZMP入力変化が必要になる. いまの位置でrefZmpTrajをthis->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio)の間とめて、次にthis->defaultStepTime * this->defaultDoubleSupportRatioの間で次の支持脚側に動かす
-      footstepNodesList.back().remainTime = this->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio);
-      footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * this->defaultDoubleSupportRatio));
-    }
     while(footstepNodesList.size() <= this->goVelocityStepNum){
-      this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos, gaitParam.cmdVel * this->defaultStepTime);
+      this->calcDefaultNextStep(footstepNodesList, gaitParam, gaitParam.cmdVel * this->defaultStepTime);
     }
   }
 
@@ -373,62 +396,81 @@ void FootStepGenerator::transformCurrentSupportSteps(int leg, std::vector<GaitPa
   }
 }
 
-void FootStepGenerator::calcDefaultNextStep(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >& defaultTranslatePos, const cnoid::Vector3& offset /*leg frame*/) const{
+void FootStepGenerator::calcDefaultNextStep(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const GaitParam& gaitParam, const cnoid::Vector3& offset /*leg frame*/, bool stableStart) const{
   if(footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG]){
-    footstepNodesList.back().remainTime = this->defaultStepTime * this->defaultDoubleSupportRatio; // 両足支持期を延長 or 短縮
-    if(footstepNodesList.size() == 1 ||
-       (footstepNodesList[footstepNodesList.size()-2].isSupportPhase[RLEG] && footstepNodesList[footstepNodesList.size()-2].isSupportPhase[LLEG]) ||
-       (!footstepNodesList[footstepNodesList.size()-2].isSupportPhase[RLEG] && !footstepNodesList[footstepNodesList.size()-2].isSupportPhase[LLEG]) ){
+    if(footstepNodesList.back().endRefZmpState == GaitParam::FootStepNodes::refZmpState_enum::MIDDLE){
       // offsetを、両足の中間からの距離と解釈する(これ以外のケースでは支持脚からの距離と解釈する)
       cnoid::Position rleg = footstepNodesList[0].dstCoords[RLEG];
-      rleg.translation() -= rleg.linear() * defaultTranslatePos[RLEG].value();
+      rleg.translation() -= rleg.linear() * gaitParam.defaultTranslatePos[RLEG].value();
       cnoid::Position lleg = footstepNodesList[0].dstCoords[LLEG];
-      lleg.translation() -= lleg.linear() * defaultTranslatePos[LLEG].value();
+      lleg.translation() -= lleg.linear() * gaitParam.defaultTranslatePos[LLEG].value();
       cnoid::Position midCoords = mathutil::calcMidCoords(std::vector<cnoid::Position>{rleg, lleg}, std::vector<double>{1.0, 1.0});
       rleg = mathutil::orientCoordToAxis(rleg, cnoid::Vector3::UnitZ());
       lleg = mathutil::orientCoordToAxis(lleg, cnoid::Vector3::UnitZ());
       midCoords = mathutil::orientCoordToAxis(midCoords, cnoid::Vector3::UnitZ());
       // どっちをswingしてもいいので、進行方向に近いLegをswingする
-      cnoid::Vector2 rlegTolleg = (defaultTranslatePos[LLEG].value() - defaultTranslatePos[RLEG].value()).head<2>(); // leg frame
-      if(rlegTolleg.dot(offset.head<2>()) > 0) {
+      cnoid::Vector2 rlegTolleg = (gaitParam.defaultTranslatePos[LLEG].value() - gaitParam.defaultTranslatePos[RLEG].value()).head<2>(); // leg frame
+      if(rlegTolleg.dot(offset.head<2>()) > 0) { // LLEGをswingする
+        if(stableStart && footstepNodesList.size() == 1) { // 現在の時刻から突然refZmpTrajが変化すると、大きなZMP入力変化が必要になる. いまの位置でrefZmpTrajをthis->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio)の間とめる
+          footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio), GaitParam::FootStepNodes::refZmpState_enum::MIDDLE));
+        }
+        // this->defaultStepTime * this->defaultDoubleSupportRatioの間で次の支持脚側に動かす
+        if(footstepNodesList.size() <= 2) { // 末尾に両足支持期を追加
+          footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * this->defaultDoubleSupportRatio, GaitParam::FootStepNodes::refZmpState_enum::RLEG));
+        }else{ // 末尾の両足支持期を直接編集
+          footstepNodesList.back().remainTime = this->defaultStepTime * this->defaultDoubleSupportRatio; // 両足支持期を延長 or 短縮
+          footstepNodesList.back().endRefZmpState = GaitParam::FootStepNodes::refZmpState_enum::RLEG;
+        }
         cnoid::Position rlegTomidCoords = rleg.inverse() * midCoords;
         cnoid::Vector3 offset_rlegLocal;
         offset_rlegLocal.head<2>() = rlegTomidCoords.translation().head<2>() + (rlegTomidCoords.linear() * cnoid::Vector3(offset[0],offset[1],0.0)).head<2>();
         offset_rlegLocal[2] = cnoid::rpyFromRot(rlegTomidCoords.linear())[2] + offset[2];
-        footstepNodesList.push_back(calcDefaultSwingStep(LLEG, footstepNodesList.back(), defaultTranslatePos, offset_rlegLocal)); // LLEGをswingする
-        footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * this->defaultDoubleSupportRatio));
-      }else{
+        footstepNodesList.push_back(calcDefaultSwingStep(LLEG, footstepNodesList.back(), gaitParam, offset_rlegLocal)); // LLEGをswingする
+        footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * this->defaultDoubleSupportRatio, GaitParam::FootStepNodes::refZmpState_enum::LLEG));
+      }else{ // RLEGをswingする
+        if(stableStart && footstepNodesList.size() == 1) { // 現在の時刻から突然refZmpTrajが変化すると、大きなZMP入力変化が必要になる. いまの位置でrefZmpTrajをthis->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio)の間とめる
+          footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio), GaitParam::FootStepNodes::refZmpState_enum::MIDDLE));
+        }
+        // this->defaultStepTime * this->defaultDoubleSupportRatioの間で次の支持脚側に動かす
+        if(footstepNodesList.size() <= 2) { // 末尾に両足支持期を追加
+          footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * this->defaultDoubleSupportRatio, GaitParam::FootStepNodes::refZmpState_enum::LLEG));
+        }else{ // 末尾の両足支持期を直接編集
+          footstepNodesList.back().remainTime = this->defaultStepTime * this->defaultDoubleSupportRatio; // 両足支持期を延長 or 短縮
+          footstepNodesList.back().endRefZmpState = GaitParam::FootStepNodes::refZmpState_enum::LLEG;
+        }
         cnoid::Position llegTomidCoords = lleg.inverse() * midCoords;
         cnoid::Vector3 offset_llegLocal;
         offset_llegLocal.head<2>() = llegTomidCoords.translation().head<2>() + (llegTomidCoords.linear() * cnoid::Vector3(offset[0],offset[1],0.0)).head<2>();
         offset_llegLocal[2] = cnoid::rpyFromRot(llegTomidCoords.linear())[2] + offset[2];
-        footstepNodesList.push_back(calcDefaultSwingStep(RLEG, footstepNodesList.back(), defaultTranslatePos, offset_llegLocal)); // RLEGをswingする
-        footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * this->defaultDoubleSupportRatio));
+        footstepNodesList.push_back(calcDefaultSwingStep(RLEG, footstepNodesList.back(), gaitParam, offset_llegLocal)); // RLEGをswingする
+        footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * this->defaultDoubleSupportRatio, GaitParam::FootStepNodes::refZmpState_enum::RLEG));
       }
-    }else if(footstepNodesList[footstepNodesList.size()-2].isSupportPhase[RLEG]){ // 前回LLEGをswingした
-        footstepNodesList.push_back(calcDefaultSwingStep(RLEG, footstepNodesList.back(), defaultTranslatePos, offset)); // RLEGをswingする
-        footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * this->defaultDoubleSupportRatio));
+    }else if(footstepNodesList.back().endRefZmpState == GaitParam::FootStepNodes::refZmpState_enum::LLEG){ // 前回LLEGをswingした
+        footstepNodesList.push_back(calcDefaultSwingStep(RLEG, footstepNodesList.back(), gaitParam, offset)); // RLEGをswingする
+        footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * this->defaultDoubleSupportRatio, GaitParam::FootStepNodes::refZmpState_enum::RLEG));
     }else{ // 前回RLEGをswingした
-        footstepNodesList.push_back(calcDefaultSwingStep(LLEG, footstepNodesList.back(), defaultTranslatePos, offset)); // LLEGをswingする
-        footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * this->defaultDoubleSupportRatio));
+        footstepNodesList.push_back(calcDefaultSwingStep(LLEG, footstepNodesList.back(), gaitParam, offset)); // LLEGをswingする
+        footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * this->defaultDoubleSupportRatio, GaitParam::FootStepNodes::refZmpState_enum::LLEG));
     }
   }else if(footstepNodesList.back().isSupportPhase[RLEG] && !footstepNodesList.back().isSupportPhase[LLEG]){ // LLEGが浮いている
-    footstepNodesList.push_back(calcDefaultSwingStep(LLEG, footstepNodesList.back(), defaultTranslatePos, offset, true)); // LLEGをswingする. startWithSingleSupport
-    footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * this->defaultDoubleSupportRatio));
+    footstepNodesList.push_back(calcDefaultSwingStep(LLEG, footstepNodesList.back(), gaitParam, offset, true)); // LLEGをswingする. startWithSingleSupport
+    footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * this->defaultDoubleSupportRatio, GaitParam::FootStepNodes::refZmpState_enum::LLEG));
   }else if(!footstepNodesList.back().isSupportPhase[RLEG] && footstepNodesList.back().isSupportPhase[LLEG]){ // RLEGが浮いている
-    footstepNodesList.push_back(calcDefaultSwingStep(RLEG, footstepNodesList.back(), defaultTranslatePos, offset, true)); // RLEGをswingする. startWithSingleSupport
-    footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * this->defaultDoubleSupportRatio));
+    footstepNodesList.push_back(calcDefaultSwingStep(RLEG, footstepNodesList.back(), gaitParam, offset, true)); // RLEGをswingする. startWithSingleSupport
+    footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * this->defaultDoubleSupportRatio, GaitParam::FootStepNodes::refZmpState_enum::RLEG));
   }// footstepNodesListの末尾の要素が両方falseであることは無い
 }
 
-GaitParam::FootStepNodes FootStepGenerator::calcDefaultSwingStep(const int& swingLeg, const GaitParam::FootStepNodes& footstepNodes, const std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >& defaultTranslatePos, const cnoid::Vector3& offset, bool startWithSingleSupport) const{
+GaitParam::FootStepNodes FootStepGenerator::calcDefaultSwingStep(const int& swingLeg, const GaitParam::FootStepNodes& footstepNodes, const GaitParam& gaitParam, const cnoid::Vector3& offset, bool startWithSingleSupport) const{
   GaitParam::FootStepNodes fs;
   int supportLeg = (swingLeg == RLEG) ? LLEG : RLEG;
 
   cnoid::Position transform = cnoid::Position::Identity(); // supportLeg相対(Z軸は鉛直)での次のswingLegの位置
-  transform.linear() = cnoid::Matrix3(Eigen::AngleAxisd(mathutil::clamp(offset[2],this->defaultStrideLimitationTheta), cnoid::Vector3::UnitZ()));
-  transform.translation() = - defaultTranslatePos[supportLeg].value() + cnoid::Vector3(offset[0], offset[1], 0.0) + transform.linear() * defaultTranslatePos[swingLeg].value();
-  transform.translation() = mathutil::calcNearestPointOfHull(transform.translation(), this->defaultStrideLimitationHull[swingLeg]);
+  double theta = mathutil::clamp(offset[2],this->defaultStrideLimitationMinTheta[swingLeg],this->defaultStrideLimitationMaxTheta[swingLeg]);
+  transform.linear() = cnoid::Matrix3(Eigen::AngleAxisd(theta, cnoid::Vector3::UnitZ()));
+  transform.translation() = - gaitParam.defaultTranslatePos[supportLeg].value() + cnoid::Vector3(offset[0], offset[1], 0.0) + transform.linear() * gaitParam.defaultTranslatePos[swingLeg].value();
+  std::vector<cnoid::Vector3> strideLimitationHull = this->calcRealStrideLimitationHull(swingLeg, theta, gaitParam.legHull, gaitParam.defaultTranslatePos, this->defaultStrideLimitationHull);
+  transform.translation() = mathutil::calcNearestPointOfHull(transform.translation(), strideLimitationHull);
 
   fs.dstCoords[supportLeg] = footstepNodes.dstCoords[supportLeg];
   cnoid::Position prevOrigin = mathutil::orientCoordToAxis(footstepNodes.dstCoords[supportLeg], cnoid::Vector3::UnitZ());
@@ -436,6 +478,7 @@ GaitParam::FootStepNodes FootStepGenerator::calcDefaultSwingStep(const int& swin
   fs.isSupportPhase[supportLeg] = true;
   fs.isSupportPhase[swingLeg] = false;
   fs.remainTime = this->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio);
+  fs.endRefZmpState = (supportLeg == RLEG) ? GaitParam::FootStepNodes::refZmpState_enum::RLEG : GaitParam::FootStepNodes::refZmpState_enum::LLEG;
   if(!startWithSingleSupport) fs.stepHeight[swingLeg] = {this->defaultStepHeight,this->defaultStepHeight};
   else fs.stepHeight[swingLeg] = {0.0,this->defaultStepHeight};
   fs.touchVel[swingLeg] = this->touchVel;
@@ -443,7 +486,7 @@ GaitParam::FootStepNodes FootStepGenerator::calcDefaultSwingStep(const int& swin
   return fs;
 }
 
-GaitParam::FootStepNodes FootStepGenerator::calcDefaultDoubleSupportStep(const GaitParam::FootStepNodes& footstepNodes, double doubleSupportTime) const{
+GaitParam::FootStepNodes FootStepGenerator::calcDefaultDoubleSupportStep(const GaitParam::FootStepNodes& footstepNodes, double doubleSupportTime, GaitParam::FootStepNodes::refZmpState_enum endRefZmpState) const{
   GaitParam::FootStepNodes fs;
   for(int i=0;i<NUM_LEGS;i++){
     fs.dstCoords[i] = footstepNodes.dstCoords[i];
@@ -451,14 +494,8 @@ GaitParam::FootStepNodes FootStepGenerator::calcDefaultDoubleSupportStep(const G
     fs.stepHeight[i] = {0.0,0.0};
   }
   fs.remainTime = doubleSupportTime;
+  fs.endRefZmpState = endRefZmpState;
   return fs;
-}
-
-inline std::ostream &operator<<(std::ostream &os, const std::vector<cnoid::Vector3>& polygon){
-  for(int j=0;j<polygon.size();j++){
-    os << polygon[j].format(Eigen::IOFormat(Eigen::StreamPrecision, 0, ", ", ", ", "", "", " [", "]"));
-  }
-  return os;
 }
 
 inline std::ostream &operator<<(std::ostream &os, const std::vector<std::pair<std::vector<cnoid::Vector3>, double> >& candidates){
@@ -478,9 +515,9 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
        ((footstepNodesList[0].isSupportPhase[RLEG] && !footstepNodesList[0].isSupportPhase[LLEG]) || (!footstepNodesList[0].isSupportPhase[RLEG] && footstepNodesList[0].isSupportPhase[LLEG]))))
      return;
 
-  // 次の次に現在の遊脚が再び遊脚になる場合は行わない. CapturePointが遊脚の着地位置に行かないので.
-  if(footstepNodesList.size() > 2 &&
-     ((!footstepNodesList[0].isSupportPhase[RLEG] && !footstepNodesList[2].isSupportPhase[RLEG]) || (!footstepNodesList[0].isSupportPhase[LLEG] && !footstepNodesList[2].isSupportPhase[LLEG])))
+  // CapturePointが遊脚の着地位置に行かない場合には行わない
+  if((!footstepNodesList[0].isSupportPhase[RLEG] && footstepNodesList[1].endRefZmpState != GaitParam::FootStepNodes::refZmpState_enum::RLEG) ||
+     (!footstepNodesList[0].isSupportPhase[LLEG] && footstepNodesList[1].endRefZmpState != GaitParam::FootStepNodes::refZmpState_enum::LLEG))
     return;
 
 
@@ -534,9 +571,14 @@ void FootStepGenerator::modifyFootSteps(std::vector<GaitParam::FootStepNodes>& f
     }
 
     std::vector<cnoid::Vector3> strideLimitationHull; // generate frame. overwritableStrideLimitationHullの範囲内の着地位置(自己干渉・IKの考慮が含まれる). Z成分には0を入れる
-    for(int i=0;i<this->overwritableStrideLimitationHull[swingLeg].size();i++){
-      cnoid::Vector3 p = supportPoseHorizontal * this->overwritableStrideLimitationHull[swingLeg][i];
-      strideLimitationHull.emplace_back(p[0],p[1],0.0);
+    {
+      double theta = cnoid::rpyFromRot(mathutil::orientCoordToAxis(supportPoseHorizontal.linear().transpose() * footstepNodesList[0].dstCoords[swingLeg].linear(), cnoid::Vector3::Zero()))[2]; // supportLeg(水平)相対のdstCoordsのyaw
+      std::vector<cnoid::Vector3> strideLimitationHullSupportLegLocal = this->calcRealStrideLimitationHull(swingLeg, theta, gaitParam.legHull, gaitParam.defaultTranslatePos, this->overwritableStrideLimitationHull); // support leg frame(水平)
+      strideLimitationHull.reserve(strideLimitationHullSupportLegLocal.size());
+      for(int i=0;i<strideLimitationHullSupportLegLocal.size();i++){
+        cnoid::Vector3 p = supportPoseHorizontal * strideLimitationHullSupportLegLocal[i];
+        strideLimitationHull.emplace_back(p[0],p[1],0.0);
+      }
     }
 
     for(int i=0;i<samplingTimes.size();i++){
@@ -817,8 +859,12 @@ void FootStepGenerator::checkEmergencyStep(std::vector<GaitParam::FootStepNodes>
     dir[2] = 0.0;
     if(dir.norm() > 0.0) dir = dir.normalized();
     while(footstepNodesList.size() <= this->emergencyStepNum){
-      this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos, 1e-6 * dir); // 現在両足で支持している場合、dirの方向の足を最初にswingする
+      this->calcDefaultNextStep(footstepNodesList, gaitParam, 1e-6 * dir, false); // 現在両足で支持している場合、dirの方向の足を最初にswingする. 急ぐのでstableStart=false
     }
+    // refZmpを両足の中心へ戻す
+    footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio), footstepNodesList.back().endRefZmpState));
+    footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * this->defaultDoubleSupportRatio, GaitParam::FootStepNodes::refZmpState_enum::MIDDLE));
+    footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio), GaitParam::FootStepNodes::refZmpState_enum::MIDDLE)); // 末尾の両足支持期を延長. これがないと重心が目標位置に収束する前に返ってしまい, emergencyStepが無限に誘発する footGudedBalanceTimeを0.4程度に小さくすると収束が速くなるのでこの処理が不要になるのだが、今度はZ方向に振動しやすい
   }
 }
 
@@ -827,16 +873,71 @@ void FootStepGenerator::checkStableGoStop(std::vector<GaitParam::FootStepNodes>&
   // 着地位置修正を行ったなら、footstepNodesListがemergencyStepNumのサイズになるまで歩くnodeが末尾に入る.
   for(int i=0;i<NUM_LEGS; i++){
     if((footstepNodesList[0].dstCoords[i].translation().head<2>() - gaitParam.dstCoordsOrg[i].translation().head<2>()).norm() > 0.01){ // 1cm以上着地位置修正を行ったなら
-      while(footstepNodesList.size() < this->emergencyStepNum){
-        if(footstepNodesList.size() >= 2 &&
-           (footstepNodesList[footstepNodesList.size()-2].isSupportPhase[RLEG] && footstepNodesList[footstepNodesList.size()-2].isSupportPhase[LLEG]) &&
-           (footstepNodesList[footstepNodesList.size()-1].isSupportPhase[RLEG] && footstepNodesList[footstepNodesList.size()-1].isSupportPhase[LLEG])){
-          footstepNodesList.pop_back(); // 末尾に両足支持期が2つ連続している場合、後の方を削除
-        }
-
-        // 歩を追加
-        this->calcDefaultNextStep(footstepNodesList, gaitParam.defaultTranslatePos);
+      while(footstepNodesList.size() >= 2 &&
+            (footstepNodesList[footstepNodesList.size()-2].isSupportPhase[RLEG] && footstepNodesList[footstepNodesList.size()-2].isSupportPhase[LLEG]) &&
+            (footstepNodesList[footstepNodesList.size()-1].isSupportPhase[RLEG] && footstepNodesList[footstepNodesList.size()-1].isSupportPhase[LLEG])){
+        footstepNodesList.pop_back(); // 末尾に両足支持期が連続している場合、最初のものを除いて削除
       }
+      while(footstepNodesList.size() < this->emergencyStepNum){
+        // 歩を追加
+        this->calcDefaultNextStep(footstepNodesList, gaitParam);
+      }
+      // refZmpを両足の中心へ戻す
+      footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio), footstepNodesList.back().endRefZmpState));
+      footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * this->defaultDoubleSupportRatio, GaitParam::FootStepNodes::refZmpState_enum::MIDDLE));
+      footstepNodesList.push_back(calcDefaultDoubleSupportStep(footstepNodesList.back(), this->defaultStepTime * (1.0 - this->defaultDoubleSupportRatio), GaitParam::FootStepNodes::refZmpState_enum::MIDDLE)); // 末尾の両足支持期を延長. これがないと重心が目標位置に収束する前に返ってしまい, emergencyStepが無限に誘発する footGudedBalanceTimeを0.4程度に小さくすると収束が速くなるのでこの処理が不要になるのだが、今度はZ方向に振動しやすい
+
+      break;
     }
   }
+}
+
+std::vector<cnoid::Vector3> FootStepGenerator::calcRealStrideLimitationHull(const int& swingLeg, const double& theta, const std::vector<std::vector<cnoid::Vector3> >& legHull, const std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >& defaultTranslatePos, const std::vector<std::vector<cnoid::Vector3> >& strideLimitationHull) const{
+  std::vector<cnoid::Vector3> realStrideLimitationHull = strideLimitationHull[swingLeg]; // 支持脚(水平)座標系. strideLimitationHullの要素数は1以上あることが保証されているという仮定
+
+  int supportLeg = swingLeg == RLEG ? LLEG : RLEG;
+  cnoid::Matrix3 swingR = cnoid::AngleAxis(theta, cnoid::Vector3::UnitZ()).toRotationMatrix();
+  {
+    // legCollisionを考慮
+    cnoid::Vector3 supportLegToSwingLeg = defaultTranslatePos[swingLeg].value() - defaultTranslatePos[supportLeg].value(); // 支持脚(水平)座標系.
+    supportLegToSwingLeg[2] = 0.0;
+    if(supportLegToSwingLeg.norm() > 0.0){
+      cnoid::Vector3 supportLegToSwingLegDir = supportLegToSwingLeg.normalized();
+      std::vector<cnoid::Vector3> tmp;
+      const std::vector<cnoid::Vector3>& supportLegHull = legHull[supportLeg];
+      double supportLegHullSize = mathutil::findExtreams(supportLegHull, supportLegToSwingLegDir, tmp);
+      std::vector<cnoid::Vector3> swingLegHull;
+      for(int i=0;i<legHull[swingLeg].size();i++) swingLegHull.push_back(swingR * legHull[swingLeg][i]);
+      double swingLegHullSize = mathutil::findExtreams(swingLegHull, - supportLegToSwingLegDir, tmp);
+      double minDist = supportLegHullSize + this->legCollisionMargin + swingLegHullSize;
+      std::vector<cnoid::Vector3> minDistHull; // supportLegToSwingLeg方向にminDistを満たすHull
+      {
+        cnoid::Position p = cnoid::Position::Identity();
+        p.translation() = minDist * supportLegToSwingLegDir;
+        p.linear() = (cnoid::Matrix3() << supportLegToSwingLegDir[0], -supportLegToSwingLegDir[1], 0.0,
+                                          supportLegToSwingLegDir[1], supportLegToSwingLegDir[0] , 0.0,
+                                          0.0,                        0.0,                         1.0).finished();
+        minDistHull.push_back(p * cnoid::Vector3(0.0, -1e10, 0.0));
+        minDistHull.push_back(p * cnoid::Vector3(1e10, -1e10, 0.0));
+        minDistHull.push_back(p * cnoid::Vector3(1e10, 1e10, 0.0));
+        minDistHull.push_back(p * cnoid::Vector3(0.0, 1e10, 0.0));
+      }
+
+      std::vector<cnoid::Vector3> nextRealStrideLimitationHull = mathutil::calcIntersectConvexHull(realStrideLimitationHull, minDistHull);
+      if(nextRealStrideLimitationHull.size() > 0) realStrideLimitationHull = nextRealStrideLimitationHull;
+    }
+  }
+
+  {
+    // swingLegから見てもsupportLegから見てもStrideLimitationHullの中にあることを確認 (swing中の干渉を防ぐ)
+    const std::vector<cnoid::Vector3>& strideLimitationHullFromSupport = realStrideLimitationHull;
+    std::vector<cnoid::Vector3> strideLimitationHullFromSwing(realStrideLimitationHull.size());
+    for(int i=0;i<realStrideLimitationHull.size();i++){
+      strideLimitationHullFromSwing[i] = swingR * realStrideLimitationHull[i];
+    }
+    std::vector<cnoid::Vector3> nextRealStrideLimitationHull = mathutil::calcIntersectConvexHull(strideLimitationHullFromSupport, strideLimitationHullFromSwing);
+    if(nextRealStrideLimitationHull.size() > 0) realStrideLimitationHull = nextRealStrideLimitationHull;
+  }
+
+  return realStrideLimitationHull;
 }
