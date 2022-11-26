@@ -18,7 +18,7 @@ https://docs.google.com/presentation/d/1oJWIUqfYPsNI-mGdanSZhfvkEQ5jZHm7uG4CLNwV
 ```
 Y. Kakiuchi & Y. Kojio & N. Imaoka & D. Kusuyama & S. Sato & Y. Matsuura & T. Ando & M. Inaba (2022) 
 Trajectory Generation and Compensation for External Forces with a Leg-Wheeled Robot Designed for Human Passengers, 
-2015 IEEE-RAS 15th International Conference on Humanoid Robots (Humanoids)
+2022 IEEE-RAS 21st International Conference on Humanoid Robots (Humanoids)
 ```
 ```
 T. Yamamoto & T. Sugihara (2020) Foot-guided control of a biped robot through ZMP manipulation, 
