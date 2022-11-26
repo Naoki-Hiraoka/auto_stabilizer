@@ -15,7 +15,16 @@ https://docs.google.com/presentation/d/1oJWIUqfYPsNI-mGdanSZhfvkEQ5jZHm7uG4CLNwV
 
 ## FootGuidedControllerの導出
 
-この導出法は@YutaKojio 先生が考えたものである。
+```
+Y. Kakiuchi & Y. Kojio & N. Imaoka & D. Kusuyama & S. Sato & Y. Matsuura & T. Ando & M. Inaba (2022) 
+Trajectory Generation and Compensation for External Forces with a Leg-Wheeled Robot Designed for Human Passengers, 
+2015 IEEE-RAS 15th International Conference on Humanoid Robots (Humanoids)
+```
+```
+T. Yamamoto & T. Sugihara (2020) Foot-guided control of a biped robot through ZMP manipulation, 
+Advanced Robotics, 34:21-22, 1472-1489, DOI: 10.1080/01691864.2020.1827031
+```
+
 ### 問題定義
 
 Capture Pointを$x$、重心を$c$、ZMPを$z$と表すと、
