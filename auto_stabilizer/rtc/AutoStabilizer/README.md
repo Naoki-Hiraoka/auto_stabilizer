@@ -60,10 +60,10 @@ $$
 \begin{eqnarray}
   \mathrm{where} & u^r = \left\lbrace
   \begin{array}{cc}
-  u^r_1 = a_1t+b_1 & (x\leq T_1)\\
-  u^r_2 = a_2t+b_2 & (T_1 < x\leq T_2)\\
+  u^r_1 = a_1t+b_1 & (t\leq T_1)\\
+  u^r_2 = a_2t+b_2 & (T_1 < t\leq T_2)\\
   \vdots\\
-  u^r_n = a_nt+b_n & (T_{n-1} < x\leq T_{n})
+  u^r_n = a_nt+b_n & (T_{n-1} < t\leq T_{n})
   \end{array}\right.
 \end{eqnarray}
 $$
