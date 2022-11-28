@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="2">
   <name>auto_stabilizer</name>
-  <version>0.0.0</version>
+  <version>0.3.0</version>
   <description>The auto_stabilizer package</description>
 
   <maintainer email="hiraoka@jsk.imi.i.u-tokyuo.ac.jp">Naoki-Hiraoka</maintainer>
@@ -17,7 +17,10 @@
   <depend>choreonoid</depend>
   <depend>hrpsys_ros_bridge</depend>
   <depend>ik_constraint</depend>
-  <depend>prioritized_qp</depend>
-  <depend>fullbody_inverse_kinematics_solver</depend>
+  <depend>prioritized_qp_osqp</depend>
   <depend>joint_limit_table</depend>
+  <depend>prioritized_inverse_kinematics_solver</depend>
+  <depend>ik_constraint_joint_limit_table</depend>
+  <depend>collision_checker_msgs</depend>
+  <depend>auto_stabilizer_msgs</depend>
 </package>

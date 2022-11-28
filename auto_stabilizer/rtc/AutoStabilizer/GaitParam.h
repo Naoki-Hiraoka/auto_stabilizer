@@ -13,6 +13,9 @@
 enum leg_enum{RLEG=0, LLEG=1, NUM_LEGS=2};
 
 class GaitParam {
+  // このクラスのメンバ変数は、全てfiniteである(nanやinfが無い)ことが仮定されている. 外部から値をセットするときには、finiteでない値を入れないようにすること
+
+  // robotは、rootLinkがFreeJointでなければならない
 public:
   // constant parameter
   std::vector<std::string> eeName; // constant. 要素数2以上. 0番目がrleg, 1番目がllegという名前である必要がある
@@ -28,18 +31,33 @@ public:
   // parameter
   std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> > copOffset = std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >{cpp_filters::TwoPointInterpolator<cnoid::Vector3>(cnoid::Vector3(0.0,0.02,0.0),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::HOFFARBIB),cpp_filters::TwoPointInterpolator<cnoid::Vector3>(cnoid::Vector3(0.0,-0.02,0.0),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::HOFFARBIB)}; // 要素数2. rleg: 0. lleg: 1. endeffector frame. 足裏COPの目標位置. 幾何的な位置はcopOffset.value()無しで考えるが、目標COPを考えるときはcopOffset.value()を考慮する. クロスできたりジャンプできたりする脚でないと左右方向(外側向き)の着地位置修正は難しいので、その方向に転びそうになることが極力ないように内側にcopをオフセットさせておくとよい.  単位[m]. 滑らかに変化する.
   std::vector<std::vector<cnoid::Vector3> > legHull = std::vector<std::vector<cnoid::Vector3> >(2, std::vector<cnoid::Vector3>{cnoid::Vector3(0.115,0.065,0.0),cnoid::Vector3(-0.095,0.065,0.0),cnoid::Vector3(-0.095,-0.065,0.0),cnoid::Vector3(0.115,-0.065,0.0)}); // 要素数2. rleg: 0. lleg: 1. endeffector frame.  凸形状で,上から見て半時計回り. Z成分はあったほうが計算上扱いやすいからありにしているが、0でなければならない. 単位[m]. JAXONでは、COPがY -0.1近くにくるとギア飛びしやすいので、少しYの下限を少なくしている
-  std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> > defaultTranslatePos = std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >(2,cpp_filters::TwoPointInterpolator<cnoid::Vector3>(cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::HOFFARBIB)); // goPos, goVelocity, setFootSteps等するときの右脚と左脚の中心からの相対位置. また、reference frameとgenerate frameの対応付けに用いられる. (Z軸は鉛直). Z成分はあったほうが計算上扱いやすいからありにしているが、0でなければならない. RefToGenFrameConverterが「左右」という概念を使うので、X成分も0でなければならない. 単位[m] 滑らかに変化する.
+  std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> > defaultTranslatePos = std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >(2,cpp_filters::TwoPointInterpolator<cnoid::Vector3>(cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::HOFFARBIB)); // goPos, goVelocity, setFootSteps等するときの右脚と左脚の中心からの相対位置. また、reference frameとgenerate frameの対応付けに用いられる. (Z軸は鉛直). Z成分はあったほうが計算上扱いやすいからありにしているが、0でなければならない. RefToGenFrameConverter(handFixMode)が「左右」という概念を使うので、X成分も0でなければならない. 単位[m] 滑らかに変化する.
   std::vector<cpp_filters::TwoPointInterpolator<double> > isManualControlMode = std::vector<cpp_filters::TwoPointInterpolator<double> >(2, cpp_filters::TwoPointInterpolator<double>(0.0, 0.0, 0.0, cpp_filters::LINEAR)); // 要素数2. 0: rleg. 1: lleg. 0~1. 連続的に変化する. 1ならicEETargetPoseに従い、refEEWrenchに応じて重心をオフセットする. 0ならImpedanceControlをせず、refEEWrenchを無視し、DampingControlを行わない. 静止状態で無い場合や、支持脚の場合は、勝手に0になる. 両足が同時に1になることはない. 1にするなら、RefToGenFrameConverter.refFootOriginWeightを0にしたほうが良い. 1の状態でStartAutoStabilizerすると、遊脚で始まる
 
   std::vector<bool> jointControllable; // 要素数と順序はnumJoints()と同じ. falseの場合、qやtauはrefの値をそのまま出力する(writeOutputPort時にref値で上書き). IKでは動かさない(ref値をそのまま). トルク計算では目標トルクを通常通り計算する. このパラメータはMODE_IDLEのときにしか変更されない
 
 public:
-  // from reference port
+  // from data port
   cnoid::BodyPtr refRobotRaw; // reference. reference world frame
   std::vector<cnoid::Vector6> refEEWrenchOrigin; // 要素数と順序はeeNameと同じ.FootOrigin frame. EndEffector origin. ロボットが受ける力
   std::vector<cpp_filters::TwoPointInterpolatorSE3> refEEPoseRaw; // 要素数と順序はeeNameと同じ. reference world frame. EEPoseはjoint angleなどと比べて遅い周期で届くことが多いので、interpolaterで補間する.
   cnoid::BodyPtr actRobotRaw; // actual. actual imu world frame
+  class Collision {
+  public:
+    std::string link1 = "";
+    cnoid::Vector3 point1 = cnoid::Vector3::Zero(); // link1 frame
+    std::string link2 = "";
+    cnoid::Vector3 point2 = cnoid::Vector3::Zero(); // link2 frame
+    cnoid::Vector3 direction21 = cnoid::Vector3::UnitX(); // generate frame
+    double distance = 0.0;
 
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  };
+  std::vector<Collision> selfCollision;
+  std::vector<std::vector<cnoid::Vector3> > steppableRegion; // generate frame. 着地可能領域の凸包の集合. 要素数0なら、全ての領域が着地可能として扱われる. Z成分はあったほうが計算上扱いやすいからありにしているが、0でなければならない. 
+  std::vector<double> steppableHeight; // generate frame. 要素数と順序はsteppableRegionと同じ。steppableRegionの各要素の重心Z.
+  double relLandingHeight = -1e15; // generate frame. 現在の遊脚のfootstepNodesList[0]のdstCoordsのZ. -1e10未満なら、relLandingHeightとrelLandingNormalは無視される. footStepNodesListsの次のnodeに移るたびにFootStepGeneratorによって-1e15に上書きされる.
+  cnoid::Vector3 relLandingNormal = cnoid::Vector3::UnitZ(); // generate frame. 現在の遊脚のfootstepNodesList[0]のdstCoordsのZ軸の方向. ノルムは常に1
 public:
   // AutoStabilizerの中で計算更新される.
 
@@ -81,13 +99,29 @@ public:
       それ以外には、footstepNodesList[0]のremainTimeが突然0になることはない
       footstepNodesList[1]のisSupportPhaseは、footstepNodesListのサイズが1である場合を除いて変更されない.
       両足支持期の次のstepのisSupportPhaseを変えたり、後ろに新たにfootstepNodesを追加する場合、必ず両足支持期のremainTimeをそれなりに長い時間にする(片足に重心やrefZmpを移す補間の時間のため)
+
+      右脚支持期の直前のnodeのendRefZmpStateはRLEGでなければならない
+      右脚支持期のnodeのendRefZmpStateはRLEGでなければならない
+      左脚支持期の直前のnodeのendRefZmpStateはLLEGでなければならない
+      左脚支持期のnodeのendRefZmpStateはLLEGでなければならない
+      両脚支持期の直前のnodeのendRefZmpStateはRLEG or LLEG or MIDDLEでなければならない.
+      両脚支持期のnodeのendRefZmpStateはRLEG or LLEG or MIDDLEでなければならない.
+      footstepNodesList[0]のendRefZmpStateは変更されない.
+      footstepNodesList[0]のendRefZmpStateは、isStatic()である場合を除いて変更されない.
     */
     std::vector<cnoid::Position> dstCoords = std::vector<cnoid::Position>(NUM_LEGS,cnoid::Position::Identity()); // 要素数2. rleg: 0. lleg: 1. generate frame.
     std::vector<bool> isSupportPhase = std::vector<bool>(NUM_LEGS, true); // 要素数2. rleg: 0. lleg: 1. footstepNodesListの末尾の要素が両方falseであることは無い
     double remainTime = 0.0;
+    enum class refZmpState_enum{RLEG, LLEG, MIDDLE};
+    refZmpState_enum endRefZmpState = refZmpState_enum::MIDDLE; // このnode終了時のrefZmpの位置.
 
     // 遊脚軌道用パラメータ
     std::vector<std::vector<double> > stepHeight = std::vector<std::vector<double> >(NUM_LEGS,std::vector<double>(2,0)); // 要素数2. rleg: 0. lleg: 1. swing期には、srcCoordsの高さ+[0]とdstCoordsの高さ+[1]の高い方に上げるような軌道を生成する
+    std::vector<bool> stopCurrentPosition = std::vector<bool>(NUM_LEGS, false); // 現在の位置で強制的に止めるかどうか
+    std::vector<double> goalOffset = std::vector<double>(NUM_LEGS,0.0); // [m]. 遊脚軌道生成時に、遅づきの場合、generate frameで鉛直方向に, 目標着地位置に対して加えるオフセットの最大値. 0以下.
+    std::vector<double> touchVel = std::vector<double>(NUM_LEGS,0.3); // 0より大きい. 単位[m/s]. 足を下ろすときの速さ
+
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   };
   std::vector<FootStepNodes> footstepNodesList = std::vector<FootStepNodes>(1); // 要素数1以上. 0番目が現在の状態. 末尾の要素以降は、末尾の状態がずっと続くとして扱われる.
   std::vector<cnoid::Position> srcCoords = std::vector<cnoid::Position>(NUM_LEGS,cnoid::Position::Identity()); // 要素数2. rleg: 0. lleg: 1. generate frame. 現在のfootstep開始時のgenCoords
@@ -104,6 +138,7 @@ public:
 
   cnoid::Vector3 genCog; // generate frame. abcで計算された目標COM
   cnoid::Vector3 genCogVel;  // generate frame.  abcで計算された目標COM速度
+  cnoid::Vector3 genCogAcc;  // generate frame.  abcで計算された目標COM加速度
   std::vector<cnoid::Position> abcEETargetPose; // 要素数と順序はeeNameと同じ.generate frame. abcで計算された目標位置姿勢
 
   // Stabilizer
@@ -117,6 +152,15 @@ public:
 
   // FullbodyIKSolver
   cnoid::BodyPtr genRobot; // output. 関節位置制御用
+
+  // for debug data
+  class DebugData {
+  public:
+    std::vector<cnoid::Vector3> strideLimitationHull = std::vector<cnoid::Vector3>(); // generate frame. overwritableStrideLimitationHullの範囲内の着地位置(自己干渉・IKの考慮が含まれる). Z成分には0を入れる
+    std::vector<std::vector<cnoid::Vector3> > capturableHulls = std::vector<std::vector<cnoid::Vector3> >(); // generate frame. 要素数と順番はcandidatesに対応
+    std::vector<double> cpViewerLog = std::vector<double>(37, 0.0);
+  };
+  DebugData debugData; // デバッグ用のOutPortから出力するためのデータ. AutoStabilizer内の制御処理では使われることは無い. そのため、モード遷移や初期化等の処理にはあまり注意を払わなくて良い
 
 public:
   bool isStatic() const{ // 現在static状態かどうか
@@ -167,6 +211,12 @@ public:
       defaultTranslatePos[i].reset(defaultTranslatePos[i].getGoal());
       isManualControlMode[i].reset(isManualControlMode[i].getGoal());
     }
+
+    // 現在の支持脚からの..という性質のportなので、リセットする必要がある
+    steppableRegion.clear();
+    steppableHeight.clear();
+    relLandingHeight = -1e15;
+    relLandingNormal = cnoid::Vector3::UnitZ();
   }
 
   // 毎周期呼ばれる. 内部の補間器をdtだけ進める
@@ -192,28 +242,6 @@ public:
 };
 
 // for debug
-inline std::ostream &operator<<(std::ostream &os, const GaitParam& gaitParam) {
-  os << "current" << std::endl;
-  os << " RLEG: " << std::endl;
-  os << "  pos: " << (gaitParam.genCoords[RLEG].value().translation()).format(Eigen::IOFormat(Eigen::StreamPrecision, 0, ", ", ", ", "", "", " [", "]")) << std::endl;
-  os << "  rot: " << (gaitParam.genCoords[RLEG].value().linear()).format(Eigen::IOFormat(Eigen::StreamPrecision, 0, ", ", "", " [", "]")) << std::endl;
-  os << " LLEG: " << std::endl;
-  os << "  pos: " << (gaitParam.genCoords[LLEG].value().translation()).format(Eigen::IOFormat(Eigen::StreamPrecision, 0, ", ", ", ", "", "", " [", "]")) << std::endl;
-  os << "  rot: " << (gaitParam.genCoords[LLEG].value().linear()).format(Eigen::IOFormat(Eigen::StreamPrecision, 0, ", ", "", " [", "]")) << std::endl;
-  for(int i=0;i<gaitParam.footstepNodesList.size();i++){
-    os << "footstep" << i << std::endl;
-    os << " RLEG: " << std::endl;
-    os << "  pos: " << (gaitParam.footstepNodesList[i].dstCoords[RLEG].translation()).format(Eigen::IOFormat(Eigen::StreamPrecision, 0, ", ", ", ", "", "", " [", "]")) << std::endl;
-    os << "  rot: " << (gaitParam.footstepNodesList[i].dstCoords[RLEG].linear()).format(Eigen::IOFormat(Eigen::StreamPrecision, 0, ", ", "", " [", "]")) << std::endl;
-    os << "  height = " << gaitParam.footstepNodesList[i].stepHeight[RLEG][0] << " " << gaitParam.footstepNodesList[i].stepHeight[RLEG][1] << std::endl;
-    os << " LLEG: " << std::endl;
-    os << "  pos: " << (gaitParam.footstepNodesList[i].dstCoords[LLEG].translation()).format(Eigen::IOFormat(Eigen::StreamPrecision, 0, ", ", ", ", "", "", " [", "]")) << std::endl;
-    os << "  rot: " << (gaitParam.footstepNodesList[i].dstCoords[LLEG].linear()).format(Eigen::IOFormat(Eigen::StreamPrecision, 0, ", ", "", " [", "]")) << std::endl;
-    os << "  height = " << gaitParam.footstepNodesList[i].stepHeight[LLEG][0] << " " << gaitParam.footstepNodesList[i].stepHeight[LLEG][1] << std::endl;
-    os << " time = " << gaitParam.footstepNodesList[i].remainTime << "[s]" << std::endl;;
-  }
-  return os;
-};
 
 inline std::ostream &operator<<(std::ostream &os, const std::vector<GaitParam::FootStepNodes>& footstepNodesList) {
   for(int i=0;i<footstepNodesList.size();i++){
@@ -222,14 +250,34 @@ inline std::ostream &operator<<(std::ostream &os, const std::vector<GaitParam::F
     os << "  pos: " << (footstepNodesList[i].dstCoords[RLEG].translation()).format(Eigen::IOFormat(Eigen::StreamPrecision, 0, ", ", ", ", "", "", " [", "]")) << std::endl;
     os << "  rot: " << (footstepNodesList[i].dstCoords[RLEG].linear()).format(Eigen::IOFormat(Eigen::StreamPrecision, 0, ", ", "", " [", "]")) << std::endl;
     os << "  height = " << footstepNodesList[i].stepHeight[RLEG][0] << " " << footstepNodesList[i].stepHeight[RLEG][1] << std::endl;
+    os << "  goaloffset = " << footstepNodesList[i].goalOffset[RLEG] << std::endl;
     os << " LLEG: " << std::endl;
     os << "  pos: " << (footstepNodesList[i].dstCoords[LLEG].translation()).format(Eigen::IOFormat(Eigen::StreamPrecision, 0, ", ", ", ", "", "", " [", "]")) << std::endl;
     os << "  rot: " << (footstepNodesList[i].dstCoords[LLEG].linear()).format(Eigen::IOFormat(Eigen::StreamPrecision, 0, ", ", "", " [", "]")) << std::endl;
     os << "  height = " << footstepNodesList[i].stepHeight[LLEG][0] << " " << footstepNodesList[i].stepHeight[LLEG][1] << std::endl;
+    os << "  goaloffset = " << footstepNodesList[i].goalOffset[LLEG] << std::endl;
     os << " time = " << footstepNodesList[i].remainTime << "[s]" << std::endl;;
   }
   return os;
 };
 
+inline std::ostream &operator<<(std::ostream &os, const GaitParam& gaitParam) {
+  os << "current" << std::endl;
+  os << " RLEG: " << std::endl;
+  os << "  pos: " << (gaitParam.genCoords[RLEG].value().translation()).format(Eigen::IOFormat(Eigen::StreamPrecision, 0, ", ", ", ", "", "", " [", "]")) << std::endl;
+  os << "  rot: " << (gaitParam.genCoords[RLEG].value().linear()).format(Eigen::IOFormat(Eigen::StreamPrecision, 0, ", ", "", " [", "]")) << std::endl;
+  os << " LLEG: " << std::endl;
+  os << "  pos: " << (gaitParam.genCoords[LLEG].value().translation()).format(Eigen::IOFormat(Eigen::StreamPrecision, 0, ", ", ", ", "", "", " [", "]")) << std::endl;
+  os << "  rot: " << (gaitParam.genCoords[LLEG].value().linear()).format(Eigen::IOFormat(Eigen::StreamPrecision, 0, ", ", "", " [", "]")) << std::endl;
+  os << gaitParam.footstepNodesList << std::endl;
+  return os;
+};
+
+inline std::ostream &operator<<(std::ostream &os, const std::vector<cnoid::Vector3>& polygon){
+  for(int j=0;j<polygon.size();j++){
+    os << polygon[j].format(Eigen::IOFormat(Eigen::StreamPrecision, 0, ", ", ", ", "", "", " [", "]"));
+  }
+  return os;
+}
 
 #endif

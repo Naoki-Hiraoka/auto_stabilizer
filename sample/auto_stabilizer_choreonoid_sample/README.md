@@ -60,6 +60,9 @@ roseus
               (make-coords :pos (float-vector 0 100 0) :name :lleg)
               (make-coords :pos (float-vector 0 100 0) :name :lleg)
               (make-coords :pos (float-vector 0 100 0) :name :lleg)))
+(send *ri* :set-foot-steps
+        (list (make-coords :pos (float-vector 0 -100 0) :name :rleg)
+              (make-coords :pos (float-vector 0 100 0) :rpy (float-vector pi/2 0 0) :name :lleg)))
 (send *ri* :start-impedance :arms)
 (send *ri* :stop-impedance :arms)
 (print-ros-msg (send *ri* :get-auto-stabilizer-param))
@@ -88,7 +91,11 @@ roseus
 (send *robot* :rleg :move-end-pos #F(0 -50 50))
 (send *robot* :rleg :move-end-rot 15 :y :local)
 (send *ri* :angle-vector (send *robot* :angle-vector) 3000)
+(send *ri* :wait-interpolation)
 (send *ri* :go-pos 0 0 0)
+(send *robot* :reset-pose)
+(send *ri* :angle-vector (send *robot* :angle-vector) 3000)
+(send *ri* :wait-interpolation)
 (send *ri* :set-auto-stabilizer-param
       :reference-frame (list t t)
       :is-hand-fix-mode nil
@@ -98,6 +105,7 @@ roseus
 ;; stair. 階段の前に移動させてから行う
 (send *robot* :reset-pose)
 (send *robot* :legs :move-end-pos #F(0 0 150))
+(send *robot* :move-centroid-on-foot :both '(:rleg :lleg))
 (send *ri* :angle-vector (send *robot* :angle-vector) 3000)
 (send *ri* :wait-interpolation)
 (send *ri* :set-auto-stabilizer-param
@@ -131,4 +139,32 @@ roseus
               )
         (list 50 50 50 50 50 50)
         (list 2.0 2.0 2.0 2.0 2.0 2.0))
+```
+
+### memo
+
+シミュレーションでは、次のようなパラメータにした方が性能が良い
+```
+(send *ri* :set-auto-stabilizer-param
+           :footguided-balance-time 0.4
+           :overwritable-min-step-time 0.5
+           )
+```
+
+視覚無しで傾斜のある地面を歩くときは、次のようなパラメータにした方が性能が良い. とはいえ視覚を使うのが正解.
+```
+(send *ri* :set-auto-stabilizer-param
+           :contact-detection-threshold 200
+           :emergency-step-cp-check-margin 0.1
+           :goal-offset -0.05
+           )
+```
+
+```
+(send *ri* :set-auto-stabilizer-param :contact-detection-threshold 300.0)
+;;(send *ri* :set-auto-stabilizer-param :is-stable-go-stop-mode nil)
+(send *robot* :reset-pose)
+(send *robot* :legs :move-end-pos #F(0 0 150))
+(send *robot* :move-centroid-on-foot :both '(:rleg :lleg))
+(send *ri* :angle-vector (send *robot* :angle-vector) 3000)
 ```

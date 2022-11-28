@@ -3,7 +3,7 @@
 #include "MathUtil.h"
 
 bool RefToGenFrameConverter::initGenRobot(const GaitParam& gaitParam, // input
-                                          cnoid::BodyPtr& genRobot, cpp_filters::TwoPointInterpolatorSE3& o_footMidCoords, cnoid::Vector3& o_genCogVel) const{ // output
+                                          cnoid::BodyPtr& genRobot, cpp_filters::TwoPointInterpolatorSE3& o_footMidCoords, cnoid::Vector3& o_genCogVel, cnoid::Vector3& o_genCogAcc) const{ // output
   genRobot->rootLink()->T() = gaitParam.refRobotRaw->rootLink()->T();
   genRobot->rootLink()->v() = gaitParam.refRobotRaw->rootLink()->v();
   genRobot->rootLink()->w() = gaitParam.refRobotRaw->rootLink()->w();
@@ -22,9 +22,11 @@ bool RefToGenFrameConverter::initGenRobot(const GaitParam& gaitParam, // input
   genRobot->calcCenterOfMass();
 
   cnoid::Vector3 genCogVel = cnoid::Vector3::Zero();
+  cnoid::Vector3 genCogAcc = cnoid::Vector3::Zero();
 
   o_footMidCoords.reset(footMidCoords);
   o_genCogVel = genCogVel;
+  o_genCogAcc = genCogAcc;
   return true;
 }
 

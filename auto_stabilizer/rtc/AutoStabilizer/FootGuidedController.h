@@ -49,13 +49,19 @@ namespace footguidedcontroller{
       u += exp(- w * Tj) * (ur.at(j).getGoal() - ur.at(j+1).getStart() + (ur.at(j).getSlope() - ur.at(j+1).getSlope()) / w);
     }
 
+    if((1 - exp(-2 * w * Tj)) == 0.0) { // ゼロ除算チェック
+      std::cerr << "[calcFootGuidedControl] (1 - exp(-2 * w * Tj))==0 !" << std::endl;
+      return ur[1].getStart();
+    }
+
     return ur[1].getStart() + 2 / (1 - exp(-2 * w * Tj)) * u;
   };
 
   template <typename T> void updateState(const double& w, const T& l, const T& c, const T& dc, const T& u, double m, double dt,
-                                         T& o_c, T& o_dc, T& o_f/*uから受ける力*/) {
+                                         T& o_c, T& o_dc, T& o_ddc, T& o_f/*uから受ける力*/) {
     o_c = c + dc * dt;
     o_dc = dc + w * w * (c - u - l) * dt;
+    o_ddc = w * w * (c - u - l);
     o_f = m * w * w * (c - u);
     return;
   };

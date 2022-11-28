@@ -109,9 +109,9 @@ bool Stabilizer::calcZMP(const GaitParam& gaitParam, double dt, bool useActState
   }else{ // 跳躍期
     tgtZmp = cog - cnoid::Vector3(gaitParam.l[0],gaitParam.l[1], 0.0);
   }
-  cnoid::Vector3 tgtCog,tgtCogVel,tgtForce;
+  cnoid::Vector3 tgtCog,tgtCogVel,tgtCogAcc,tgtForce;
   footguidedcontroller::updateState(gaitParam.omega,gaitParam.l,cog,cogVel,tgtZmp,gaitParam.genRobot->mass(),dt,
-                                      tgtCog, tgtCogVel, tgtForce);
+                                      tgtCog, tgtCogVel, tgtCogAcc, tgtForce);
 
   // tgtForceにrefEEWrenchのXY成分を足す TODO
 
@@ -182,7 +182,7 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
 
       this->constraintTask_->w() = cnoid::VectorX::Ones(dim) * 1e-6;
       this->constraintTask_->toSolve() = false;
-      this->constraintTask_->solver().settings()->setVerbosity(0);
+      this->constraintTask_->settings().verbose = 0;
     }
     {
       // 2. ZMPがtgtZmp
@@ -210,7 +210,7 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
 
       this->tgtZmpTask_->w() = cnoid::VectorX::Ones(dim) * 1e-6;
       this->tgtZmpTask_->toSolve() = false; // 常にtgtZmpが支持領域内にあるなら解く必要がないので高速化のためfalseにする. ない場合があるならtrueにする. calcWrenchでtgtZmpをtruncateしているのでfalseでよい
-      this->tgtZmpTask_->solver().settings()->setVerbosity(0);
+      this->tgtZmpTask_->settings().verbose = 0;
     }
     {
       // 3. 各脚の各頂点のノルムの重心がCOPOffsetと一致 (fzの値でスケールされてしまうので、alphaを用いて左右をそろえる)
@@ -254,8 +254,8 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
       this->copTask_->toSolve() = true;
       // this->copTask_->options().setToReliable();
       // this->copTask_->options().printLevel = qpOASES::PL_NONE; // PL_HIGH or PL_NONE
-      this->copTask_->solver().settings()->setCheckTermination(5); // default 25. 高速化
-      this->copTask_->solver().settings()->setVerbosity(0);
+      this->copTask_->settings().check_termination = 5; // default 25. 高速化
+      this->copTask_->settings().verbose = 0;
     }
 
     std::vector<std::shared_ptr<prioritized_qp_base::Task> > tasks{this->constraintTask_,this->tgtZmpTask_,this->copTask_};
@@ -264,13 +264,13 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
                                    result,
                                    0 // debuglevel
                                    )){
-      // QP fail. 目標力を何も入れないよりはマシなので適当に入れる.
-      tgtEEWrench[RLEG].head<3>() = tgtForce / 2;
-      tgtEEWrench[LLEG].head<3>() = tgtForce / 2;
+      // QP fail. 適当に1/2 tgtForceずつ分配してもよいが、QPがfailするのはだいたい転んでいるときなので、ゼロを入れたほうが安全
+      tgtEEWrench[RLEG].setZero();
+      tgtEEWrench[LLEG].setZero();
     }else{
       int idx = 0;
       for(int i=0;i<NUM_LEGS;i++){
-	tgtEEWrench[i].setZero();
+        tgtEEWrench[i].setZero();
         for(int j=0;j<gaitParam.legHull[i].size();j++){
           tgtEEWrench[i].head<3>() += tgtForce * result[idx];
           tgtEEWrench[i].tail<3>() += (EEPose[i].linear() * gaitParam.legHull[i][j]).cross(tgtForce * result[idx]);

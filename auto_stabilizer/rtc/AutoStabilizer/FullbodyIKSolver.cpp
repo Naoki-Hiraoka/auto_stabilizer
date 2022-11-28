@@ -1,5 +1,5 @@
 #include "FullbodyIKSolver.h"
-#include <fullbody_inverse_kinematics_solver/FullbodyInverseKinematicsSolverFast.h>
+#include <prioritized_inverse_kinematics_solver/PrioritizedInverseKinematicsSolver.h>
 
 bool FullbodyIKSolver::solveFullbodyIK(double dt, const GaitParam& gaitParam,
                                        cnoid::BodyPtr& genRobot) const{
@@ -8,28 +8,61 @@ bool FullbodyIKSolver::solveFullbodyIK(double dt, const GaitParam& gaitParam,
     if(!gaitParam.jointControllable[i]) genRobot->joint(i)->q() = gaitParam.refRobot->joint(i)->q();
   }
 
-  // update joint limit
-  for(int i=0;i<gaitParam.refRobot->numJoints();i++){
+  // jointControllableの関節のみ、探索変数にする
+  std::vector<cnoid::LinkPtr> variables; variables.reserve(1+genRobot->numJoints());
+  std::vector<double> dqWeight; dqWeight.reserve(6+genRobot->numJoints());
+  variables.push_back(genRobot->rootLink());
+  for(int i=0;i<6;i++) dqWeight.push_back(1.0);
+  for(size_t i=0;i<genRobot->numJoints();i++){
+    if(gaitParam.jointControllable[i]) {
+      variables.push_back(genRobot->joint(i));
+      dqWeight.push_back(this->dqWeight[i].value());
+    }
+  }
+
+  std::vector<std::shared_ptr<IK::IKConstraint> > ikConstraint0;
+
+  // joint velocity
+  for(size_t i=0;i<genRobot->numJoints();i++){
     if(!gaitParam.jointControllable[i]) continue;
-    cnoid::LinkPtr joint = genRobot->joint(i);
-    double u = gaitParam.refRobot->joint(i)->q_upper();
-    double l = gaitParam.refRobot->joint(i)->q_lower();
-    for(int j=0;j<gaitParam.jointLimitTables[i].size();j++){
-      u = std::min(u,gaitParam.jointLimitTables[i][j]->getUlimit());
-      l = std::max(l,gaitParam.jointLimitTables[i][j]->getLlimit());
-      }
-    joint->q() = std::min(u, std::max(l, joint->q()));
-    joint->setJointRange(l, u);
+    this->jointVelocityConstraint[i]->joint() = genRobot->joint(i);
+    this->jointVelocityConstraint[i]->dt() = dt;
+    this->jointVelocityConstraint[i]->maxError() = 1.0 * dt;
+    this->jointVelocityConstraint[i]->weight() = 1.0;
+    ikConstraint0.push_back(this->jointVelocityConstraint[i]);
   }
 
-  if(this->jlim_avoid_weight.size() != 6+genRobot->numJoints()) this->jlim_avoid_weight = cnoid::VectorX::Zero(6+genRobot->numJoints());
-  cnoid::VectorX dq_weight_all = cnoid::VectorX::Zero(6+genRobot->numJoints());
-  for(int i=0;i<6;i++) dq_weight_all[i] = 1.0;
-  for(int i=0;i<genRobot->numJoints();i++){
-    if(gaitParam.jointControllable[i]) dq_weight_all[6+i] = 1.0;
+  // joint angle
+  for(size_t i=0;i<genRobot->numJoints();i++){
+    if(!gaitParam.jointControllable[i]) continue;
+    this->jointLimitConstraint[i]->joint() = genRobot->joint(i);
+    this->jointLimitConstraint[i]->jointLimitTables() = gaitParam.jointLimitTables[i];
+    this->jointLimitConstraint[i]->maxError() = 1.0 * dt;
+    this->jointLimitConstraint[i]->weight() = 1.0;
+    ikConstraint0.push_back(this->jointLimitConstraint[i]);
   }
 
-  std::vector<std::shared_ptr<IK::IKConstraint> > ikConstraint;
+  std::vector<std::shared_ptr<IK::IKConstraint> > ikConstraint1;
+  this->selfCollisionConstraint.resize(gaitParam.selfCollision.size());
+  for(size_t i=0;i<this->selfCollisionConstraint.size();i++){
+    if(!this->selfCollisionConstraint[i]) this->selfCollisionConstraint[i] = std::make_shared<IK::ClientCollisionConstraint>();
+    this->selfCollisionConstraint[i]->A_link() = genRobot->link(gaitParam.selfCollision[i].link1);
+    this->selfCollisionConstraint[i]->B_link() = genRobot->link(gaitParam.selfCollision[i].link2);
+    this->selfCollisionConstraint[i]->tolerance() = 0.01;
+    this->selfCollisionConstraint[i]->maxError() = 10.0*dt;
+    this->selfCollisionConstraint[i]->weight() = 1.0;
+    this->selfCollisionConstraint[i]->velocityDamper() = 0.1 / dt;
+    this->selfCollisionConstraint[i]->A_localp() = gaitParam.selfCollision[i].point1;
+    this->selfCollisionConstraint[i]->B_localp() = gaitParam.selfCollision[i].point2;
+    this->selfCollisionConstraint[i]->direction() = gaitParam.selfCollision[i].direction21;
+
+    // 全自己干渉情報を与えると計算コストが膨大になるため、距離が近いもののみ与える
+    if(gaitParam.selfCollision[i].distance < 0.05){
+      ikConstraint1.push_back(this->selfCollisionConstraint[i]);
+    }
+  }
+
+  std::vector<std::shared_ptr<IK::IKConstraint> > ikConstraint2;
 
   // EEF
   for(int i=0;i<gaitParam.eeName.size();i++){
@@ -39,11 +72,11 @@ bool FullbodyIKSolver::solveFullbodyIK(double dt, const GaitParam& gaitParam,
     this->ikEEPositionConstraint[i]->B_localpos() = gaitParam.abcEETargetPose[i];
     this->ikEEPositionConstraint[i]->maxError() << 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt;
     this->ikEEPositionConstraint[i]->precision() << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0; // 強制的にIKをmax loopまで回す
-    if(i<NUM_LEGS) this->ikEEPositionConstraint[i]->weight() << 10.0, 10.0, 10.0, 10.0, 10.0, 10.0;
+    if(i<NUM_LEGS) this->ikEEPositionConstraint[i]->weight() << 3.0, 3.0, 3.0, 3.0, 3.0, 3.0;
     else this->ikEEPositionConstraint[i]->weight() << 1.0, 1.0, 1.0, 1.0, 1.0, 1.0;
     this->ikEEPositionConstraint[i]->eval_link() = nullptr;
     this->ikEEPositionConstraint[i]->eval_localR() = this->ikEEPositionConstraint[i]->B_localpos().linear();
-    ikConstraint.push_back(this->ikEEPositionConstraint[i]);
+    ikConstraint2.push_back(this->ikEEPositionConstraint[i]);
   }
 
   // COM
@@ -54,9 +87,9 @@ bool FullbodyIKSolver::solveFullbodyIK(double dt, const GaitParam& gaitParam,
     this->comConstraint->B_localp() = gaitParam.genCog + gaitParam.sbpOffset;
     this->comConstraint->maxError() << 10.0*dt, 10.0*dt, 10.0*dt;
     this->comConstraint->precision() << 0.0, 0.0, 0.0; // 強制的にIKをmax loopまで回す
-    this->comConstraint->weight() << 3.0, 3.0, 1.0;
+    this->comConstraint->weight() << 10.0, 10.0, 1.0;
     this->comConstraint->eval_R() = cnoid::Matrix3::Identity();
-    ikConstraint.push_back(this->comConstraint);
+    ikConstraint2.push_back(this->comConstraint);
   }
 
   // Angular Momentum
@@ -68,7 +101,7 @@ bool FullbodyIKSolver::solveFullbodyIK(double dt, const GaitParam& gaitParam,
     this->angularMomentumConstraint->weight() << 1e-4, 1e-4, 0.0; // TODO
     this->angularMomentumConstraint->dt() = dt;
     this->comConstraint->eval_R() = cnoid::Matrix3::Identity();
-    ikConstraint.push_back(this->angularMomentumConstraint);
+    ikConstraint2.push_back(this->angularMomentumConstraint);
   }
 
   // root
@@ -83,7 +116,7 @@ bool FullbodyIKSolver::solveFullbodyIK(double dt, const GaitParam& gaitParam,
     //this->rootPositionConstraint->weight() << 0.0, 0.0, 0.0, 3e-1, 3e-1, 3e-1;
     this->rootPositionConstraint->eval_link() = nullptr;
     this->rootPositionConstraint->eval_localR() = cnoid::Matrix3::Identity();
-    ikConstraint.push_back(this->rootPositionConstraint);
+    ikConstraint2.push_back(this->rootPositionConstraint);
   }
 
   // reference angle
@@ -95,7 +128,7 @@ bool FullbodyIKSolver::solveFullbodyIK(double dt, const GaitParam& gaitParam,
       this->refJointAngleConstraint[i]->weight() = 1e-1; // 小さい値すぎると、qp終了判定のtoleranceによって無視されてしまう
       this->refJointAngleConstraint[i]->targetq() = gaitParam.refRobot->joint(i)->q();
       this->refJointAngleConstraint[i]->precision() = 0.0; // 強制的にIKをmax loopまで回す
-      ikConstraint.push_back(this->refJointAngleConstraint[i]);
+      ikConstraint2.push_back(this->refJointAngleConstraint[i]);
     }
   }
 
@@ -103,26 +136,27 @@ bool FullbodyIKSolver::solveFullbodyIK(double dt, const GaitParam& gaitParam,
   //  この現象を防ぐには、未来の情報を含んだIKを作るか、歩行動作中にIKが解きづらい姿勢を経由しないように着地位置等をリミットするか. 後者を採用
   //  歩行動作ではないゆっくりとした動作であれば、この現象が発生しても問題ない
 
-  for(int i=0;i<ikConstraint.size();i++) ikConstraint[i]->debuglevel() = 0; //debuglevel
-  fik::solveFullbodyIKLoopFast(genRobot,
-                               ikConstraint,
-                               this->jlim_avoid_weight,
-                               dq_weight_all,
-                               1,//loop
-                               1e-6, // wn
-                               0, //debug
-                               dt,
-                               1e2, // we. 1e0だとやや不安定. 1e3だと大きすぎる
-                               false // enable_jlim_avnoid.
-                               );
+  std::vector<std::vector<std::shared_ptr<IK::IKConstraint> > > constraints{ikConstraint0,ikConstraint1,ikConstraint2};
+  for(size_t i=0;i<constraints.size();i++){
+    for(size_t j=0;j<constraints[i].size();j++){
+      constraints[i][j]->debuglevel() = 0;//debuglevel
+    }
+  }
+  prioritized_inverse_kinematics_solver::IKParam param;
+  param.maxIteration = 1;
+  param.dqWeight = dqWeight;
+  param.wn = 1e-6;
+  param.we = 1e2; // 1e0だとやや不安定. 1e3だと大きすぎる
+  param.debugLevel = 0;
+  param.dt = dt;
+  prioritized_inverse_kinematics_solver::solveIKLoop(variables,
+                                                     constraints,
+                                                     this->tasks,
+                                                     param
+                                                     );
 
-  // enable_jlim_avnoidはjoint limit tableと併用不可
-    //     fullbodyIKは不等式制約が扱えないので、前回の周期の開始時よりも今回の開始時の方がlimitに近ければ、その関節のdq_weightを大きくして動かしにくくする、というアプローチをとっている.
-  //     これは、各タスクが滑らかに変化していることを前提にしている。そうでなく、limitからの距離が近づいたり離れたりを頻繁にくりかえすような状況では、重みが不連続に変動するのでロボットが振動的になってしまう.
-  //     ここまでは、各タスクが滑らかに変化するように作ればよく、実用上のほとんどのケースでは各タスクは滑らかに変化するので、問題ない.
-  //     ところが、joint_limit_tableを用いてjoint->q_upper()とjoint->q_lower()を更新すると、limit側が勝手に動くので、タスクに関係なく、limitからの距離が近づいたり離れたりする. すると、ロボットが振動的になってしまうことがある.
-  //     不等式制約が扱えるQPベースのIKなら、この問題は発生しない.
-  // (joint->q_upper()とjoint->q_lower()をjoint limit tableを用いて更新するのをやめて、解いた後にtableに基づきlimitするようにする、といった手法を試したが、解消できなかった)
+
+  // 念の為limit check
   for(int i=0;i<gaitParam.refRobot->numJoints();i++){
     if(!gaitParam.jointControllable[i]) continue;
     cnoid::LinkPtr joint = genRobot->joint(i);

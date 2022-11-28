@@ -2,7 +2,7 @@
 #define Stabilizer_H
 
 #include "GaitParam.h"
-#include <prioritized_qp/PrioritizedQPSolver.h>
+#include <prioritized_qp_osqp/prioritized_qp_osqp.h>
 #include <cnoid/JointPath>
 
 class Stabilizer{
@@ -20,25 +20,25 @@ public:
   std::vector<std::vector<double> > swingDgain = std::vector<std::vector<double> >(2); // 要素数2. [rleg, lleg]. rootLinkから各endeffectorまでの各関節のゲイン. 0~100
   double swing2LandingTransitionTime = 0.05; // [s]. 0より大きい
   double landing2SupportTransitionTime = 0.1; // [s]. 0より大きい
-  double support2SwingTransitionTime = 0.1; // [s]. 0より大きい
+  double support2SwingTransitionTime = 0.2; // [s]. 0より大きい
 
   void init(const GaitParam& gaitParam, cnoid::BodyPtr& actRobotTqc){
     for(int i=0;i<NUM_LEGS;i++){
       cnoid::JointPath jointPath(actRobotTqc->rootLink(), actRobotTqc->link(gaitParam.eeParentLink[i]));
       if(jointPath.numJoints() == 6){
-        supportPgain[i] = {5,30,20,10,1,1};
-        supportDgain[i] = {10,30,20,20,5,5};
-        landingPgain[i] = {5,30,20,10,1,1};
-        landingDgain[i] = {10,30,20,20,5,5};
-        swingPgain[i] = {5,30,20,10,1,1};
-        swingDgain[i] = {10,30,20,20,5,5};
-	// 下はもとのauto_stabilizerの値. ゲインが低すぎて、go-velocity 0 0 0のときに前に進んでいってしまう
         // supportPgain[i] = {5,10,10,5,0.1,0.1};
         // supportDgain[i] = {10,20,20,10,10,10};
-        // landingPgain[i] = {5,1,1,1,0.1,0.1};
-        // landingDgain[i] = {10,10,10,10,5,5};
-        // swingPgain[i] = {5,30,20,10,5,5};
-        // swingDgain[i] = {10,30,20,20,10,10};
+        // landingPgain[i] = {5,10,10,5,0.1,0.1};
+        // landingDgain[i] = {10,20,20,10,10,10};
+        // swingPgain[i] = {5,10,10,5,0.1,0.1};
+        // swingDgain[i] = {10,20,20,10,10,10};
+        // 下はもとのauto_stabilizerの値. ゲインが低すぎて、go-velocity 0 0 0のときに前に進んでいってしまう
+        supportPgain[i] = {5,15,10,5,0.2,0.2};
+        supportDgain[i] = {10,20,20,10,5,5};
+        landingPgain[i] = {5,15,1,1,0.2,0.2};
+        landingDgain[i] = {10,10,10,10,5,5};
+        swingPgain[i] = {5,30,20,10,5,5};
+        swingDgain[i] = {10,30,20,20,30,30};
       }else{
         supportPgain[i].resize(jointPath.numJoints(), 100.0);
         supportDgain[i].resize(jointPath.numJoints(), 100.0);
@@ -51,9 +51,9 @@ public:
   }
 protected:
   // 計算高速化のためのキャッシュ. クリアしなくても別に副作用はない.
-  mutable std::shared_ptr<prioritized_qp::Task> constraintTask_ = std::make_shared<prioritized_qp::Task>();
-  mutable std::shared_ptr<prioritized_qp::Task> tgtZmpTask_ = std::make_shared<prioritized_qp::Task>();;
-  mutable std::shared_ptr<prioritized_qp::Task> copTask_ = std::make_shared<prioritized_qp::Task>();;
+  mutable std::shared_ptr<prioritized_qp_osqp::Task> constraintTask_ = std::make_shared<prioritized_qp_osqp::Task>();
+  mutable std::shared_ptr<prioritized_qp_osqp::Task> tgtZmpTask_ = std::make_shared<prioritized_qp_osqp::Task>();;
+  mutable std::shared_ptr<prioritized_qp_osqp::Task> copTask_ = std::make_shared<prioritized_qp_osqp::Task>();;
 public:
   void initStabilizerOutput(const GaitParam& gaitParam,
                             cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, cnoid::Vector3& o_stTargetZmp, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage) const;

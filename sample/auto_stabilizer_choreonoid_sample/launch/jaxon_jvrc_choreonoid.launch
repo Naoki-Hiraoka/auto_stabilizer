@@ -4,7 +4,7 @@
   <env name="CHOREONOID_ROBOT" value="JAXON_RED" /> <!-- for JAXONCustomizer -->
 
   <arg name="CONF_FILE" value="$(find hrpsys_choreonoid_tutorials)/models/JAXON_JVRC.conf"/>
-  <arg name="URDF_FILE" value="$(find hrpsys_choreonoid_tutorials)/models/JAXON_JVRC.urdf"/>
+  <arg name="URDF_FILE" value="$(find hrpsys_choreonoid_tutorials)/models/JAXON_JVRC_SENSORS.urdf"/>
   <arg name="MODEL_FILE" value="$(find jvrc_models)/JAXON_JVRC/JAXON_JVRCmain_hrpsys.wrl" />
   <arg name="LOAD_OBJECTS" default="false" />
   <arg name="PROJECT_FILE" default="$(find auto_stabilizer_choreonoid_sample)/config/JAXON_RED_RH_FLAT.cnoid" unless="$(arg LOAD_OBJECTS)"/> <!-- hrpsys_choreonoid_tutorialsのものとほぼ同じだが、ロボットモデルにbushがついていない. torque control modeではbushが無い方が実機に近い挙動をする気がするので -->
@@ -41,8 +41,28 @@
   </include>
 
   <node pkg="auto_stabilizer" name="AutoStabilizerServiceROSBridge" type="AutoStabilizerServiceROSBridgeComp"
-        output="screen" args ='-o "corba.master_manager:localhost:2810" -o "corba.nameservers:localhost:15005" -o "naming.formats:%n.rtc" -o "exec_cxt.periodic.type:PeriodicExecutionContext" -o "exec_cxt.periodic.rate:2000" -o "logger.file_name:/tmp/rtc%p.log"' />
+        output="screen" args ='-o "corba.master_manager:localhost:2810" -o "corba.nameservers:localhost:15005" -o "naming.formats:%n.rtc" -o "exec_cxt.periodic.type:PeriodicExecutionContext" -o "exec_cxt.periodic.rate:100" -o "logger.file_name:/tmp/rtc%p.log"' />
   <rtconnect from="AutoStabilizerServiceROSBridge.rtc:AutoStabilizerService" to="ast.rtc:AutoStabilizerService"  subscription_type="new"/>
   <rtactivate component="AutoStabilizerServiceROSBridge.rtc" />
+
+  <!-- self collision BEGIN -->
+  <node pkg="collision_checker_rtc" name="CollisionChecker" type="CollisionCheckerComp"
+        output="screen" args ='-o "corba.master_manager:localhost:2810" -o "corba.nameservers:localhost:15005" -o "naming.formats:%n.rtc" -o "exec_cxt.periodic.rate:50" -o "example.CollisionChecker.config_file:$(arg CONF_FILE)"' />
+  <rtconnect from="ast.rtc:q" to="CollisionChecker0.rtc:qIn" subscription_type="new" push_policy="new" push_rate="50" buffer_length="8"/>
+  <rtconnect from="ast.rtc:genBasePosOut" to="CollisionChecker0.rtc:basePosIn"  subscription_type="new" push_policy="all" push_rate="50" buffer_length="8"/>
+  <rtconnect from="ast.rtc:genBaseRpyOut" to="CollisionChecker0.rtc:baseRpyIn"  subscription_type="new" push_policy="all" push_rate="50" buffer_length="8"/>
+  <rtconnect from="CollisionChecker0.rtc:collisionOut" to="ast.rtc:selfCollisionIn" subscription_type="new" push_policy="new" push_rate="50" buffer_length="8"/>
+  <rtactivate component="CollisionChecker0.rtc" />
+  <!-- self collision END -->
+
+  <!-- steppable region BEGIN -->
+  <node pkg="auto_stabilizer_ros_bridge" name="AutoStabilizerROSBridge" type="AutoStabilizerROSBridgeComp"
+        output="screen" args ='-o "corba.master_manager:localhost:2810" -o "corba.nameservers:localhost:15005" -o "naming.formats:%n.rtc" -o "exec_cxt.periodic.rate:500"' />
+  <rtconnect from="ast.rtc:landingTargetOut" to="AutoStabilizerROSBridge.rtc:landingTargetIn" subscription_type="new"/>
+  <rtconnect from="ast.rtc:steppableRegionIn" to="AutoStabilizerROSBridge.rtc:steppableRegionOut" subscription_type="new"/>
+  <rtconnect from="ast.rtc:landingHeightIn" to="AutoStabilizerROSBridge.rtc:landingHeightOut" subscription_type="new"/>
+  <rtactivate component="AutoStabilizerROSBridge.rtc" />
+  <!-- steppable region END -->
+
   <node name="rtmlaunch_jaxon_jvrc_choreonoid" pkg="openrtm_tools" type="rtmlaunch.py" args="$(find auto_stabilizer_choreonoid_sample)/launch/jaxon_jvrc_choreonoid.launch" output="screen"/>
 </launch>

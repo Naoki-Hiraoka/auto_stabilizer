@@ -24,8 +24,11 @@
 // #include <cpp_filters/IIRFilter.h>
 // #include <joint_limit_table/JointLimitTable.h>
 
+#include <hrpsys/idl/RobotHardwareService.hh>
+#include <collision_checker_msgs/idl/Collision.hh>
+#include <auto_stabilizer_msgs/idl/AutoStabilizer.hh>
+
 #include "AutoStabilizerService_impl.h"
-#include "hrpsys/idl/RobotHardwareService.hh"
 #include "GaitParam.h"
 #include "RefToGenFrameConverter.h"
 #include "ActToGenFrameConverter.h"
@@ -99,6 +102,13 @@ protected:
     std::vector<RTC::TimedPose3D> m_refEEPose_; // Reference World frame. 要素数及び順番はgaitParam_.eeNameと同じ
     std::vector<std::unique_ptr<RTC::InPort<RTC::TimedPose3D> > > m_refEEPoseIn_;
     RTC::Time refEEPoseLastUpdateTime_; // m_refEEPoseIn_のどれかに最後にdataが届いたときの、m_qRef_.tmの時刻
+    collision_checker_msgs::TimedCollisionSeq m_selfCollision_; // generate frame. genRobotの自己干渉の最近傍点
+    RTC::InPort<collision_checker_msgs::TimedCollisionSeq> m_selfCollisionIn_;
+    auto_stabilizer_msgs::TimedSteppableRegion m_steppableRegion_; // 着地可能領域. 支持脚を水平にした座標系
+    RTC::InPort<auto_stabilizer_msgs::TimedSteppableRegion> m_steppableRegionIn_;
+    RTC::Time steppableRegionLastUpdateTime_; // m_steppableRegionIn_に最後にdataが届いたときの、m_qRef_.tmの時刻
+    auto_stabilizer_msgs::TimedLandingPosition m_landingHeight_; // 着地姿勢. 支持脚を水平にした座標系
+    RTC::InPort<auto_stabilizer_msgs::TimedLandingPosition> m_landingHeightIn_;
 
     RTC::TimedDoubleSeq m_q_;
     RTC::OutPort<RTC::TimedDoubleSeq> m_qOut_;
@@ -108,12 +118,21 @@ protected:
     RTC::OutPort<RTC::TimedPose3D> m_genBasePoseOut_;
     RTC::TimedDoubleSeq m_genBaseTform_;  // Generate World frame
     RTC::OutPort<RTC::TimedDoubleSeq> m_genBaseTformOut_; // for HrpsysSeqStateROSBridge
+    RTC::TimedAcceleration3D m_genImuAcc_; // acceleration of IMU sensor in generate world frame. represented in sensor frame. これがあったほうが姿勢推定の性能が上がる.
+    RTC::OutPort<RTC::TimedAcceleration3D> m_genImuAccOut_;
+    auto_stabilizer_msgs::TimedLandingPosition m_landingTarget_; // 着地位置. 支持脚を水平にした座標系
+    RTC::OutPort<auto_stabilizer_msgs::TimedLandingPosition> m_landingTargetOut_;
+    std::vector<RTC::TimedPose3D> m_actEEPose_; // Generate World frame. 要素数及び順番はgaitParam_.eeNameと同じ
+    std::vector<std::unique_ptr<RTC::OutPort<RTC::TimedPose3D> > > m_actEEPoseOut_;
+    std::vector<RTC::TimedDoubleSeq> m_actEEWrench_; // Generate World frame. EndEffector origin. 要素数及び順番はgaitParam_.eeNameと同じ. ロボットが受ける力
+    std::vector<std::unique_ptr<RTC::OutPort<RTC::TimedDoubleSeq> > > m_actEEWrenchOut_;
 
     AutoStabilizerService_impl m_service0_;
     RTC::CorbaPort m_AutoStabilizerServicePort_;
 
     RTC::CorbaConsumer<OpenHRP::RobotHardwareService> m_robotHardwareService0_;
     RTC::CorbaPort m_RobotHardwareServicePort_;
+
 
     // only for log
     RTC::TimedPoint3D m_genBasePos_; // Generate World frame
@@ -136,13 +155,20 @@ protected:
     RTC::OutPort<RTC::TimedDoubleSeq> m_dstLandingPosOut_; // for log
     RTC::TimedDoubleSeq m_remainTime_;
     RTC::OutPort<RTC::TimedDoubleSeq> m_remainTimeOut_; // for log
-
-    std::vector<RTC::TimedPose3D> m_actEEPose_; // Generate World frame. 要素数及び順番はgaitParam_.eeNameと同じ
-    std::vector<std::unique_ptr<RTC::OutPort<RTC::TimedPose3D> > > m_actEEPoseOut_;
+    RTC::TimedDoubleSeq m_genCoords_;
+    RTC::OutPort<RTC::TimedDoubleSeq> m_genCoordsOut_; // for log
+    RTC::TimedDoubleSeq m_captureRegion_;
+    RTC::OutPort<RTC::TimedDoubleSeq> m_captureRegionOut_; // for log
+    RTC::TimedDoubleSeq m_steppableRegionLog_;
+    RTC::OutPort<RTC::TimedDoubleSeq> m_steppableRegionLogOut_; // for log
+    RTC::TimedDoubleSeq m_steppableRegionNumLog_;
+    RTC::OutPort<RTC::TimedDoubleSeq> m_steppableRegionNumLogOut_; // for log
+    RTC::TimedDoubleSeq m_strideLimitationHull_;
+    RTC::OutPort<RTC::TimedDoubleSeq> m_strideLimitationHullOut_; // for log
+    RTC::TimedDoubleSeq m_cpViewerLog_;
+    RTC::OutPort<RTC::TimedDoubleSeq> m_cpViewerLogOut_; // for log
     std::vector<RTC::TimedDoubleSeq> m_tgtEEWrench_; // Generate World frame. EndEffector origin. 要素数及び順番はgaitParam_.eeNameと同じ. ロボットが受ける力
     std::vector<std::unique_ptr<RTC::OutPort<RTC::TimedDoubleSeq> > > m_tgtEEWrenchOut_;
-    std::vector<RTC::TimedDoubleSeq> m_actEEWrench_; // Generate World frame. EndEffector origin. 要素数及び順番はgaitParam_.eeNameと同じ. ロボットが受ける力
-    std::vector<std::unique_ptr<RTC::OutPort<RTC::TimedDoubleSeq> > > m_actEEWrenchOut_;
   };
   Ports ports_;
 
@@ -245,7 +271,7 @@ protected:
   bool getProperty(const std::string& key, std::string& ret);
   static void copyEigenCoords2FootStep(const cnoid::Position& in_fs, OpenHRP::AutoStabilizerService::Footstep& out_fs);
 
-  static bool readInPortData(const double& dt, AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobotRaw, cnoid::BodyPtr actRobotRaw, std::vector<cnoid::Vector6>& refEEWrenchOrigin, std::vector<cpp_filters::TwoPointInterpolatorSE3>& refEEPoseRaw);
+  static bool readInPortData(const double& dt, const GaitParam& gaitParam, const AutoStabilizer::ControlMode& mode, AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobotRaw, cnoid::BodyPtr actRobotRaw, std::vector<cnoid::Vector6>& refEEWrenchOrigin, std::vector<cpp_filters::TwoPointInterpolatorSE3>& refEEPoseRaw, std::vector<GaitParam::Collision>& selfCollision, std::vector<std::vector<cnoid::Vector3> >& steppableRegion, std::vector<double>& steppableHeight, double& relLandingHeight, cnoid::Vector3& relLandingNormal);
   static bool execAutoStabilizer(const AutoStabilizer::ControlMode& mode, GaitParam& gaitParam, double dt, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ActToGenFrameConverter& actToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer, const ExternalForceHandler& externalForceHandler, const FullbodyIKSolver& fullbodyIKSolver, const LegManualController& legManualController, const CmdVelGenerator& cmdVelGenerator);
   static bool writeOutPortData(AutoStabilizer::Ports& ports, const AutoStabilizer::ControlMode& mode, cpp_filters::TwoPointInterpolator<double>& idleToAbcTransitionInterpolator, double dt, const GaitParam& gaitParam);
 };

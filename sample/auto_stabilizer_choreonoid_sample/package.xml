@@ -13,6 +13,8 @@
   <buildtool_depend>catkin</buildtool_depend>
 
   <depend>auto_stabilizer</depend>
+  <depend>auto_stabilizer_ros_bridge</depend>
   <depend>hrpsys_choreonoid_tutorials</depend>
   <depend>vnoid_world</depend>
+  <depend>collision_checker_rtc</depend>
 </package>

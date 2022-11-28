@@ -67,6 +67,8 @@ class JAXON_RED_HrpsysConfigurator(ChoreonoidHrpsysConfigurator):
                     connectPorts(self.rmfo.port("off_" + sen), self.ast.port("act"+sen+"In"))
                 else:
                     connectPorts(self.rh.port(sen), self.ast.port("act"+sen+"In"))
+            if self.kf:
+                connectPorts(self.ast.port("genImuAccOut"), self.kf.port("accRef"))
             connectPorts(self.ast.port("RobotHardwareService"), self.rh.port("RobotHardwareService"))
 
     def defJointGroups (self):
@@ -100,6 +102,18 @@ class JAXON_RED_HrpsysConfigurator(ChoreonoidHrpsysConfigurator):
             rtm.connectPorts(rtm.findRTC("ast").port("dstLandingPosOut"),rtm.findRTC("log").port("ast_dstLandingPosOut"))
             self.log_svc.add("TimedDoubleSeq","ast_remainTimeOut")
             rtm.connectPorts(rtm.findRTC("ast").port("remainTimeOut"),rtm.findRTC("log").port("ast_remainTimeOut"))
+            self.log_svc.add("TimedDoubleSeq","ast_genCoordsOut")
+            rtm.connectPorts(rtm.findRTC("ast").port("genCoordsOut"),rtm.findRTC("log").port("ast_genCoordsOut"))
+            self.log_svc.add("TimedDoubleSeq","ast_captureRegionOut")
+            rtm.connectPorts(rtm.findRTC("ast").port("captureRegionOut"),rtm.findRTC("log").port("ast_captureRegionOut"))
+            self.log_svc.add("TimedDoubleSeq","ast_steppableRegionLogOut")
+            rtm.connectPorts(rtm.findRTC("ast").port("steppableRegionLogOut"),rtm.findRTC("log").port("ast_steppableRegionLogOut"))
+            self.log_svc.add("TimedDoubleSeq","ast_steppableRegionNumLogOut")
+            rtm.connectPorts(rtm.findRTC("ast").port("steppableRegionNumLogOut"),rtm.findRTC("log").port("ast_steppableRegionNumLogOut"))
+            self.log_svc.add("TimedDoubleSeq","ast_strideLimitationHullOut")
+            rtm.connectPorts(rtm.findRTC("ast").port("strideLimitationHullOut"),rtm.findRTC("log").port("ast_strideLimitationHullOut"))
+            self.log_svc.add("TimedDoubleSeq","ast_cpViewerLogOut")
+            rtm.connectPorts(rtm.findRTC("ast").port("cpViewerLogOut"),rtm.findRTC("log").port("ast_cpViewerLogOut"))
             for ee in ["rleg", "lleg", "rarm", "larm"]:
                 self.log_svc.add("TimedDoubleSeq","ast_tgt" + ee + "WrenchOut")
                 rtm.connectPorts(rtm.findRTC("ast").port("tgt" + ee + "WrenchOut"),rtm.findRTC("log").port("ast_tgt" + ee + "WrenchOut"))
@@ -108,6 +122,9 @@ class JAXON_RED_HrpsysConfigurator(ChoreonoidHrpsysConfigurator):
         super(JAXON_RED_HrpsysConfigurator, self).setupLogger()
 
     def startABSTIMP (self):
+        ### for torque control
+        self.el_svc.setServoErrorLimit("all", sys.float_info.max)
+        self.rh_svc.setServoErrorLimit("all", sys.float_info.max)
         ### not used on hrpsys
         if self.el:
             self.el_svc.setServoErrorLimit("RARM_F_JOINT0", sys.float_info.max)
@@ -117,6 +134,11 @@ class JAXON_RED_HrpsysConfigurator(ChoreonoidHrpsysConfigurator):
         ###
         self.rh_svc.setJointControlMode("all",OpenHRP.RobotHardwareService.TORQUE)
         self.rh_svc.setServoTorqueGainPercentage("all",100)
+        # ast setting
+        astp=self.ast_svc.getAutoStabilizerParam()[1]
+        astp.controllable_joints = self.Groups[0][1] + self.Groups[1][1] + self.Groups[2][1] + self.Groups[3][1] + self.Groups[4][1] + self.Groups[5][1] # remove hand joints
+        astp.dq_weight[12:15] = [1e2]*3 # reduce chest joint move
+        self.ast_svc.setAutoStabilizerParam(astp)
         self.ast_svc.startAutoBalancer()
         # Suppress limit over message and behave like real robot that always angle-vector is in seq.
         # Latter four 0.0 are for hands.

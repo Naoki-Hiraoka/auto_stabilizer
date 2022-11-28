@@ -33,6 +33,10 @@ main:
       - { key: ast_actDcmOut, id: [2]}
       - { key: ast_dstLandingPosOut, id: [2]}
       - { key: ast_dstLandingPosOut, id: [5]}
+      - { key: ast_genCoordsOut, id: [2]}
+      - { key: ast_genCoordsOut, id: [5]}
+      - { key: ast_genCoordsOut, id: [8]}
+      - { key: ast_genCoordsOut, id: [11]}
     bottom_label:
 
   remain time:

@@ -7,16 +7,16 @@ add_definitions(-Wno-deprecated)
 
 find_package(catkin REQUIRED COMPONENTS
   ik_constraint
-  fullbody_inverse_kinematics_solver
-  prioritized_qp
-  #prioritized_inverse_kinematics_solver
+  prioritized_qp_osqp
+  prioritized_inverse_kinematics_solver
   cpp_filters
-  #ik_constraint_joint_limit_table
+  ik_constraint_joint_limit_table
   hrpsys_ros_bridge
   joint_limit_table
+  collision_checker_msgs
+  auto_stabilizer_msgs
   )
 find_package(choreonoid REQUIRED)
-find_package(OsqpEigen REQUIRED)
 
 find_package(PkgConfig)
 pkg_check_modules(openrtm_aist openrtm-aist REQUIRED)
@@ -25,7 +25,6 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
   ${CHOREONOID_INCLUDE_DIRS}
   ${openrtm_aist_INCLUDE_DIRS}
-  $<TARGET_PROPERTY:OsqpEigen::OsqpEigen,INTERFACE_INCLUDE_DIRECTORIES>
   )
 link_directories(
   ${CHOREONOID_LIBRARY_DIRS}
@@ -52,8 +51,6 @@ target_link_libraries(AutoStabilizer
   ${openrtm_aist_LIBRARIES}
   ${${PROJECT_NAME}_IDLLIBRARY_DIRS}
   RobotHardwareServiceSkel RobotHardwareServiceStub
-  #OsqpEigen::OsqpEigen # -isystemでこのワークスペースのdevel/includeがinclude_directoriesに入るのだが、優先順位末尾に入ってしまう
-  #$<TARGET_PROPERTY:OsqpEigen::OsqpEigen,INTERFACE_LINK_LIBRARIES> # なくても良い?
   )
 set_target_properties(AutoStabilizer PROPERTIES PREFIX "")
 add_dependencies(AutoStabilizer RTMBUILD2_${PROJECT_NAME}_genrpc) # wait for rtmbuild2_genidl

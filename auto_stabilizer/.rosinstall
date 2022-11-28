@@ -22,6 +22,9 @@
     uri: https://github.com/Naoki-Hiraoka/ik_solvers
     local-name: ik_solvers
 - git:
+    uri: https://github.com/Naoki-Hiraoka/abseil_catkin.git
+    local-name: abseil_catkin
+- git:
     uri: https://github.com/Naoki-Hiraoka/qp_solvers
     local-name: qp_solvers
 - git:
@@ -30,3 +33,6 @@
 - git:
     uri: https://github.com/Naoki-Hiraoka/joint_limit_table
     local-name: joint_limit_table
+- git:
+    uri: https://github.com/Naoki-Hiraoka/collision_checker_rtc
+    local-name: collision_checker_rtc
