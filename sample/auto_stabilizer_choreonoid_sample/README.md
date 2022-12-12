@@ -85,6 +85,7 @@ roseus
 (send *robot* :rleg :move-end-pos #F(0 0 50))
 (send *ri* :angle-vector (send *robot* :angle-vector) 3000)
 (send *ri* :wait-interpolation)
+(send *ri* :wait-foot-steps) ;; 歩行中は:is-manual-control-mode を変えることができない仕様になっているので
 (send *ri* :set-auto-stabilizer-param
       :is-manual-control-mode (list t nil)
       )
