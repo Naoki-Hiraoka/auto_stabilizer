@@ -12,6 +12,10 @@ public:
   std::vector<cpp_filters::TwoPointInterpolator<double> > refFootOriginWeight = std::vector<cpp_filters::TwoPointInterpolator<double> >(NUM_LEGS,cpp_filters::TwoPointInterpolator<double>(1.0,0.0,0.0,cpp_filters::HOFFARBIB)); // 要素数2. 0: rleg. 1: lleg. 0~1. Reference座標系のfootOriginを計算するときに用いるweight. このfootOriginからの相対位置で、GaitGeneratorに管理されていないEndEffectorのReference位置が解釈される. interpolatorによって連続的に変化する. 全てのLegのrefFootOriginWeightが同時に0になることはない.
   cpp_filters::TwoPointInterpolator<double> solveFKMode = cpp_filters::TwoPointInterpolator<double>(1.0,0.0,0.0,cpp_filters::HOFFARBIB); // 0~1. 1ならエンドエフェクタ位置姿勢をrefRobotRawのFKから求める. 0なら、refEEPoseRawから求める. startAutoBalancerした直後は必ず1
 
+protected:
+  // 内部で変更されるパラメータ. startAutoBalancer時にリセットされる
+  mutable bool isInitial = true;
+
 public:
   // startAutoBalancer時に呼ばれる
   void reset() {
@@ -19,6 +23,7 @@ public:
     handFixModeY.reset(handFixModeY.getGoal());
     for(int i=0;i<refFootOriginWeight.size();i++) refFootOriginWeight[i].reset(refFootOriginWeight[i].getGoal());
     solveFKMode.reset(1.0);
+    isInitial = true;
   }
   // 内部の補間器をdtだけ進める
   void update(double dt){
@@ -47,7 +52,7 @@ protected:
   // 現在のFootStepNodesListから、genRobotのfootMidCoordsを求める (gaitParam.footMidCoords)
   void calcFootMidCoords(const GaitParam& gaitParam, double dt, cpp_filters::TwoPointInterpolatorSE3& footMidCoords) const;
   // refRobotRawをrefRobotに変換する.
-  void convertRefRobotRaw(const GaitParam& gaitParam, const cnoid::Position& genFootMidCoords, cnoid::BodyPtr& refRobot, std::vector<cnoid::Position>& refEEPoseFK, double& refdz) const;
+  void convertRefRobotRaw(const GaitParam& gaitParam, const cnoid::Position& genFootMidCoords, const double& dt, cnoid::BodyPtr& refRobot, std::vector<cnoid::Position>& refEEPoseFK, double& refdz) const;
   // refEEPoseRawを変換する.
   void convertRefEEPoseRaw(const GaitParam& gaitParam, const cnoid::Position& genFootMidCoords, std::vector<cnoid::Position>& refEEPoseWithOutFK) const;
 

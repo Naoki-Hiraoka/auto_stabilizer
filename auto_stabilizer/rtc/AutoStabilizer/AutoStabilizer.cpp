@@ -149,16 +149,31 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
       this->gaitParam_.maxTorque[i] = std::max(climit * gearRatio * torqueConst, 0.0);
     }
     std::string jointLimitTableStr; this->getProperty("joint_limit_table",jointLimitTableStr);
-    std::vector<std::shared_ptr<joint_limit_table::JointLimitTable> > jointLimitTables = joint_limit_table::readJointLimitTablesFromProperty (this->gaitParam_.genRobot, jointLimitTableStr);
-    for(size_t i=0;i<jointLimitTables.size();i++){
-      // apply margin
-      for(size_t j=0;j<jointLimitTables[i]->lLimitTable().size();j++){
-        if(jointLimitTables[i]->uLimitTable()[j] - jointLimitTables[i]->lLimitTable()[j] > 0.002){
-          jointLimitTables[i]->uLimitTable()[j] -= 0.001;
-          jointLimitTables[i]->lLimitTable()[j] += 0.001;
+    {
+      std::vector<std::shared_ptr<joint_limit_table::JointLimitTable> > jointLimitTables = joint_limit_table::readJointLimitTablesFromProperty (this->gaitParam_.genRobot, jointLimitTableStr);
+      for(size_t i=0;i<jointLimitTables.size();i++){
+        // apply margin
+        for(size_t j=0;j<jointLimitTables[i]->lLimitTable().size();j++){
+          if(jointLimitTables[i]->uLimitTable()[j] - jointLimitTables[i]->lLimitTable()[j] > 0.002){
+            jointLimitTables[i]->uLimitTable()[j] -= 0.001;
+            jointLimitTables[i]->lLimitTable()[j] += 0.001;
+          }
         }
+        this->gaitParam_.jointLimitTables[jointLimitTables[i]->getSelfJoint()->jointId()].push_back(jointLimitTables[i]);
       }
-      this->gaitParam_.jointLimitTables[jointLimitTables[i]->getSelfJoint()->jointId()].push_back(jointLimitTables[i]);
+    }
+    {
+      std::vector<std::shared_ptr<joint_limit_table::JointLimitTable> > jointLimitTablesTqc = joint_limit_table::readJointLimitTablesFromProperty (this->gaitParam_.actRobotTqc, jointLimitTableStr);
+      for(size_t i=0;i<jointLimitTablesTqc.size();i++){
+        // apply margin
+        for(size_t j=0;j<jointLimitTablesTqc[i]->lLimitTable().size();j++){
+          if(jointLimitTablesTqc[i]->uLimitTable()[j] - jointLimitTablesTqc[i]->lLimitTable()[j] > 0.002){
+            jointLimitTablesTqc[i]->uLimitTable()[j] -= 0.001;
+            jointLimitTablesTqc[i]->lLimitTable()[j] += 0.001;
+          }
+        }
+        this->gaitParam_.jointLimitTablesTqc[jointLimitTablesTqc[i]->getSelfJoint()->jointId()].push_back(jointLimitTablesTqc[i]);
+      }
     }
 
     // apply margin to jointlimit

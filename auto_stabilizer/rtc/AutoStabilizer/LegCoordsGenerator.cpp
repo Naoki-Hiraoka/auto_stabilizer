@@ -233,20 +233,22 @@ void LegCoordsGenerator::calcEETargetPose(const GaitParam& gaitParam, double dt,
     cnoid::Vector6 prevVel = gaitParam.abcEETargetVel[i];
 
     cnoid::Position targetPose;
-    if(i<NUM_LEGS) targetPose = gaitParam.genCoords[i].value();
-    else targetPose = gaitParam.icEETargetPose[i];
-
     cnoid::Vector6 targetVel;
-    if(this->isInitial) targetVel.setZero();
-    else {
-      targetVel.head<3>() = (targetPose.translation() - prevPose.translation()) / dt;
-      Eigen::AngleAxisd dR(targetPose.linear() * prevPose.linear().transpose());  // generate frame.
-      targetVel.tail<3>() = dR.angle() / dt * dR.axis();
-    }
-
     cnoid::Vector6 targetAcc;
-    if(this->isInitial) targetAcc.setZero();
-    else targetAcc = (targetVel - prevVel) / dt;
+
+    if(i<NUM_LEGS){
+      gaitParam.genCoords[i].value(targetPose, targetVel, targetAcc);
+    }else{
+      targetPose = gaitParam.icEETargetPose[i];
+      if(this->isInitial) targetVel.setZero();
+      else {
+        targetVel.head<3>() = (targetPose.translation() - prevPose.translation()) / dt;
+        Eigen::AngleAxisd dR(targetPose.linear() * prevPose.linear().transpose());  // generate frame.
+        targetVel.tail<3>() = dR.angle() / dt * dR.axis();
+      }
+      if(this->isInitial) targetAcc.setZero();
+      else targetAcc = (targetVel - prevVel) / dt;
+    }
 
     o_abcEETargetPose[i] = targetPose;
     o_abcEETargetVel[i] = targetVel;

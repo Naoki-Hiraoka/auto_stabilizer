@@ -24,6 +24,7 @@ public:
 
   std::vector<double> maxTorque; // constant. 要素数と順序はnumJoints()と同じ. 単位は[Nm]. 0以上
   std::vector<std::vector<std::shared_ptr<joint_limit_table::JointLimitTable> > > jointLimitTables; // constant. 要素数と順序はnumJoints()と同じ. for genRobot.
+  std::vector<std::vector<std::shared_ptr<joint_limit_table::JointLimitTable> > > jointLimitTablesTqc; // constant. 要素数と順序はnumJoints()と同じ. for actRobotTqc.
 
   const double g = 9.80665; // 重力加速度
 
@@ -171,6 +172,7 @@ public:
   void init(const cnoid::BodyPtr& robot){
     maxTorque.resize(robot->numJoints(), std::numeric_limits<double>::max());
     jointLimitTables.resize(robot->numJoints());
+    jointLimitTablesTqc.resize(robot->numJoints());
     jointControllable.resize(robot->numJoints(), true);
     refRobotRaw = robot->clone();
     refRobotRaw->calcForwardKinematics(); refRobotRaw->calcCenterOfMass();
