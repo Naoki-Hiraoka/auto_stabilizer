@@ -5,6 +5,14 @@
 #include <prioritized_qp_osqp/prioritized_qp_osqp.h>
 #include <cnoid/JointPath>
 
+#include <aik_constraint/PositionConstraint.h>
+#include <aik_constraint/COMConstraint.h>
+#include <aik_constraint/JointAngleConstraint.h>
+#include <aik_constraint/AngularMomentumConstraint.h>
+#include <aik_constraint_joint_limit_table/JointLimitMinMaxTableConstraint.h>
+#include <aik_constraint/ClientCollisionConstraint.h>
+#include <prioritized_acc_inverse_kinematics_solver/PrioritizedAccInverseKinematicsSolver.h>
+
 class Stabilizer{
 public:
   // Stabilizerでしか使わないパラメータ
@@ -54,18 +62,26 @@ protected:
   mutable std::shared_ptr<prioritized_qp_osqp::Task> constraintTask_ = std::make_shared<prioritized_qp_osqp::Task>();
   mutable std::shared_ptr<prioritized_qp_osqp::Task> tgtZmpTask_ = std::make_shared<prioritized_qp_osqp::Task>();;
   mutable std::shared_ptr<prioritized_qp_osqp::Task> copTask_ = std::make_shared<prioritized_qp_osqp::Task>();;
+
+  // FullbodyIKSolverでのみ使うキャッシュ
+  // 内部にヤコビアンの情報をキャッシュするが、クリアしなくても副作用はあまりない
+  mutable std::vector<std::shared_ptr<aik_constraint::PositionConstraint> > ikEEPositionConstraint; // 要素数と順序はeeNameと同じ.
+  mutable std::vector<std::shared_ptr<aik_constraint::JointAngleConstraint> > refJointAngleConstraint; // 要素数と順序はrobot->numJoints()と同じ
+  mutable std::shared_ptr<aik_constraint::PositionConstraint> rootPositionConstraint = std::make_shared<aik_constraint::PositionConstraint>();
+  mutable std::shared_ptr<aik_constraint::COMConstraint> comConstraint = std::make_shared<aik_constraint::COMConstraint>();
+  mutable std::shared_ptr<aik_constraint::AngularMomentumConstraint> angularMomentumConstraint = std::make_shared<aik_constraint::AngularMomentumConstraint>();
+  mutable std::vector<std::shared_ptr<aik_constraint_joint_limit_table::JointLimitMinMaxTableConstraint> > jointLimitConstraint;
+  mutable std::vector<std::shared_ptr<aik_constraint::ClientCollisionConstraint> > selfCollisionConstraint;
 public:
   void initStabilizerOutput(const GaitParam& gaitParam,
-                            cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, cnoid::Vector3& o_stTargetZmp, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage) const;
+                            cnoid::Vector3& o_stTargetZmp, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage) const;
 
   bool execStabilizer(const GaitParam& gaitParam, double dt, bool useActState,
-                      cnoid::BodyPtr& actRobotTqc, cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, cnoid::Position& o_stTargetRootPose, cnoid::Vector3& o_stTargetZmp, std::vector<cnoid::Vector6>& o_stEETargetWrench, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPgainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDgainPercentage) const;
+                      cnoid::BodyPtr& actRobotTqc, cnoid::Vector3& o_stTargetZmp, std::vector<cnoid::Vector6>& o_stEETargetWrench, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPgainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDgainPercentage) const;
 
 protected:
-  bool moveBasePosRotForBodyRPYControl(double dt, const GaitParam& gaitParam, bool useActState,
-                                       cpp_filters::TwoPointInterpolator<cnoid::Vector3>& o_stOffsetRootRpy, cnoid::Position& o_stTargetRootPose) const;
   bool calcZMP(const GaitParam& gaitParam, double dt, bool useActState,
-               cnoid::Vector3& o_tgtZmp/*generate座標系*/, cnoid::Vector3& o_tgtForce/*generate座標系*/) const;
+               cnoid::Vector3& o_tgtZmp/*generate座標系*/, cnoid::Vector3& o_tgtCogAcc/*generate座標系*/) const;
   bool calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tgtZmp/*generate座標系*/, const cnoid::Vector3& tgtForce/*generate座標系. ロボットが受ける力*/, bool useActState,
                   std::vector<cnoid::Vector6>& o_tgtEEWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/) const;
   bool calcTorque(double dt, const GaitParam& gaitParam, const std::vector<cnoid::Vector6>& tgtEEWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/,

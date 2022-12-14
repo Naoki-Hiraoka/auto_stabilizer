@@ -28,7 +28,6 @@ public:
   mutable std::vector<std::shared_ptr<IK::ClientCollisionConstraint> > selfCollisionConstraint;
 protected:
   // クリアしなくても副作用はあまりない
-  mutable cnoid::VectorX jlim_avoid_weight;
   mutable std::vector<std::shared_ptr<prioritized_qp_base::Task> > tasks;
 public:
   // 初期化時に一回呼ばれる

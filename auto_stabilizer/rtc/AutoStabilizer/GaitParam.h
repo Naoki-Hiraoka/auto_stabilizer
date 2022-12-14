@@ -71,6 +71,7 @@ public:
   // actToGenFrameConverter
   cnoid::BodyPtr actRobot; // actual. generate frame
   cpp_filters::FirstOrderLowPassFilter<cnoid::Vector3> actCogVel = cpp_filters::FirstOrderLowPassFilter<cnoid::Vector3>(3.5, cnoid::Vector3::Zero());  // generate frame.  現在のCOM速度. cutoff=4.0Hzは今の歩行時間と比べて遅すぎる気もするが、実際のところ問題なさそう? もとは4Hzだったが、 静止時に衝撃が加わると上下方向に左右交互に振動することがあるので少し小さくする必要がある. 3Hzにすると、追従性が悪くなってギアが飛んだ
+  cpp_filters::FirstOrderLowPassFilter<cnoid::Vector6> actRootVel = cpp_filters::FirstOrderLowPassFilter<cnoid::Vector6>(3.5, cnoid::Vector6::Zero()); // generate frame. 現在のroot速度. rootLink origin. actCogVelと同程度. これを使ってfilterした後の値がactRobot->rootLink()->v()/w()に入るので、現在のroot速度を使いたいときはactRootVelではなくactRobot->rootLink()->v()/w()を使う
   std::vector<cnoid::Position> actEEPose; // 要素数と順序はeeNameと同じ.generate frame
   std::vector<cnoid::Vector6> actEEWrench; // 要素数と順序はeeNameと同じ.generate frame. EndEffector origin. ロボットが受ける力
 
@@ -140,10 +141,10 @@ public:
   cnoid::Vector3 genCogVel;  // generate frame.  abcで計算された目標COM速度
   cnoid::Vector3 genCogAcc;  // generate frame.  abcで計算された目標COM加速度
   std::vector<cnoid::Position> abcEETargetPose; // 要素数と順序はeeNameと同じ.generate frame. abcで計算された目標位置姿勢
+  std::vector<cnoid::Vector6> abcEETargetVel; // 要素数と順序はeeNameと同じ.generate frame. endeffector origin. abcで計算された目標速度
+  std::vector<cnoid::Vector6> abcEETargetAcc; // 要素数と順序はeeNameと同じ.generate frame. endeffector origin. abcで計算された目標加速度
 
   // Stabilizer
-  cpp_filters::TwoPointInterpolator<cnoid::Vector3> stOffsetRootRpy = cpp_filters::TwoPointInterpolator<cnoid::Vector3>(cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::LINEAR);; // gaitParam.footMidCoords座標系. stで計算された目標位置姿勢オフセット
-  cnoid::Position stTargetRootPose = cnoid::Position::Identity(); // generate frame. stTargetRootPose = stOffsetRootRpy + refRobot->rootLink
   cnoid::Vector3 stTargetZmp; // generate frame. stで計算された目標ZMP
   std::vector<cnoid::Vector6> stEETargetWrench; // 要素数と順序はeeNameと同じ.generate frame. EndEffector origin. ロボットが受ける力
   std::vector<cpp_filters::TwoPointInterpolator<double> > stServoPGainPercentage; // 要素数と順序はrobot->numJoints()と同じ. 0~100. 現状, setGoal(*,dt)以下の時間でgoal指定するとwriteOutPortDataが破綻する
@@ -201,6 +202,8 @@ public:
     icEEOffset.push_back(cpp_filters::TwoPointInterpolator<cnoid::Vector6>(cnoid::Vector6::Zero(),cnoid::Vector6::Zero(),cnoid::Vector6::Zero(), cpp_filters::HOFFARBIB));
     icEETargetPose.push_back(cnoid::Position::Identity());
     abcEETargetPose.push_back(cnoid::Position::Identity());
+    abcEETargetVel.push_back(cnoid::Vector6::Zero());
+    abcEETargetAcc.push_back(cnoid::Vector6::Zero());
     stEETargetWrench.push_back(cnoid::Vector6::Zero());
   }
 

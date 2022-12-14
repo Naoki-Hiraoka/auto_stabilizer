@@ -109,7 +109,7 @@ bool FullbodyIKSolver::solveFullbodyIK(double dt, const GaitParam& gaitParam,
     this->rootPositionConstraint->A_link() = genRobot->rootLink();
     this->rootPositionConstraint->A_localpos() = cnoid::Position::Identity();
     this->rootPositionConstraint->B_link() = nullptr;
-    this->rootPositionConstraint->B_localpos() = gaitParam.stTargetRootPose;
+    this->rootPositionConstraint->B_localpos() = gaitParam.refRobot->rootLink()->T();
     this->rootPositionConstraint->maxError() << 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt, 10.0*dt;
     this->rootPositionConstraint->precision() << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0; // 強制的にIKをmax loopまで回す
     this->rootPositionConstraint->weight() << 0.0, 0.0, 0.0, 3.0, 3.0, 3.0; // 角運動量を利用するときは重みを小さく. 通常時、胴の質量・イナーシャやマスパラ誤差の大きさや、胴を大きく動かすための出力不足などによって、二足動歩行では胴の傾きの自由度を使わない方がよい

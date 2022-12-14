@@ -341,8 +341,16 @@ bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam
     ports.m_qRefIn_.read();
     if(ports.m_qRef_.data.length() == refRobotRaw->numJoints()){
       for(int i=0;i<ports.m_qRef_.data.length();i++){
-        if(std::isfinite(ports.m_qRef_.data[i])) refRobotRaw->joint(i)->q() = ports.m_qRef_.data[i];
-        else std::cerr << "m_qRef is not finite!" << std::endl;
+        if(std::isfinite(ports.m_qRef_.data[i])) {
+          double q = ports.m_qRef_.data[i];
+          double dq = (q - refRobotRaw->joint(i)->q()) / dt; // 指令関節角度はSequencePlayerなどによって滑らかになっていると仮定し、そのまま微分する. 初回のloopのときに値がとんでしまうが、MODE_IDLE状態なので問題ない
+          double ddq = (dq - refRobotRaw->joint(i)->dq()) / dt; // 指令関節角度はSequencePlayerなどによって滑らかになっていると仮定し、そのまま微分する
+          refRobotRaw->joint(i)->q() = q;
+          refRobotRaw->joint(i)->dq() = dq;
+          refRobotRaw->joint(i)->ddq() = ddq;
+        }else{
+          std::cerr << "m_qRef is not finite!" << std::endl;
+        }
       }
       qRef_updated = true;
     }
@@ -359,9 +367,12 @@ bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam
   if(ports.m_refBasePosIn_.isNew()){
     ports.m_refBasePosIn_.read();
     if(std::isfinite(ports.m_refBasePos_.data.x) && std::isfinite(ports.m_refBasePos_.data.y) && std::isfinite(ports.m_refBasePos_.data.z)){
-      refRobotRaw->rootLink()->p()[0] = ports.m_refBasePos_.data.x;
-      refRobotRaw->rootLink()->p()[1] = ports.m_refBasePos_.data.y;
-      refRobotRaw->rootLink()->p()[2] = ports.m_refBasePos_.data.z;
+      cnoid::Vector3 p(ports.m_refBasePos_.data.x,ports.m_refBasePos_.data.y,ports.m_refBasePos_.data.z);
+      cnoid::Vector3 v = (p - refRobotRaw->rootLink()->p()) / dt;  // 指令ルート位置はSequencePlayerなどによって滑らかになっていると仮定し、そのまま微分する. 初回のloopのときに値がとんでしまうが、MODE_IDLE状態なので問題ない
+      cnoid::Vector3 dv = (v - refRobotRaw->rootLink()->v()) / dt;  // 指令ルート位置はSequencePlayerなどによって滑らかになっていると仮定し、そのまま微分する
+      refRobotRaw->rootLink()->p() = p;
+      refRobotRaw->rootLink()->v() = v;
+      refRobotRaw->rootLink()->dv() = dv;
     } else {
       std::cerr << "m_refBasePos is not finite!" << std::endl;
     }
@@ -369,13 +380,18 @@ bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam
   if(ports.m_refBaseRpyIn_.isNew()){
     ports.m_refBaseRpyIn_.read();
     if(std::isfinite(ports.m_refBaseRpy_.data.r) && std::isfinite(ports.m_refBaseRpy_.data.p) && std::isfinite(ports.m_refBaseRpy_.data.y)){
-      refRobotRaw->rootLink()->R() = cnoid::rotFromRpy(ports.m_refBaseRpy_.data.r, ports.m_refBaseRpy_.data.p, ports.m_refBaseRpy_.data.y);
+      cnoid::Matrix3 R = cnoid::rotFromRpy(ports.m_refBaseRpy_.data.r, ports.m_refBaseRpy_.data.p, ports.m_refBaseRpy_.data.y);
+      Eigen::AngleAxisd dR(R * refRobotRaw->rootLink()->R().transpose());  // reference frame.
+      cnoid::Vector3 w = dR.angle() / dt * dR.axis(); // 指令ルート姿勢はSequencePlayerなどによって滑らかになっていると仮定し、そのまま微分する. 初回のloopのときに値がとんでしまうが、MODE_IDLE状態なので問題ない
+      cnoid::Vector3 dw = (w - refRobotRaw->rootLink()->w()) / dt; // 指令ルート姿勢はSequencePlayerなどによって滑らかになっていると仮定し、そのまま微分する
+      refRobotRaw->rootLink()->R() = R;
+      refRobotRaw->rootLink()->w() = w;
+      refRobotRaw->rootLink()->dw() = dw;
     } else {
       std::cerr << "m_refBaseRpy is not finite!" << std::endl;
     }
   }
   refRobotRaw->calcForwardKinematics();
-  refRobotRaw->calcCenterOfMass();
 
   for(int i=0;i<ports.m_refEEWrenchIn_.size();i++){
     if(ports.m_refEEWrenchIn_[i]->isNew()){
@@ -440,7 +456,6 @@ bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam
     }
   }
   actRobotRaw->calcForwardKinematics();
-  actRobotRaw->calcCenterOfMass();
 
   cnoid::DeviceList<cnoid::ForceSensor> forceSensors(actRobotRaw->devices());
   for(int i=0;i<ports.m_actWrenchIn_.size();i++){
@@ -563,6 +578,8 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
   if(mode.isSyncToABCInit()){ // startAutoBalancer直後の初回. gaitParamのリセット
     refToGenFrameConverter.initGenRobot(gaitParam,
                                         gaitParam.genRobot, gaitParam.footMidCoords, gaitParam.genCogVel, gaitParam.genCogAcc);
+    actToGenFrameConverter.initOutput(gaitParam,
+                                      gaitParam.actCogVel, gaitParam.actRootVel);
     externalForceHandler.initExternalForceHandlerOutput(gaitParam,
                                                         gaitParam.omega, gaitParam.l, gaitParam.sbpOffset, gaitParam.genCog);
     impedanceController.initImpedanceOutput(gaitParam,
@@ -572,7 +589,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
     legCoordsGenerator.initLegCoords(gaitParam,
                                      gaitParam.refZmpTraj, gaitParam.genCoords);
     stabilizer.initStabilizerOutput(gaitParam,
-                                    gaitParam.stOffsetRootRpy, gaitParam.stTargetZmp, gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage);
+                                    gaitParam.stTargetZmp, gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage);
   }
 
   // FootOrigin座標系を用いてrefRobotRawをgenerate frameに投影しrefRobotとする
@@ -581,7 +598,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
 
   // FootOrigin座標系を用いてactRobotRawをgenerate frameに投影しactRobotとする
   actToGenFrameConverter.convertFrame(gaitParam, dt,
-                                      gaitParam.actRobot, gaitParam.actEEPose, gaitParam.actEEWrench, gaitParam.actCogVel);
+                                      gaitParam.actRobot, gaitParam.actEEPose, gaitParam.actEEWrench, gaitParam.actCogVel, gaitParam.actRootVel);
 
   // 目標外力に応じてオフセットを計算する
   externalForceHandler.handleExternalForce(gaitParam, mode.isSTRunning(), dt,
@@ -609,21 +626,18 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
                                    gaitParam.refZmpTraj, gaitParam.genCoords, gaitParam.swingState);
   legCoordsGenerator.calcCOMCoords(gaitParam, dt,
                                    gaitParam.genCog, gaitParam.genCogVel, gaitParam.genCogAcc);
-  for(int i=0;i<gaitParam.eeName.size();i++){
-    if(i<NUM_LEGS) gaitParam.abcEETargetPose[i] = gaitParam.genCoords[i].value();
-    else gaitParam.abcEETargetPose[i] = gaitParam.icEETargetPose[i];
-  }
+  legCoordsGenerator.calcEETargetPose(gaitParam, dt,
+                                      gaitParam.abcEETargetPose, gaitParam.abcEETargetVel, gaitParam.abcEETargetAcc);
 
   // Stabilizer
   if(mode.isSyncToStopSTInit()){ // stopST直後の初回
-    gaitParam.stOffsetRootRpy.setGoal(cnoid::Vector3::Zero(),mode.remainTime());
     for(int i=0;i<gaitParam.genRobot->numJoints();i++){
       if(gaitParam.stServoPGainPercentage[i].getGoal() != 100.0) gaitParam.stServoPGainPercentage[i].setGoal(100.0, mode.remainTime());
       if(gaitParam.stServoDGainPercentage[i].getGoal() != 100.0) gaitParam.stServoDGainPercentage[i].setGoal(100.0, mode.remainTime());
     }
   }
   stabilizer.execStabilizer(gaitParam, dt, mode.isSTRunning(),
-                            gaitParam.actRobotTqc, gaitParam.stOffsetRootRpy, gaitParam.stTargetRootPose, gaitParam.stTargetZmp, gaitParam.stEETargetWrench, gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage);
+                            gaitParam.actRobotTqc, gaitParam.stTargetZmp, gaitParam.stEETargetWrench, gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage);
 
   // FullbodyIKSolver
   fullbodyIKSolver.solveFullbodyIK(dt, gaitParam,// input
@@ -972,6 +986,7 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
       this->externalForceHandler_.reset();
       this->footStepGenerator_.reset();
       this->impedanceController_.reset();
+      this->legCoordsGenerator_.reset();
       this->fullbodyIKSolver_.reset();
     }
     AutoStabilizer::execAutoStabilizer(this->mode_, this->gaitParam_, this->dt_, this->footStepGenerator_, this->legCoordsGenerator_, this->refToGenFrameConverter_, this->actToGenFrameConverter_, this->impedanceController_, this->stabilizer_,this->externalForceHandler_, this->fullbodyIKSolver_, this->legManualController_, this->cmdVelGenerator_);

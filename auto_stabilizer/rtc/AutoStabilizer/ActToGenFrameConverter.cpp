@@ -4,10 +4,18 @@
 #include <cnoid/ForceSensor>
 #include <cnoid/EigenUtil>
 
+void ActToGenFrameConverter::initOutput(const GaitParam& gaitParam, // input
+                                        cpp_filters::FirstOrderLowPassFilter<cnoid::Vector3>& o_actCogVel, cpp_filters::FirstOrderLowPassFilter<cnoid::Vector6>& o_actRootVel) const {
+  o_actCogVel.reset(cnoid::Vector3::Zero());
+  o_actRootVel.reset(cnoid::Vector6::Zero());
+  return;
+}
+
 bool ActToGenFrameConverter::convertFrame(const GaitParam& gaitParam, double dt,// input
-                                          cnoid::BodyPtr& actRobot, std::vector<cnoid::Position>& o_actEEPose, std::vector<cnoid::Vector6>& o_actEEWrench, cpp_filters::FirstOrderLowPassFilter<cnoid::Vector3>& o_actCogVel) const {
+                                          cnoid::BodyPtr& actRobot, std::vector<cnoid::Position>& o_actEEPose, std::vector<cnoid::Vector6>& o_actEEWrench, cpp_filters::FirstOrderLowPassFilter<cnoid::Vector3>& o_actCogVel, cpp_filters::FirstOrderLowPassFilter<cnoid::Vector6>& o_actRootVel) const {
 
   cnoid::Vector3 actCogPrev = actRobot->centerOfMass();
+  cnoid::Position actRootPrev = actRobot->rootLink()->T();
 
   {
     // FootOrigin座標系を用いてactRobotRawをgenerate frameに投影しactRobotとする
@@ -56,29 +64,34 @@ bool ActToGenFrameConverter::convertFrame(const GaitParam& gaitParam, double dt,
   }
 
   cnoid::Vector3 actCogVel;
+  cnoid::Vector6 actRootVel;
   {
-    // actCogを計算
     bool genContactState_changed = false;
     for(int i=0;i<NUM_LEGS;i++){
       if(gaitParam.footstepNodesList[0].isSupportPhase[i] != gaitParam.prevSupportPhase[i]) genContactState_changed = true;
     }
-    if(genContactState_changed){
+    // actCogを計算
+    if(this->isInitial || genContactState_changed){
       //座標系が飛んでいるので、gaitParam.actCogVel は前回の周期の値をそのままつかう
       actCogVel = gaitParam.actCogVel.value();
+      actRootVel = gaitParam.actRootVel.value();
     }else{
       actCogVel = (actRobot->centerOfMass() - actCogPrev) / dt;
+      actRootVel.head<3>() = (actRobot->rootLink()->translation() - actRootPrev.translation()) / dt;
+      Eigen::AngleAxisd actRootdR(actRobot->rootLink()->R() * actRootPrev.linear().transpose()); // generate frame. rootlink origin.
+      actRootVel.tail<3>() = actRootdR.angle() / dt * actRootdR.axis();
     }
   }
 
+  o_actRootVel.passFilter(actRootVel, dt);
+  actRobot->rootLink()->v() = o_actRootVel.value().head<3>();
+  actRobot->rootLink()->w() = o_actRootVel.value().tail<3>();
+  actRobot->calcForwardKinematics(true);
+
   o_actEEPose = actEEPose;
   o_actEEWrench = actEEWrench;
-  if(this->isInitial){
-    o_actCogVel.reset(cnoid::Vector3::Zero());
-  } else {
-    o_actCogVel.passFilter(actCogVel, dt);
-  }
+  o_actCogVel.passFilter(actCogVel, dt);
 
   this->isInitial = false;
-
   return true;
 }

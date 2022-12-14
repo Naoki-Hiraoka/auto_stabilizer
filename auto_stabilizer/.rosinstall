@@ -36,3 +36,6 @@
 - git:
     uri: https://github.com/Naoki-Hiraoka/collision_checker_rtc
     local-name: collision_checker_rtc
+- git:
+    uri: https://github.com/Naoki-Hiraoka/aik_solvers
+    local-name: aik_solvers
