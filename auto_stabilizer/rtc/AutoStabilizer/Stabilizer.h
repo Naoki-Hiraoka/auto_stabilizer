@@ -56,6 +56,15 @@ public:
         swingDgain[i].resize(jointPath.numJoints(), 100.0);
       }
     }
+
+    ikEEPositionConstraint.clear();
+    for(int i=0;i<gaitParam.eeName.size();i++) ikEEPositionConstraint.push_back(std::make_shared<aik_constraint::PositionConstraint>());
+    refJointAngleConstraint.clear();
+    for(int i=0;i<actRobotTqc->numJoints();i++) refJointAngleConstraint.push_back(std::make_shared<aik_constraint::JointAngleConstraint>());
+    jointLimitConstraint.clear();
+    for(int i=0;i<actRobotTqc->numJoints();i++) jointLimitConstraint.push_back(std::make_shared<aik_constraint_joint_limit_table::JointLimitMinMaxTableConstraint>());
+    // selfCollisionConstraint.clear();
+    // for(int i=0;i<gaitParam.selfCollision.size();i++) selfCollisionConstraint.push_back(std::make_shared<aik_constraint::ClientCollisionConstraint>());
   }
 protected:
   // 計算高速化のためのキャッシュ. クリアしなくても別に副作用はない.
