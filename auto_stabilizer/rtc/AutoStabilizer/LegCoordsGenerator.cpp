@@ -198,7 +198,7 @@ void LegCoordsGenerator::calcCOMCoords(const GaitParam& gaitParam, double dt, cn
         if(!gaitParam.footstepNodesList[0].isSupportPhase[i]) continue;
         for(int j=0;j<gaitParam.legHull[i].size();j++){
           cnoid::Vector3 p = gaitParam.genCoords[i].value()*gaitParam.legHull[i][j];
-          if(p[2] > gaitParam.actCog[2] - 1e-2) p[2] = gaitParam.actCog[2] - 1e-2; // 重心よりも支持点が高いと射影が破綻するので
+          if(p[2] > gaitParam.genCog[2] - 1e-2) p[2] = gaitParam.genCog[2] - 1e-2; // 重心よりも支持点が高いと射影が破綻するので
           vertices.push_back(p);
         }
       }
