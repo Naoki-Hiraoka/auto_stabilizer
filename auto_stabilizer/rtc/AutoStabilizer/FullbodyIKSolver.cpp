@@ -84,7 +84,7 @@ bool FullbodyIKSolver::solveFullbodyIK(double dt, const GaitParam& gaitParam,
     this->comConstraint->A_robot() = genRobot;
     this->comConstraint->A_localp() = cnoid::Vector3::Zero();
     this->comConstraint->B_robot() = nullptr;
-    this->comConstraint->B_localp() = gaitParam.genCog + gaitParam.sbpOffset;
+    this->comConstraint->B_localp() = gaitParam.genCog;
     this->comConstraint->maxError() << 10.0*dt, 10.0*dt, 10.0*dt;
     this->comConstraint->precision() << 0.0, 0.0, 0.0; // 強制的にIKをmax loopまで回す
     this->comConstraint->weight() << 10.0, 10.0, 1.0;

@@ -32,14 +32,14 @@ public:
   }
 
   bool initExternalForceHandlerOutput(const GaitParam& gaitParam,
-                                      double& o_omega, cnoid::Vector3& o_l, cnoid::Vector3& o_sbpOffset, cnoid::Vector3& o_genCog) const;
+                                      double& o_omega, cnoid::Vector3& o_l) const;
 
   bool handleExternalForce(const GaitParam& gaitParam, bool useActState, double dt,
-                           double& o_omega, cnoid::Vector3& o_l, cnoid::Vector3& o_sbpOffset, cnoid::Vector3& o_actCog) const;
+                           double& o_omega, cnoid::Vector3& o_l) const;
 
 protected:
   bool handleFeedForwardExternalForce(const GaitParam& gaitParam,
-                                      double& o_omega, cnoid::Vector3& o_l, cnoid::Vector3& o_feedForwardSbpOffset) const;
+                                      double& o_omega, cnoid::Vector3& o_l) const;
   bool handleFeedBackExternalForce(const GaitParam& gaitParam, bool useActState, double dt, double omega, const cnoid::Vector3& feedForwardSbpOffset,
                                    cnoid::Vector3& o_feedBackSbpOffset) const;
 };

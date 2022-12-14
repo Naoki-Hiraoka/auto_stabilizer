@@ -12,7 +12,7 @@ void ActToGenFrameConverter::initOutput(const GaitParam& gaitParam, // input
 }
 
 bool ActToGenFrameConverter::convertFrame(const GaitParam& gaitParam, double dt,// input
-                                          cnoid::BodyPtr& actRobot, std::vector<cnoid::Position>& o_actEEPose, std::vector<cnoid::Vector6>& o_actEEWrench, cpp_filters::FirstOrderLowPassFilter<cnoid::Vector3>& o_actCogVel, cpp_filters::FirstOrderLowPassFilter<cnoid::Vector6>& o_actRootVel) const {
+                                          cnoid::BodyPtr& actRobot, std::vector<cnoid::Position>& o_actEEPose, std::vector<cnoid::Vector6>& o_actEEWrench, cnoid::Vector3& o_actCog, cpp_filters::FirstOrderLowPassFilter<cnoid::Vector3>& o_actCogVel, cpp_filters::FirstOrderLowPassFilter<cnoid::Vector6>& o_actRootVel) const {
 
   cnoid::Vector3 actCogPrev = actRobot->centerOfMass();
   cnoid::Position actRootPrev = actRobot->rootLink()->T();
@@ -90,6 +90,7 @@ bool ActToGenFrameConverter::convertFrame(const GaitParam& gaitParam, double dt,
 
   o_actEEPose = actEEPose;
   o_actEEWrench = actEEWrench;
+  o_actCog = actRobot->centerOfMass();
   o_actCogVel.passFilter(actCogVel, dt);
 
   this->isInitial = false;

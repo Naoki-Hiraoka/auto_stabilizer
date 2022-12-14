@@ -70,6 +70,7 @@ public:
 
   // actToGenFrameConverter
   cnoid::BodyPtr actRobot; // actual. generate frame
+  cnoid::Vector3 actCog; // generate frame.
   cpp_filters::FirstOrderLowPassFilter<cnoid::Vector3> actCogVel = cpp_filters::FirstOrderLowPassFilter<cnoid::Vector3>(3.5, cnoid::Vector3::Zero());  // generate frame.  現在のCOM速度. cutoff=4.0Hzは今の歩行時間と比べて遅すぎる気もするが、実際のところ問題なさそう? もとは4Hzだったが、 静止時に衝撃が加わると上下方向に左右交互に振動することがあるので少し小さくする必要がある. 3Hzにすると、追従性が悪くなってギアが飛んだ
   cpp_filters::FirstOrderLowPassFilter<cnoid::Vector6> actRootVel = cpp_filters::FirstOrderLowPassFilter<cnoid::Vector6>(3.5, cnoid::Vector6::Zero()); // generate frame. 現在のroot速度. rootLink origin. actCogVelと同程度. これを使ってfilterした後の値がactRobot->rootLink()->v()/w()に入るので、現在のroot速度を使いたいときはactRootVelではなくactRobot->rootLink()->v()/w()を使う
   std::vector<cnoid::Position> actEEPose; // 要素数と順序はeeNameと同じ.generate frame
@@ -78,8 +79,6 @@ public:
   // ExternalForceHandler
   double omega = std::sqrt(g / refdz); // DCMの計算に用いる. 0より大きい
   cnoid::Vector3 l = cnoid::Vector3(0, 0, refdz); // generate frame. FootGuidedControlで外力を計算するときの、ZMP-重心の相対位置に対するオフセット. また、CMPの計算時にDCMに対するオフセット(CMP + l = DCM). 連続的に変化する.
-  cnoid::Vector3 sbpOffset = cnoid::Vector3::Zero(); // generate frame. 外力考慮重心と重心のオフセット. genCog = genRobot->centerOfMass() - sbpOffset. actCog = actRobot->centerOfMass() - sbpOffset.
-  cnoid::Vector3 actCog; // generate frame. 現在のCOMにsbpOffsetを施したもの actCog = actRobot->centerOfMass() - sbpOffset
 
   // ImpedanceController
   std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> > icEEOffset; // 要素数と順序はeeNameと同じ.generate frame. endEffector origin. icで計算されるオフセット

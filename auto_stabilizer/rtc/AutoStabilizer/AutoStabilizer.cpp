@@ -577,11 +577,11 @@ bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam
 bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode, GaitParam& gaitParam, double dt, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ActToGenFrameConverter& actToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer, const ExternalForceHandler& externalForceHandler, const FullbodyIKSolver& fullbodyIKSolver,const LegManualController& legManualController, const CmdVelGenerator& cmdVelGenerator) {
   if(mode.isSyncToABCInit()){ // startAutoBalancer直後の初回. gaitParamのリセット
     refToGenFrameConverter.initGenRobot(gaitParam,
-                                        gaitParam.genRobot, gaitParam.footMidCoords, gaitParam.genCogVel, gaitParam.genCogAcc);
+                                        gaitParam.genRobot, gaitParam.footMidCoords, gaitParam.genCog, gaitParam.genCogVel, gaitParam.genCogAcc);
     actToGenFrameConverter.initOutput(gaitParam,
                                       gaitParam.actCogVel, gaitParam.actRootVel);
     externalForceHandler.initExternalForceHandlerOutput(gaitParam,
-                                                        gaitParam.omega, gaitParam.l, gaitParam.sbpOffset, gaitParam.genCog);
+                                                        gaitParam.omega, gaitParam.l);
     impedanceController.initImpedanceOutput(gaitParam,
                                             gaitParam.icEEOffset);
     footStepGenerator.initFootStepNodesList(gaitParam,
@@ -598,11 +598,11 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
 
   // FootOrigin座標系を用いてactRobotRawをgenerate frameに投影しactRobotとする
   actToGenFrameConverter.convertFrame(gaitParam, dt,
-                                      gaitParam.actRobot, gaitParam.actEEPose, gaitParam.actEEWrench, gaitParam.actCogVel, gaitParam.actRootVel);
+                                      gaitParam.actRobot, gaitParam.actEEPose, gaitParam.actEEWrench, gaitParam.actCog, gaitParam.actCogVel, gaitParam.actRootVel);
 
   // 目標外力に応じてオフセットを計算する
   externalForceHandler.handleExternalForce(gaitParam, mode.isSTRunning(), dt,
-                                           gaitParam.omega, gaitParam.l, gaitParam.sbpOffset, gaitParam.actCog);
+                                           gaitParam.omega, gaitParam.l);
 
   // Impedance Controller
   impedanceController.calcImpedanceControl(dt, gaitParam,
@@ -1303,9 +1303,13 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
     }
   }
 
-  if((this->refToGenFrameConverter_.handFixMode.getGoal() == 1.0) != i_param.is_hand_fix_mode) {
-    if(this->mode_.isABCRunning()) this->refToGenFrameConverter_.handFixMode.setGoal(i_param.is_hand_fix_mode ? 1.0 : 0.0, 1.0); // 1.0[s]で補間
-    else this->refToGenFrameConverter_.handFixMode.reset(i_param.is_hand_fix_mode ? 1.0 : 0.0);
+  if((this->refToGenFrameConverter_.handFixModeX.getGoal() == 1.0) != i_param.is_hand_fix_mode_x) {
+    if(this->mode_.isABCRunning()) this->refToGenFrameConverter_.handFixModeX.setGoal(i_param.is_hand_fix_mode_x ? 1.0 : 0.0, 1.0); // 1.0[s]で補間
+    else this->refToGenFrameConverter_.handFixModeX.reset(i_param.is_hand_fix_mode_x ? 1.0 : 0.0);
+  }
+  if((this->refToGenFrameConverter_.handFixModeY.getGoal() == 1.0) != i_param.is_hand_fix_mode) {
+    if(this->mode_.isABCRunning()) this->refToGenFrameConverter_.handFixModeY.setGoal(i_param.is_hand_fix_mode ? 1.0 : 0.0, 1.0); // 1.0[s]で補間
+    else this->refToGenFrameConverter_.handFixModeY.reset(i_param.is_hand_fix_mode ? 1.0 : 0.0);
   }
   if(i_param.reference_frame.length() == NUM_LEGS && (i_param.reference_frame[RLEG] || i_param.reference_frame[LLEG])){
     for(int i=0;i<NUM_LEGS;i++) {
@@ -1541,7 +1545,8 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
     i_param.is_manual_control_mode[i] = (this->gaitParam_.isManualControlMode[i].getGoal() == 1.0);
   }
 
-  i_param.is_hand_fix_mode = (this->refToGenFrameConverter_.handFixMode.getGoal() == 1.0);
+  i_param.is_hand_fix_mode = (this->refToGenFrameConverter_.handFixModeY.getGoal() == 1.0);
+  i_param.is_hand_fix_mode_x = (this->refToGenFrameConverter_.handFixModeX.getGoal() == 1.0);
   i_param.reference_frame.length(NUM_LEGS);
   for(int i=0;i<NUM_LEGS;i++) {
     i_param.reference_frame[i] = (this->refToGenFrameConverter_.refFootOriginWeight[i].getGoal() == 1.0);
