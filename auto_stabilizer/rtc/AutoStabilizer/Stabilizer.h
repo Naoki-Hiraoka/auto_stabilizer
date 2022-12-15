@@ -30,6 +30,15 @@ public:
   double landing2SupportTransitionTime = 0.1; // [s]. 0より大きい
   double support2SwingTransitionTime = 0.2; // [s]. 0より大きい
 
+  std::vector<cnoid::Vector6> ee_K; // 要素数EndEffectors. EndEffector frame. endEffector origin. 0以上
+  std::vector<cnoid::Vector6> ee_D; // 要素数EndEffectors. EndEffector frame. endEffector origin. 0以上
+  std::vector<cnoid::Vector6> ee_swing_K; // 要素数NUM_LEGS. EndEffector frame. endEffector origin. 0以上
+  std::vector<cnoid::Vector6> ee_swing_D; // 要素数NUM_LEGS. EndEffector frame. endEffector origin. 0以上
+  std::vector<cnoid::Vector6> ee_landing_K; // 要素数NUM_LEGS. EndEffector frame. endEffector origin. 0以上
+  std::vector<cnoid::Vector6> ee_landing_D; // 要素数NUM_LEGS. EndEffector frame. endEffector origin. 0以上
+  cnoid::Vector3 root_K = cnoid::Vector3(100,100,100); // rootlink frame
+  cnoid::Vector3 root_D = cnoid::Vector3(10,10,10); // rootlink frame
+
   void init(const GaitParam& gaitParam, cnoid::BodyPtr& actRobotTqc){
     for(int i=0;i<NUM_LEGS;i++){
       cnoid::JointPath jointPath(actRobotTqc->rootLink(), actRobotTqc->link(gaitParam.eeParentLink[i]));
@@ -55,6 +64,17 @@ public:
         swingPgain[i].resize(jointPath.numJoints(), 100.0);
         swingDgain[i].resize(jointPath.numJoints(), 100.0);
       }
+    }
+
+    for(int i=0;i<gaitParam.eeName.size();i++){
+      ee_K.push_back((cnoid::Vector6() << 50, 50, 50, 20, 20, 20).finished());
+      ee_D.push_back((cnoid::Vector6() << 10, 10, 10, 10, 10, 10).finished());
+    }
+    for(int i=0;i<NUM_LEGS;i++){
+      ee_swing_K.push_back((cnoid::Vector6() << 200, 200, 200, 100, 100, 100).finished());
+      ee_swing_D.push_back((cnoid::Vector6() << 30, 30, 30, 20, 20, 20).finished());
+      ee_landing_K.push_back((cnoid::Vector6() << 200, 200, 20, 100, 100, 100).finished());
+      ee_landing_D.push_back((cnoid::Vector6() << 30, 30, 5, 20, 20, 20).finished());
     }
 
     ikEEPositionConstraint.clear();
