@@ -227,6 +227,8 @@ module OpenHRP
       sequence<sequence<double> > swing_pgain;
       /// 要素数2. [rleg, lleg]. rootLinkから各endeffectorまでの各関節のゲイン. 0~100. 下限0 上限100
       sequence<sequence<double> > swing_dgain;
+      /// 要素数と順序はrobot->numJoints()と同じ. 0より大きい. 各関節の変位に対する重みの比. default 1. 動かしたくない関節は大きくする. 全く動かしたくないなら、controllable_jointsを使うこと
+      sequence<double> st_dq_weight;
 
       // FullbodyIKSolver
       /// 要素数と順序はrobot->numJoints()と同じ. 0より大きい. 各関節の変位に対する重みの比. default 1. 動かしたくない関節は大きくする. 全く動かしたくないなら、controllable_jointsを使うこと

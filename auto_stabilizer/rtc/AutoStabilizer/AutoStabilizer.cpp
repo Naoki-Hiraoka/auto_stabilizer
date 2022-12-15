@@ -1514,6 +1514,12 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
       }
     }
   }
+  if(i_param.st_dq_weight.length() == this->stabilizer_.dqWeight.size()){
+    for(int i=0;i<this->stabilizer_.dqWeight.size();i++){
+      double value = std::max(0.01, i_param.st_dq_weight[i]);
+      if(value != this->stabilizer_.dqWeight[i].getGoal()) this->stabilizer_.dqWeight[i].setGoal(value, 2.0); // 2秒で遷移
+    }
+  }
 
   if(i_param.dq_weight.length() == this->fullbodyIKSolver_.dqWeight.size()){
     for(int i=0;i<this->fullbodyIKSolver_.dqWeight.size();i++){
@@ -1723,6 +1729,10 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
       i_param.swing_pgain[i][j] = this->stabilizer_.swingPgain[i][j];
       i_param.swing_dgain[i][j] = this->stabilizer_.swingDgain[i][j];
     }
+  }
+  i_param.st_dq_weight.length(this->stabilizer_.dqWeight.size());
+  for(int i=0;i<this->stabilizer_.dqWeight.size();i++){
+    i_param.st_dq_weight[i] = this->stabilizer_.dqWeight[i].getGoal();
   }
 
   i_param.dq_weight.length(this->fullbodyIKSolver_.dqWeight.size());
