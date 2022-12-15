@@ -161,9 +161,10 @@ bool Stabilizer::calcResolvedAccelerationControl(const GaitParam& gaitParam, dou
       // 加速させない
       this->ikEEPositionConstraint[i]->pgain().setZero();
       this->ikEEPositionConstraint[i]->B_localvel().setZero();
-      this->ikEEPositionConstraint[i]->dgain() = this->ee_landing_D[i];
+      this->ikEEPositionConstraint[i]->dgain() = this->ee_support_D[i]; // 着地の瞬間には脚は速度をもっているので、適切に吸収してやらないと外乱として重心に加わってしまう
+      this->refJointAngleConstraint[i]->maxAccByVelError() = 20.0;
       this->ikEEPositionConstraint[i]->ref_acc().setZero();
-      this->ikEEPositionConstraint[i]->weight() = 1.0 * cnoid::Vector6::Ones();
+      this->ikEEPositionConstraint[i]->weight() = 3.0 * cnoid::Vector6::Ones();
       ikConstraint2.push_back(this->ikEEPositionConstraint[i]);
     }else if(i < NUM_LEGS &&
              gaitParam.isManualControlMode[i].getGoal() == 0.0){ // 遊脚
@@ -177,7 +178,7 @@ bool Stabilizer::calcResolvedAccelerationControl(const GaitParam& gaitParam, dou
       this->ikEEPositionConstraint[i]->B_localpos() = gaitParam.abcEETargetPose[i];
       this->ikEEPositionConstraint[i]->B_localvel() = gaitParam.abcEETargetVel[i];
       this->ikEEPositionConstraint[i]->ref_acc() = gaitParam.abcEETargetAcc[i];
-      this->ikEEPositionConstraint[i]->weight() = 0.1 * cnoid::Vector6::Ones();
+      this->ikEEPositionConstraint[i]->weight() = 1.0 * cnoid::Vector6::Ones();
       ikConstraint2.push_back(this->ikEEPositionConstraint[i]);
     }else{ // maniulation arm/leg
       this->ikEEPositionConstraint[i]->pgain() = this->ee_K[i];
@@ -185,7 +186,7 @@ bool Stabilizer::calcResolvedAccelerationControl(const GaitParam& gaitParam, dou
       this->ikEEPositionConstraint[i]->B_localpos() = gaitParam.abcEETargetPose[i];
       this->ikEEPositionConstraint[i]->B_localvel() = gaitParam.abcEETargetVel[i];
       this->ikEEPositionConstraint[i]->ref_acc() = gaitParam.abcEETargetAcc[i];
-      this->ikEEPositionConstraint[i]->weight() = 0.1 * cnoid::Vector6::Ones();
+      this->ikEEPositionConstraint[i]->weight() = 0.3 * cnoid::Vector6::Ones();
       ikConstraint3.push_back(this->ikEEPositionConstraint[i]); // low prioritiy
     }
   }
@@ -196,7 +197,7 @@ bool Stabilizer::calcResolvedAccelerationControl(const GaitParam& gaitParam, dou
     this->comConstraint->pgain().setZero(); // footguidedで計算された加速をそのまま使う
     this->comConstraint->dgain().setZero(); // footguidedで計算された加速をそのまま使う
     this->comConstraint->ref_acc() = tgtCogAcc; // footguidedで計算された加速をそのまま使う
-    this->comConstraint->weight() << 1.0, 1.0, 1.0;
+    this->comConstraint->weight() << 3.0, 3.0, 0.3; // 0.1, wn=1e-4だと、wnに負けて不正確になる
     ikConstraint2.push_back(this->comConstraint);
   }
   {
@@ -212,7 +213,7 @@ bool Stabilizer::calcResolvedAccelerationControl(const GaitParam& gaitParam, dou
     this->rootPositionConstraint->ref_acc().tail<3>() = gaitParam.refRobot->rootLink()->dw();
     this->rootPositionConstraint->eval_link() = actRobotTqc->rootLink(); // local 座標系でerrorやgainを評価
     this->rootPositionConstraint->weight().head<3>().setZero(); // 傾きのみ
-    this->rootPositionConstraint->weight().tail<3>() = 1.0 * cnoid::Vector3::Ones();
+    this->rootPositionConstraint->weight().tail<3>() = 0.3 * cnoid::Vector3::Ones();
     ikConstraint2.push_back(this->rootPositionConstraint);
   }
 
@@ -231,7 +232,7 @@ bool Stabilizer::calcResolvedAccelerationControl(const GaitParam& gaitParam, dou
       this->refJointAngleConstraint[i]->targetq() = gaitParam.refRobot->joint(i)->q();
       this->refJointAngleConstraint[i]->targetdq() = gaitParam.refRobot->joint(i)->dq();
       this->refJointAngleConstraint[i]->ref_acc() = gaitParam.refRobot->joint(i)->ddq();
-      this->refJointAngleConstraint[i]->pgain() = 1 * this->dqWeight[i].value();
+      this->refJointAngleConstraint[i]->pgain() = 1 * std::pow(this->dqWeight[i].value(), 2);
       this->refJointAngleConstraint[i]->maxAccByPosError() = 3.0;
       this->refJointAngleConstraint[i]->dgain() = 5 * this->dqWeight[i].value();
       this->refJointAngleConstraint[i]->maxAccByVelError() = 10.0;
@@ -250,10 +251,6 @@ bool Stabilizer::calcResolvedAccelerationControl(const GaitParam& gaitParam, dou
 
   prioritized_acc_inverse_kinematics_solver::IKParam param;
   param.debugLevel = debugLevel;
-  param.ddqWeight.resize(5+variables.size());
-  param.ddqWeight[6 + 12] = 1e2;
-  param.ddqWeight[6 + 13] = 1e2;
-  param.ddqWeight[6 + 14] = 1e2;
   param.wn = 1e-4;
   param.we = 1e-6;
   bool solved = prioritized_acc_inverse_kinematics_solver::solveAIK(variables,
@@ -288,6 +285,10 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
     tgtSupWrench_o.tail<3>() -= gaitParam.actEEPose[i].translation().cross(tgtEEManipWrench[i].tail<3>());
   }
 
+  cnoid::Vector6 tgtSupWrench; // ルートリンクが支持脚から受ける必要がある外力. generate frame. cog origin.
+  tgtSupWrench.head<3>() = tgtSupWrench_o.head<3>();
+  tgtSupWrench.tail<3>() = tgtSupWrench_o.tail<3>();
+  tgtSupWrench.tail<3>() += (- actRobotTqc->centerOfMass()).cross(tgtSupWrench_o.head<3>());
 
   // トルク制御の目標反力
   std::vector<cnoid::Vector6> tgtEEWrench = tgtEEManipWrench; /* 要素数EndEffector数. generate frame. EndEffector origin*/
@@ -306,16 +307,16 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
 
   if(supportEE.size()>0){
     /*
-      legは、legから受けるwrenchの和がtgtSupWrench_oを満たすように.
+      legは、legから受けるwrenchの和がtgtSupWrenchを満たすように.
       各EEFのwrenchを、EEF+copOffset frame/originの6軸表現で考える.
 
       階層QPのタスクは次の通り
       1. 接触力制約
-      2. 和がtgtSupWrench_o (trans)
-      3. 和がtgtSupWrench_o (rot).
+      2. 和がtgtSupWrench (rot).
+      3. 和がtgtSupWrench (trans)
       4. ノルムの2乗和の最小化 (fzは大きくて良い.)
 
-      rotがtransより下の優先度になることにより、擬似的なhip strategyが実現される
+      rotがtransより下の優先度になることにより、擬似的なhip strategyが実現されるようにも思える. しかし、重心位置はFootGuidedControlやmodifyFootStepsで制御できるが、身体の回転を制御する手段は乏しいので、回転しすぎて破綻しないようにrotを優先して満たしたほうが良い
     */
 
     const int dim = 6 * supportEE.size();
@@ -365,38 +366,13 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
     }
 
     {
-      // 2. 和がtgtSupWrench_o (trans)
-      Eigen::SparseMatrix<double,Eigen::ColMajor> A_colMajor(3,dim); // insertする順番がcolMajorなので
-      for(int i=0;i<supportEE.size();i++){
-        int leg = supportEE[i];
-        cnoid::Matrix3 eeR = gaitParam.actEEPose[leg].linear();
-        for(int j=0;j<3;j++) {
-          for(int k=0;k<3;k++) A_colMajor.insert(k,i*6+j) = eeR(k,j);
-        }
-      }
-      this->tgtForceTask_->A() = A_colMajor;
-      this->tgtForceTask_->b() = tgtSupWrench_o.head<3>();
-      this->tgtForceTask_->wa() = cnoid::VectorX::Ones(3);
-
-      this->tgtForceTask_->C() = Eigen::SparseMatrix<double,Eigen::RowMajor>(0,dim);
-      this->tgtForceTask_->dl() = Eigen::VectorXd::Zero(0);
-      this->tgtForceTask_->du() = Eigen::VectorXd::Ones(0);
-      this->tgtForceTask_->wc() = cnoid::VectorX::Ones(0);
-
-      this->tgtForceTask_->w() = cnoid::VectorX::Ones(dim) * 1e-6;
-      this->tgtForceTask_->toSolve() = true;
-      this->tgtForceTask_->settings().check_termination = 5; // default 25. 高速化
-      this->tgtForceTask_->settings().verbose = 0;
-    }
-
-    {
-      // 2. 和がtgtSupWrench_o (rot)
+      // 2. 和がtgtSupWrench (rot)
       Eigen::SparseMatrix<double,Eigen::ColMajor> A_colMajor(3,dim); // insertする順番がcolMajorなので
       for(int i=0;i<supportEE.size();i++){
         int leg = supportEE[i];
         cnoid::Position eePose = gaitParam.actEEPose[leg]; eePose.translation() += eePose.linear() * gaitParam.copOffset[leg].value();
         cnoid::Matrix3 eeR = eePose.linear();
-        cnoid::Matrix3 eepCross = mathutil::cross(eePose.translation()) * eeR;
+        cnoid::Matrix3 eepCross = mathutil::cross(eePose.translation() - actRobotTqc->centerOfMass()) * eeR;
         for(int j=0;j<3;j++) {
           for(int k=0;k<3;k++) A_colMajor.insert(k,i*6+j) = eepCross(k,j);
         }
@@ -405,7 +381,7 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
         }
       }
       this->tgtTorqueTask_->A() = A_colMajor;
-      this->tgtTorqueTask_->b() = tgtSupWrench_o.tail<3>();
+      this->tgtTorqueTask_->b() = tgtSupWrench.tail<3>();
       this->tgtTorqueTask_->wa() = cnoid::VectorX::Ones(3);
 
       this->tgtTorqueTask_->C() = Eigen::SparseMatrix<double,Eigen::RowMajor>(0,dim);
@@ -417,6 +393,31 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
       this->tgtTorqueTask_->toSolve() = true;
       this->tgtTorqueTask_->settings().check_termination = 5; // default 25. 高速化
       this->tgtTorqueTask_->settings().verbose = 0;
+    }
+
+    {
+      // 3. 和がtgtSupWrench (trans)
+      Eigen::SparseMatrix<double,Eigen::ColMajor> A_colMajor(3,dim); // insertする順番がcolMajorなので
+      for(int i=0;i<supportEE.size();i++){
+        int leg = supportEE[i];
+        cnoid::Matrix3 eeR = gaitParam.actEEPose[leg].linear();
+        for(int j=0;j<3;j++) {
+          for(int k=0;k<3;k++) A_colMajor.insert(k,i*6+j) = eeR(k,j);
+        }
+      }
+      this->tgtForceTask_->A() = A_colMajor;
+      this->tgtForceTask_->b() = tgtSupWrench.head<3>();
+      this->tgtForceTask_->wa() = cnoid::VectorX::Ones(3);
+
+      this->tgtForceTask_->C() = Eigen::SparseMatrix<double,Eigen::RowMajor>(0,dim);
+      this->tgtForceTask_->dl() = Eigen::VectorXd::Zero(0);
+      this->tgtForceTask_->du() = Eigen::VectorXd::Ones(0);
+      this->tgtForceTask_->wc() = cnoid::VectorX::Ones(0);
+
+      this->tgtForceTask_->w() = cnoid::VectorX::Ones(dim) * 1e-6;
+      this->tgtForceTask_->toSolve() = true;
+      this->tgtForceTask_->settings().check_termination = 5; // default 25. 高速化
+      this->tgtForceTask_->settings().verbose = 0;
     }
 
     {
@@ -446,7 +447,7 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
       this->normTask_->settings().verbose = 0;
     }
 
-    std::vector<std::shared_ptr<prioritized_qp_base::Task> > tasks{this->constraintTask_,this->tgtForceTask_,this->tgtTorqueTask_,this->normTask_};
+    std::vector<std::shared_ptr<prioritized_qp_base::Task> > tasks{this->constraintTask_,this->tgtTorqueTask_,this->tgtForceTask_,this->normTask_};
     cnoid::VectorX result; // EEF+copOffset frame/origin
     if(prioritized_qp_base::solve(tasks,
                                    result,

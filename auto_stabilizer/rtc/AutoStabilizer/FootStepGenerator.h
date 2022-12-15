@@ -8,7 +8,7 @@ class FootStepGenerator{
 public:
   // FootStepGeneratorでしか使わないパラメータ
   double legCollisionMargin = 0.02; // [m]. 左右の足のlegHullがこの距離以上離れるようにする. 0以上.
-  double defaultStepTime = 0.8; // [s]. goPosやgoVelocityのときに自動生成されるfootstepの一歩の時間. 0より大きい
+  double defaultStepTime = 1.0; // [s]. goPosやgoVelocityのときに自動生成されるfootstepの一歩の時間. 0より大きい
   std::vector<double> defaultStrideLimitationMaxTheta = std::vector<double>{0.261799,0.785398}; // 要素数2. rleg: 0. lleg: 1. leg frame. [rad]. goPosやgoVelocityのときに自動生成されるfootstepの上限. 支持脚相対. default 15,45[deg]. 0以上. 足裏同士の干渉は自動で回避できるが、膝同士の干渉はIK以外では回避できないので、内股方向には小さくすること.
   std::vector<double> defaultStrideLimitationMinTheta = std::vector<double>{-0.785398,-0.261799}; // 要素数2. rleg: 0. lleg: 1. leg frame. [rad]. goPosやgoVelocityのときに自動生成されるfootstepの下限. 支持脚相対. default 15,45[deg]. 0以下. 足裏同士の干渉は自動で回避できるが、膝同士の干渉はIK以外では回避できないので、内股方向には小さくすること.
   std::vector<std::vector<cnoid::Vector3> > defaultStrideLimitationHull = std::vector<std::vector<cnoid::Vector3> >{std::vector<cnoid::Vector3>{cnoid::Vector3(0.25,-0.18,0),cnoid::Vector3(-0.25,-0.18,0),cnoid::Vector3(-0.25,-0.45,0),cnoid::Vector3(0.25,-0.45,0)},std::vector<cnoid::Vector3>{cnoid::Vector3(0.25,0.45,0),cnoid::Vector3(-0.25,0.45,0),cnoid::Vector3(-0.25,0.18,0),cnoid::Vector3(0.25,0.18,0)}}; // 要素数2. 0: rleg用, 1: lleg用. 単位[m]. goPosやgoVelocityのときに自動生成されるfootstepの、遊脚のエンドエフェクタの着地位置の範囲の凸包. 反対の脚のEndEffector frame(Z軸は鉛直)で表現した着地可能領域(自己干渉やIKの考慮が含まれる). あったほうが扱いやすいのでZ成分があるが、Z成分は0でないといけない. 凸形状で,上から見て半時計回り. thetaの影響はlegHullとlegCollisionMarginを用いて別で評価されるので、defaultStrideLimitationHullでは考慮しなくて良い. 左右方向にsteppable regionをまたぐ場合は、これのY成分が大きくないと後ろ足がまたげない

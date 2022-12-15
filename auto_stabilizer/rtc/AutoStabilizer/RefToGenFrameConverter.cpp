@@ -99,6 +99,7 @@ bool RefToGenFrameConverter::convertFrame(const GaitParam& gaitParam, double dt,
   o_refdz = refdz;
   o_footMidCoords = footMidCoords;
 
+  this->isInitial = false;
   return true;
 }
 
@@ -164,8 +165,6 @@ void RefToGenFrameConverter::convertRefRobotRaw(const GaitParam& gaitParam, cons
   cnoid::Matrix3 prevRootR = refRobot->rootLink()->R();
   cnoid::Vector3 prevRootv = refRobot->rootLink()->v();
   cnoid::Vector3 prevRootw = refRobot->rootLink()->w();
-  cnoid::Vector3 prevRootdv = refRobot->rootLink()->dv();
-  cnoid::Vector3 prevRootdw = refRobot->rootLink()->dw();
 
   cnoidbodyutil::copyRobotState(gaitParam.refRobotRaw, refRobot);
   cnoid::Position rleg = refRobot->link(gaitParam.eeParentLink[RLEG])->T()*gaitParam.eeLocalT[RLEG];
