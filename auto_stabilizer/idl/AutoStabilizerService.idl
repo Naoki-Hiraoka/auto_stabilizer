@@ -203,30 +203,28 @@ module OpenHRP
       double footguided_balance_time;
 
       // Stabilizer
-      /// Body attitude control gain [rad/s] (roll, pitch). 下限0.0
-      sequence<double, 2> eefm_body_attitude_control_gain;
-      /// Time constant for body attitude control [s] (roll, pitch).o 下限0.01
-      sequence<double, 2> eefm_body_attitude_control_time_const;
-      /// Limit of compensation for difference between ref-act root rot [rad]. stabilierが動いているときは変更不可. 下限0.0
-      sequence<double, 2> eefm_body_attitude_control_compensation_limit;
-      /// 下限0.01[s]
-      double swing2landing_transition_time;
-      /// 下限0.01[s]
-      double landing2support_transition_time;
-      /// 下限0.01[s]
-      double support2swing_transition_time;
-      /// 要素数2. [rleg, lleg]. rootLinkから各endeffectorまでの各関節のゲイン. 0~100. 下限0 上限100
-      sequence<sequence<double> > support_pgain;
-      /// 要素数2. [rleg, lleg]. rootLinkから各endeffectorまでの各関節のゲイン. 0~100. 下限0 上限100
-      sequence<sequence<double> > support_dgain;
-      /// 要素数2. [rleg, lleg]. rootLinkから各endeffectorまでの各関節のゲイン. 0~100. 下限0 上限100
-      sequence<sequence<double> > landing_pgain;
-      /// 要素数2. [rleg, lleg]. rootLinkから各endeffectorまでの各関節のゲイン. 0~100. 下限0 上限100
-      sequence<sequence<double> > landing_dgain;
-      /// 要素数2. [rleg, lleg]. rootLinkから各endeffectorまでの各関節のゲイン. 0~100. 下限0 上限100
-      sequence<sequence<double> > swing_pgain;
-      /// 要素数2. [rleg, lleg]. rootLinkから各endeffectorまでの各関節のゲイン. 0~100. 下限0 上限100
-      sequence<sequence<double> > swing_dgain;
+      /// 要素数endeffectors. EndEffector frame. endEffector origin. 0以上
+      sequence<sequence<double, 6>, 2> ee_p;
+      /// 要素数endeffectors. EndEffector frame. endEffector origin. 0以上
+      sequence<sequence<double, 6>, 2> ee_d;
+      /// 要素数2. [rleg, lleg]. EndEffector frame. endEffector origin. 0以上
+      sequence<sequence<double, 6>,2 > ee_support_d;
+      /// 要素数2. [rleg, lleg]. EndEffector frame. endEffector origin. 0以上
+      sequence<sequence<double, 6>, 2> ee_landing_p;
+      /// 要素数2. [rleg, lleg]. EndEffector frame. endEffector origin. 0以上
+      sequence<sequence<double, 6>, 2> ee_landing_d;
+      /// 要素数2. [rleg, lleg]. EndEffector frame. endEffector origin. 0以上
+      sequence<sequence<double, 6>, 2> ee_swing_p;
+      /// 要素数2. [rleg, lleg]. EndEffector frame. endEffector origin. 0以上
+      sequence<sequence<double, 6>, 2> ee_swing_d;
+      /// rootlink frame. 0以上
+      sequence<double, 3> root_p;
+      /// rootlink frame. 0以上
+      sequence<double, 3> root_d;
+      /// 0以上
+      double joint_p;
+      /// 0以上
+      double joint_d;
       /// 要素数と順序はrobot->numJoints()と同じ. 0より大きい. 各関節の変位に対する重みの比. default 1. 動かしたくない関節は大きくする. 全く動かしたくないなら、controllable_jointsを使うこと
       sequence<double> st_dq_weight;
 

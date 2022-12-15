@@ -162,7 +162,7 @@ bool Stabilizer::calcResolvedAccelerationControl(const GaitParam& gaitParam, dou
       this->ikEEPositionConstraint[i]->pgain().setZero();
       this->ikEEPositionConstraint[i]->B_localvel().setZero();
       this->ikEEPositionConstraint[i]->dgain() = this->ee_support_D[i]; // 着地の瞬間には脚は速度をもっているので、適切に吸収してやらないと外乱として重心に加わってしまう
-      this->refJointAngleConstraint[i]->maxAccByVelError() = 20.0;
+      this->ikEEPositionConstraint[i]->maxAccByVelError() = 20.0 * cnoid::Vector6::Ones();
       this->ikEEPositionConstraint[i]->ref_acc().setZero();
       this->ikEEPositionConstraint[i]->weight() = 3.0 * cnoid::Vector6::Ones();
       ikConstraint2.push_back(this->ikEEPositionConstraint[i]);
@@ -232,9 +232,9 @@ bool Stabilizer::calcResolvedAccelerationControl(const GaitParam& gaitParam, dou
       this->refJointAngleConstraint[i]->targetq() = gaitParam.refRobot->joint(i)->q();
       this->refJointAngleConstraint[i]->targetdq() = gaitParam.refRobot->joint(i)->dq();
       this->refJointAngleConstraint[i]->ref_acc() = gaitParam.refRobot->joint(i)->ddq();
-      this->refJointAngleConstraint[i]->pgain() = 1 * std::pow(this->dqWeight[i].value(), 2);
+      this->refJointAngleConstraint[i]->pgain() = this->joint_K * std::pow(this->dqWeight[i].value(), 2);
       this->refJointAngleConstraint[i]->maxAccByPosError() = 3.0;
-      this->refJointAngleConstraint[i]->dgain() = 5 * this->dqWeight[i].value();
+      this->refJointAngleConstraint[i]->dgain() = this->joint_D * this->dqWeight[i].value();
       this->refJointAngleConstraint[i]->maxAccByVelError() = 10.0;
       this->refJointAngleConstraint[i]->weight() = 0.1 * this->dqWeight[i].value();
       ikConstraint4.push_back(this->refJointAngleConstraint[i]);

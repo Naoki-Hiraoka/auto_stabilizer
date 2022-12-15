@@ -1697,39 +1697,41 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
   i_param.preview_step_num = this->legCoordsGenerator_.previewStepNum;
   i_param.footguided_balance_time = this->legCoordsGenerator_.footGuidedBalanceTime;
 
-  i_param.eefm_body_attitude_control_gain.length(2);
-  i_param.eefm_body_attitude_control_time_const.length(2);
-  i_param.eefm_body_attitude_control_compensation_limit.length(2);
-  for(int i=0;i<2;i++) {
-    i_param.eefm_body_attitude_control_gain[i] = this->stabilizer_.bodyAttitudeControlGain[i];
-    i_param.eefm_body_attitude_control_time_const[i] = this->stabilizer_.bodyAttitudeControlTimeConst[i];
-    i_param.eefm_body_attitude_control_compensation_limit[i] = this->stabilizer_.bodyAttitudeControlCompensationLimit[i];
-  }
-  i_param.swing2landing_transition_time = this->stabilizer_.swing2LandingTransitionTime;
-  i_param.landing2support_transition_time = this->stabilizer_.landing2SupportTransitionTime;
-  i_param.support2swing_transition_time = this->stabilizer_.support2SwingTransitionTime;
-  i_param.support_pgain.length(NUM_LEGS);
-  i_param.support_dgain.length(NUM_LEGS);
-  i_param.landing_pgain.length(NUM_LEGS);
-  i_param.landing_dgain.length(NUM_LEGS);
-  i_param.swing_pgain.length(NUM_LEGS);
-  i_param.swing_dgain.length(NUM_LEGS);
-  for(int i=0;i<NUM_LEGS;i++){
-    i_param.support_pgain[i].length(this->stabilizer_.supportPgain[i].size());
-    i_param.support_dgain[i].length(this->stabilizer_.supportPgain[i].size());
-    i_param.landing_pgain[i].length(this->stabilizer_.supportPgain[i].size());
-    i_param.landing_dgain[i].length(this->stabilizer_.supportPgain[i].size());
-    i_param.swing_pgain[i].length(this->stabilizer_.supportPgain[i].size());
-    i_param.swing_dgain[i].length(this->stabilizer_.supportPgain[i].size());
-    for(int j=0;j<this->stabilizer_.supportPgain[i].size();j++){
-      i_param.support_pgain[i][j] = this->stabilizer_.supportPgain[i][j];
-      i_param.support_dgain[i][j] = this->stabilizer_.supportDgain[i][j];
-      i_param.landing_pgain[i][j] = this->stabilizer_.landingPgain[i][j];
-      i_param.landing_dgain[i][j] = this->stabilizer_.landingDgain[i][j];
-      i_param.swing_pgain[i][j] = this->stabilizer_.swingPgain[i][j];
-      i_param.swing_dgain[i][j] = this->stabilizer_.swingDgain[i][j];
+  i_param.ee_p.length(this->gaitParam_.eeName.size());
+  i_param.ee_d.length(this->gaitParam_.eeName.size());
+  for(int i=0;i<this->gaitParam_.eeName.size();i++){
+    i_param.ee_p[i].length(this->stabilizer_.ee_K[i].size());
+    i_param.ee_d[i].length(this->stabilizer_.ee_D[i].size());
+    for(int j=0;j<this->stabilizer_.ee_K[i].size();j++){
+      i_param.ee_p[i][j] = this->stabilizer_.ee_K[i][j];
+      i_param.ee_d[i][j] = this->stabilizer_.ee_D[i][j];
     }
   }
+  i_param.ee_support_d.length(NUM_LEGS);
+  i_param.ee_landing_p.length(NUM_LEGS);
+  i_param.ee_landing_d.length(NUM_LEGS);
+  i_param.ee_swing_p.length(NUM_LEGS);
+  i_param.ee_swing_d.length(NUM_LEGS);
+  for(int i=0;i<NUM_LEGS;i++){
+    i_param.ee_support_d[i].length(this->stabilizer_.ee_support_D[i].size());
+    i_param.ee_landing_p[i].length(this->stabilizer_.ee_landing_K[i].size());
+    i_param.ee_landing_d[i].length(this->stabilizer_.ee_landing_D[i].size());
+    i_param.ee_swing_p[i].length(this->stabilizer_.ee_swing_K[i].size());
+    i_param.ee_swing_d[i].length(this->stabilizer_.ee_swing_D[i].size());
+    for(int j=0;j<this->stabilizer_.ee_support_D[i].size();j++){
+      i_param.ee_support_d[i][j] = this->stabilizer_.ee_support_D[i][j];
+      i_param.ee_landing_p[i][j] = this->stabilizer_.ee_landing_K[i][j];
+      i_param.ee_landing_d[i][j] = this->stabilizer_.ee_landing_D[i][j];
+      i_param.ee_swing_p[i][j] = this->stabilizer_.ee_swing_K[i][j];
+      i_param.ee_swing_d[i][j] = this->stabilizer_.ee_swing_D[i][j];
+    }
+  }
+  i_param.root_p.length(3);
+  for(int i=0;i<3;i++) i_param.root_p[i] = this->stabilizer_.root_K[i];
+  i_param.root_d.length(3);
+  for(int i=0;i<3;i++) i_param.root_d[i] = this->stabilizer_.root_D[i];
+  i_param.joint_p = this->stabilizer_.joint_K;
+  i_param.joint_d = this->stabilizer_.joint_D;
   i_param.st_dq_weight.length(this->stabilizer_.dqWeight.size());
   for(int i=0;i<this->stabilizer_.dqWeight.size();i++){
     i_param.st_dq_weight[i] = this->stabilizer_.dqWeight[i].getGoal();
