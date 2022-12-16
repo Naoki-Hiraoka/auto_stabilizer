@@ -16,25 +16,38 @@ void Stabilizer::initStabilizerOutput(const GaitParam& gaitParam,
 
 bool Stabilizer::execStabilizer(const GaitParam& gaitParam, double dt, bool useActState,
                                 cnoid::BodyPtr& actRobotTqc, cnoid::Vector3& o_stTargetZmp, std::vector<cnoid::Vector6>& o_stEETargetWrench, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage) const{
-  // - 現在のactual重心位置から、目標ZMPを計算
-  // - 目標ZMPを満たすように目標足裏反力を計算
-  // - 目標反力を満たすように重力補償+仮想仕事の原理
+  // - 現在のactual重心位置から、目標重心加速を計算
+  // - 目標重心加速を満たすように全身の加速度を計算
+  // - 全身の加速度と重力に釣り合うように目標足裏反力を計算. 関節トルクも求まる
 
-  // masterのhrpsysではSwingEEModificationを行っていたが、地面についているときに、time_constでもとの位置に戻るまでの間、足と重心の相対位置が着地位置タイミング修正計算で用いるものとずれることによる着地位置修正パフォーマンスの低下のデメリットの方が大きいので、削除した
+  /*
+    FootGuided Controlから、次の周期の目標の重心の加速と、角運動量の変化(0)が出てくる. これを全身の加速度に分解するときのタスク優先度について、以下の循環優先度関係がある. この矛盾は、恐らく全身モデル予測制御を使わない限り無くならない.
+    * 重心の目標加速(特にXY) > 腕などのエンドエフェクタの目標位置
+        これは自明. 特に動歩行
+    * 腕などのエンドエフェクタの目標位置 > 角運動量の目標変化
+        角運動量の変化を厳密に守ると、まともにエンドエフェクタが動かない
+    * 角運動量の目標変化 > 重心の目標加速
+        重心位置はFootGuidedControlやFootStepModificationで制御できるが、角運動量は制御する手段が乏しく、発散しやすいため
+    今は、次のような方法によって、とりあえず循環を回避している
+    - acceleration based ik で、重心の目標加速(特にXY) > 腕などのエンドエフェクタの目標位置 > 角運動量の目標変化 の優先度で解く
+    - wrench distributionで、acceleration based ikの結果の角運動量の変化 > acceleration based ikの結果の重心の加速 の優先度で解く.
+  */
+
+  // masterのhrpsysではSwingEEModification(位置制御)を行っていたが、地面についているときに、time_constでもとの位置に戻るまでの間、足と重心の相対位置が着地位置タイミング修正計算で用いるものとずれることによる着地位置修正パフォーマンスの低下のデメリットの方が大きいので、削除した
   // masterのhrpsysやもとのauto_stabilizerでは位置制御+DampingControlをサポートしていたが、位置制御+DampingControlは実機での目標接触力への追従に遅れがある. FootGuidedControlでは、目標ZMPの位相を進めたり、ZMPの追従遅れを考慮した目標ZMP計算を行ったりをしていないので、遅れに弱い. そのため、位置制御+DampingControlは削除し、所謂TorqueControlのみをサポートしている.
+
 
   // 現在のactual重心位置から、目標重心Accを計算
   cnoid::Vector3 tgtCogAcc; // generate frame
-  cnoid::Vector3 tgtForce; // generate frame. TODO. calcResolvedAccelerationControlの結果を使う
   this->calcZMP(gaitParam, dt, useActState, // input
-                o_stTargetZmp, tgtCogAcc, tgtForce); // output
+                o_stTargetZmp, tgtCogAcc); // output
 
   // actRobotTqcのq,dqにactualの値を入れ、ddqに今回の目標値を求めて入れる
   this->calcResolvedAccelerationControl(gaitParam, dt, tgtCogAcc, useActState,
                                         actRobotTqc);
 
   // actRobotTqcの自重と加速に要する力と、manipulati0on arm/legのrefForceに釣り合うように、目標支持脚反力を計算. actRobotTqcのuを求める
-  this->calcWrench(gaitParam, o_stTargetZmp, tgtForce, useActState,// input
+  this->calcWrench(gaitParam, o_stTargetZmp, useActState,// input
                    o_stEETargetWrench, actRobotTqc); // output
 
   if(useActState){
@@ -56,7 +69,7 @@ bool Stabilizer::execStabilizer(const GaitParam& gaitParam, double dt, bool useA
 }
 
 bool Stabilizer::calcZMP(const GaitParam& gaitParam, double dt, bool useActState,
-                         cnoid::Vector3& o_tgtZmp, cnoid::Vector3& o_tgtCogAcc, cnoid::Vector3& o_tgtForce) const{
+                         cnoid::Vector3& o_tgtZmp, cnoid::Vector3& o_tgtCogAcc) const{
   cnoid::Vector3 cog = useActState ? gaitParam.actCog : gaitParam.genCog;
   cnoid::Vector3 cogVel = useActState ? gaitParam.actCogVel.value() : gaitParam.genCogVel;
   cnoid::Vector3 DCM = cog + cogVel / gaitParam.omega;
@@ -87,11 +100,8 @@ bool Stabilizer::calcZMP(const GaitParam& gaitParam, double dt, bool useActState
   footguidedcontroller::updateState(gaitParam.omega,gaitParam.l,cog,cogVel,tgtZmp,gaitParam.genRobot->mass(),dt,
                                       tgtCog, tgtCogVel, tgtCogAcc, tgtForce);
 
-  // tgtForceにrefEEWrenchのXY成分を足す TODO
-
   o_tgtZmp = tgtZmp;
   o_tgtCogAcc = tgtCogAcc;
-  o_tgtForce = tgtForce;
   return true;
 }
 
@@ -221,7 +231,7 @@ bool Stabilizer::calcResolvedAccelerationControl(const GaitParam& gaitParam, dou
   {
     // task: angular momentum to zero
     this->angularMomentumConstraint->robot() = actRobotTqc;
-    this->angularMomentumConstraint->weight() << 0.3, 0.3, 0.03; // yaw旋回歩行するときのために、Zは小さく
+    this->angularMomentumConstraint->weight() << 0.1, 0.1, 0.1; // yaw旋回歩行するときのために、Zは小さく. rollとpitchも、joint angle taskの方を優先したほうがよい
     ikConstraint4.push_back(this->angularMomentumConstraint);
   }
   {
@@ -236,7 +246,7 @@ bool Stabilizer::calcResolvedAccelerationControl(const GaitParam& gaitParam, dou
       this->refJointAngleConstraint[i]->maxAccByPosError() = 3.0;
       this->refJointAngleConstraint[i]->dgain() = this->joint_D * this->dqWeight[i].value();
       this->refJointAngleConstraint[i]->maxAccByVelError() = 10.0;
-      this->refJointAngleConstraint[i]->weight() = 0.1 * this->dqWeight[i].value();
+      this->refJointAngleConstraint[i]->weight() = 0.3 * this->dqWeight[i].value();
       ikConstraint4.push_back(this->refJointAngleConstraint[i]);
     }
   }
@@ -260,7 +270,7 @@ bool Stabilizer::calcResolvedAccelerationControl(const GaitParam& gaitParam, dou
   return true;
 }
 
-bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tgtZmp/*generate座標系*/, const cnoid::Vector3& tgtForce/*generate座標系 ロボットが受ける力*/, bool useActState,
+bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tgtZmp/*generate座標系*/, bool useActState,
                             std::vector<cnoid::Vector6>& o_tgtEEWrench, cnoid::BodyPtr& actRobotTqc) const{
   if(!useActState) return false;
 
