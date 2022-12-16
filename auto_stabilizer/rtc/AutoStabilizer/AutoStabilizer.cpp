@@ -1477,43 +1477,48 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
   this->legCoordsGenerator_.previewStepNum = std::max(i_param.preview_step_num, 2);
   this->legCoordsGenerator_.footGuidedBalanceTime = std::max(i_param.footguided_balance_time, 0.01);
 
-  if(i_param.eefm_body_attitude_control_gain.length() == 2 &&
-     i_param.eefm_body_attitude_control_time_const.length() == 2 &&
-     i_param.eefm_body_attitude_control_compensation_limit.length() == 2){
-    for(int i=0;i<2;i++) {
-      this->stabilizer_.bodyAttitudeControlGain[i] = std::max(i_param.eefm_body_attitude_control_gain[i], 0.0);
-      this->stabilizer_.bodyAttitudeControlTimeConst[i] = std::max(i_param.eefm_body_attitude_control_time_const[i], 0.01);
-      if(!this->mode_.isSTRunning()) this->stabilizer_.bodyAttitudeControlCompensationLimit[i] = std::max(i_param.eefm_body_attitude_control_compensation_limit[i], 0.0);
-    }
-  }
-
-  this->stabilizer_.swing2LandingTransitionTime = std::max(i_param.swing2landing_transition_time, 0.01);
-  this->stabilizer_.landing2SupportTransitionTime = std::max(i_param.landing2support_transition_time, 0.01);
-  this->stabilizer_.support2SwingTransitionTime = std::max(i_param.support2swing_transition_time, 0.01);
-  if(i_param.support_pgain.length() == NUM_LEGS &&
-     i_param.support_dgain.length() == NUM_LEGS &&
-     i_param.landing_pgain.length() == NUM_LEGS &&
-     i_param.landing_dgain.length() == NUM_LEGS &&
-     i_param.swing_pgain.length() == NUM_LEGS &&
-     i_param.swing_dgain.length() == NUM_LEGS){
-    for(int i=0;i<NUM_LEGS;i++){
-      if(i_param.support_pgain[i].length() == this->stabilizer_.supportPgain[i].size() &&
-         i_param.support_dgain[i].length() == this->stabilizer_.supportPgain[i].size() &&
-         i_param.landing_pgain[i].length() == this->stabilizer_.supportPgain[i].size() &&
-         i_param.landing_dgain[i].length() == this->stabilizer_.supportPgain[i].size() &&
-         i_param.swing_pgain[i].length() == this->stabilizer_.supportPgain[i].size() &&
-         i_param.swing_dgain[i].length() == this->stabilizer_.supportPgain[i].size()){
-        for(int j=0;j<this->stabilizer_.supportPgain[i].size();j++){
-          this->stabilizer_.supportPgain[i][j] = std::min(std::max(i_param.support_pgain[i][j], 0.0), 100.0);
-          this->stabilizer_.supportDgain[i][j] = std::min(std::max(i_param.support_dgain[i][j], 0.0), 100.0);
-          this->stabilizer_.landingPgain[i][j] = std::min(std::max(i_param.landing_pgain[i][j], 0.0), 100.0);
-          this->stabilizer_.landingDgain[i][j] = std::min(std::max(i_param.landing_dgain[i][j], 0.0), 100.0);
-          this->stabilizer_.swingPgain[i][j] = std::min(std::max(i_param.swing_pgain[i][j], 0.0), 100.0);
-          this->stabilizer_.swingDgain[i][j] = std::min(std::max(i_param.swing_dgain[i][j], 0.0), 100.0);
+  if(i_param.ee_p.length() == this->gaitParam_.eeName.size() &&
+     i_param.ee_d.length() == this->gaitParam_.eeName.size()){
+    for(int i=0;i<this->gaitParam_.eeName.size();i++){
+      if(i_param.ee_p[i].length() == this->stabilizer_.ee_K[i].size() &&
+         i_param.ee_d[i].length() == this->stabilizer_.ee_D[i].size()){
+        for(int j=0;j<this->stabilizer_.ee_K[i].size();j++){
+          this->stabilizer_.ee_K[i][j] = std::max(i_param.ee_p[i][j], 0.0);
+          this->stabilizer_.ee_D[i][j] = std::max(i_param.ee_d[i][j], 0.0);
         }
       }
     }
   }
+  if(i_param.ee_support_d.length() == NUM_LEGS &&
+     i_param.ee_landing_p.length() == NUM_LEGS &&
+     i_param.ee_landing_d.length() == NUM_LEGS &&
+     i_param.ee_swing_p.length() == NUM_LEGS &&
+     i_param.ee_swing_d.length() == NUM_LEGS){
+    for(int i=0;i<NUM_LEGS;i++){
+      if(i_param.ee_support_d[i].length() == this->stabilizer_.ee_support_D[i].size() &&
+         i_param.ee_landing_p[i].length() == this->stabilizer_.ee_landing_K[i].size() &&
+         i_param.ee_landing_d[i].length() == this->stabilizer_.ee_landing_D[i].size() &&
+         i_param.ee_swing_p[i].length() == this->stabilizer_.ee_swing_K[i].size() &&
+         i_param.ee_swing_d[i].length() == this->stabilizer_.ee_swing_D[i].size()){
+        for(int j=0;j<this->stabilizer_.ee_support_D[i].size();j++){
+          this->stabilizer_.ee_support_D[i][j] = std::max(i_param.ee_support_d[i][j], 0.0);
+          this->stabilizer_.ee_landing_K[i][j] = std::max(i_param.ee_landing_p[i][j], 0.0);
+          this->stabilizer_.ee_landing_D[i][j] = std::max(i_param.ee_landing_d[i][j], 0.0);
+          this->stabilizer_.ee_swing_K[i][j] = std::max(i_param.ee_swing_p[i][j], 0.0);
+          this->stabilizer_.ee_swing_D[i][j] = std::max(i_param.ee_swing_d[i][j], 0.0);
+        }
+      }
+    }
+  }
+  if(i_param.root_p.length() == 3 &&
+     i_param.root_d.length() == 3){
+    for(int i=0;i<3;i++) {
+      this->stabilizer_.root_K[i] = std::max(i_param.root_p[i], 0.0);
+      this->stabilizer_.root_D[i] = std::max(i_param.root_d[i], 0.0);
+    }
+  }
+  this->stabilizer_.joint_K = std::max(i_param.joint_p, 0.0);
+  this->stabilizer_.joint_D = std::max(i_param.joint_d, 0.0);
   if(i_param.st_dq_weight.length() == this->stabilizer_.dqWeight.size()){
     for(int i=0;i<this->stabilizer_.dqWeight.size();i++){
       double value = std::max(0.01, i_param.st_dq_weight[i]);
