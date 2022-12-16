@@ -5,9 +5,8 @@
 #include <cnoid/src/Body/InverseDynamics.h>
 
 void Stabilizer::initStabilizerOutput(const GaitParam& gaitParam,
-                                      cnoid::Vector3& o_stTargetZmp, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage) const{
+                                      std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage) const{
 
-  o_stTargetZmp = gaitParam.refZmpTraj[0].getStart();
   for(int i=0;i<o_stServoPGainPercentage.size();i++){
     o_stServoPGainPercentage[i].reset(100.0);
     o_stServoDGainPercentage[i].reset(100.0);
@@ -15,7 +14,8 @@ void Stabilizer::initStabilizerOutput(const GaitParam& gaitParam,
 }
 
 bool Stabilizer::execStabilizer(const GaitParam& gaitParam, double dt, bool useActState,
-                                cnoid::BodyPtr& actRobotTqc, cnoid::Vector3& o_stTargetZmp, std::vector<cnoid::Vector6>& o_stEETargetWrench, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage) const{
+                                GaitParam::DebugData& debugData, //for Log
+                                cnoid::BodyPtr& actRobotTqc, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage) const{
   // - 現在のactual重心位置から、目標重心加速を計算
   // - 目標重心加速を満たすように全身の加速度を計算
   // - 全身の加速度と重力に釣り合うように目標足裏反力を計算. 関節トルクも求まる
@@ -40,15 +40,15 @@ bool Stabilizer::execStabilizer(const GaitParam& gaitParam, double dt, bool useA
   // 現在のactual重心位置から、目標重心Accを計算
   cnoid::Vector3 tgtCogAcc; // generate frame
   this->calcZMP(gaitParam, dt, useActState, // input
-                o_stTargetZmp, tgtCogAcc); // output
+                debugData.stTargetZmp, tgtCogAcc); // output
 
   // actRobotTqcのq,dqにactualの値を入れ、ddqに今回の目標値を求めて入れる
   this->calcResolvedAccelerationControl(gaitParam, dt, tgtCogAcc, useActState,
                                         actRobotTqc);
 
   // actRobotTqcの自重と加速に要する力と、manipulati0on arm/legのrefForceに釣り合うように、目標支持脚反力を計算. actRobotTqcのuを求める
-  this->calcWrench(gaitParam, o_stTargetZmp, useActState,// input
-                   o_stEETargetWrench, actRobotTqc); // output
+  this->calcWrench(gaitParam, useActState,// input
+                   debugData.stEETargetWrench, actRobotTqc); // output
 
   if(useActState){
     for(int i=0;i<actRobotTqc->numJoints();i++){
@@ -270,7 +270,7 @@ bool Stabilizer::calcResolvedAccelerationControl(const GaitParam& gaitParam, dou
   return true;
 }
 
-bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tgtZmp/*generate座標系*/, bool useActState,
+bool Stabilizer::calcWrench(const GaitParam& gaitParam, bool useActState,
                             std::vector<cnoid::Vector6>& o_tgtEEWrench, cnoid::BodyPtr& actRobotTqc) const{
   if(!useActState) return false;
 

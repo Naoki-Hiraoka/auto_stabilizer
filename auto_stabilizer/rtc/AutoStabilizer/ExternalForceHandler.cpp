@@ -100,61 +100,61 @@ bool ExternalForceHandler::handleFeedForwardExternalForce(const GaitParam& gaitP
 
   return true;
 }
-bool ExternalForceHandler::handleFeedBackExternalForce(const GaitParam& gaitParam, bool useActState, double dt, double omega, const cnoid::Vector3& feedForwardSbpOffset,
-                                                       cnoid::Vector3& o_feedBackSbpOffset) const{
+// bool ExternalForceHandler::handleFeedBackExternalForce(const GaitParam& gaitParam, bool useActState, double dt, double omega, const cnoid::Vector3& feedForwardSbpOffset,
+//                                                        cnoid::Vector3& o_feedBackSbpOffset) const{
 
-  cnoid::Vector3 actCP = gaitParam.actRobot->centerOfMass() + gaitParam.actCogVel.value() / omega; // generate frame. ここではsbpOffsetやlは考えない, 生の重心位置を用いる
-  cnoid::Vector3 actCPVel;
-  if(this->isInitial) actCPVel = cnoid::Vector3::Zero();
-  else actCPVel = (actCP - this->actCPPrev) / dt;
-  this->actCPPrev = actCP;
+//   cnoid::Vector3 actCP = gaitParam.actRobot->centerOfMass() + gaitParam.actCogVel.value() / omega; // generate frame. ここではsbpOffsetやlは考えない, 生の重心位置を用いる
+//   cnoid::Vector3 actCPVel;
+//   if(this->isInitial) actCPVel = cnoid::Vector3::Zero();
+//   else actCPVel = (actCP - this->actCPPrev) / dt;
+//   this->actCPPrev = actCP;
 
-  cnoid::Vector3 targetOffset = cnoid::Vector3::Zero();
-  double timeConst = this->disturbanceCompensationTimeConst;
-  if(this->useDisturbanceCompensation && useActState){
-    if(!gaitParam.isStatic()) {// 非静止状態. (着地の衝撃が大きかったり、右脚と左脚とで誤差ののり方が反対向きになったりするので、一歩ごとに積算する) (逆に静止状態時に、適当に1[s]などで区切って一歩分の誤差として積算すると、BangBang的な挙動をしてしまう)
-      cnoid::Vector3 tmpOffset = cnoid::Vector3::Zero(); // 今の外乱の大きさ
-      tmpOffset.head<2>() = (actCP - actCPVel / omega - gaitParam.stTargetZmp).head<2>();
-      this->disturbance = (this->disturbance * this->disturbanceTime + tmpOffset * dt) / (this->disturbanceTime + dt);
-      this->disturbanceTime += dt;
-      if(this->disturbanceTime > 0.0 &&
-         (gaitParam.prevSupportPhase[RLEG] != gaitParam.footstepNodesList[0].isSupportPhase[RLEG] || gaitParam.prevSupportPhase[LLEG] != gaitParam.footstepNodesList[0].isSupportPhase[LLEG])){ // footStepNodesListの変わり目
-        this->disturbanceQueue.emplace_back(this->disturbance, this->disturbanceTime);
-        this->disturbance = cnoid::Vector3::Zero();
-        this->disturbanceTime = 0.0;
-        while(this->disturbanceQueue.size() > this->disturbanceCompensationStepNum) this->disturbanceQueue.pop_front();
-      }
-    } else { // 静止状態
-      cnoid::Vector3 tmpOffset = cnoid::Vector3::Zero(); // 安易に現在の誤差を積分すると不安定になるので、現状は何もしない
-      disturbanceQueue = {std::pair<cnoid::Vector3, double>{tmpOffset,1.0}};
-      disturbance = cnoid::Vector3::Zero();
-      disturbanceTime = 0.0;
-    }
+//   cnoid::Vector3 targetOffset = cnoid::Vector3::Zero();
+//   double timeConst = this->disturbanceCompensationTimeConst;
+//   if(this->useDisturbanceCompensation && useActState){
+//     if(!gaitParam.isStatic()) {// 非静止状態. (着地の衝撃が大きかったり、右脚と左脚とで誤差ののり方が反対向きになったりするので、一歩ごとに積算する) (逆に静止状態時に、適当に1[s]などで区切って一歩分の誤差として積算すると、BangBang的な挙動をしてしまう)
+//       cnoid::Vector3 tmpOffset = cnoid::Vector3::Zero(); // 今の外乱の大きさ
+//       tmpOffset.head<2>() = (actCP - actCPVel / omega - gaitParam.stTargetZmp).head<2>();
+//       this->disturbance = (this->disturbance * this->disturbanceTime + tmpOffset * dt) / (this->disturbanceTime + dt);
+//       this->disturbanceTime += dt;
+//       if(this->disturbanceTime > 0.0 &&
+//          (gaitParam.prevSupportPhase[RLEG] != gaitParam.footstepNodesList[0].isSupportPhase[RLEG] || gaitParam.prevSupportPhase[LLEG] != gaitParam.footstepNodesList[0].isSupportPhase[LLEG])){ // footStepNodesListの変わり目
+//         this->disturbanceQueue.emplace_back(this->disturbance, this->disturbanceTime);
+//         this->disturbance = cnoid::Vector3::Zero();
+//         this->disturbanceTime = 0.0;
+//         while(this->disturbanceQueue.size() > this->disturbanceCompensationStepNum) this->disturbanceQueue.pop_front();
+//       }
+//     } else { // 静止状態
+//       cnoid::Vector3 tmpOffset = cnoid::Vector3::Zero(); // 安易に現在の誤差を積分すると不安定になるので、現状は何もしない
+//       disturbanceQueue = {std::pair<cnoid::Vector3, double>{tmpOffset,1.0}};
+//       disturbance = cnoid::Vector3::Zero();
+//       disturbanceTime = 0.0;
+//     }
 
-    double tm = 0;
-    for(std::list<std::pair<cnoid::Vector3, double> >::iterator it = this->disturbanceQueue.begin(); it != this->disturbanceQueue.end(); it++){
-      targetOffset += it->first * it->second;
-      tm += it->second;
-    }
-    targetOffset /= tm;
-    targetOffset -= feedForwardSbpOffset; // フィードフォワード外乱補償では足りない分のみを扱う
+//     double tm = 0;
+//     for(std::list<std::pair<cnoid::Vector3, double> >::iterator it = this->disturbanceQueue.begin(); it != this->disturbanceQueue.end(); it++){
+//       targetOffset += it->first * it->second;
+//       tm += it->second;
+//     }
+//     targetOffset /= tm;
+//     targetOffset -= feedForwardSbpOffset; // フィードフォワード外乱補償では足りない分のみを扱う
 
-  }else{ // if(this->useDisturbanceCompensation && useActState)
-    disturbanceQueue = {std::pair<cnoid::Vector3, double>{cnoid::Vector3::Zero(),1.0}};
-    disturbance = cnoid::Vector3::Zero();
-    disturbanceTime = 0.0;
-  }
+//   }else{ // if(this->useDisturbanceCompensation && useActState)
+//     disturbanceQueue = {std::pair<cnoid::Vector3, double>{cnoid::Vector3::Zero(),1.0}};
+//     disturbance = cnoid::Vector3::Zero();
+//     disturbanceTime = 0.0;
+//   }
 
-  cnoid::Vector3 feedBackSbpOffset = this->feedBackSbpOffsetPrev;
-  for(int i=0;i<2;i++){
-    double timeConst = this->disturbanceCompensationTimeConst;
-    if(std::abs(feedBackSbpOffset[i]) > std::abs(targetOffset[i])) timeConst *= 0.1; // 減る方向には速く
-    feedBackSbpOffset[i] += (targetOffset[i] - feedBackSbpOffset[i]) * dt / timeConst;
-    feedBackSbpOffset[i] = mathutil::clamp(feedBackSbpOffset[i], this->disturbanceCompensationLimit);
-  }
-  feedBackSbpOffset[2] = 0.0;
-  this->feedBackSbpOffsetPrev = feedBackSbpOffset;
+//   cnoid::Vector3 feedBackSbpOffset = this->feedBackSbpOffsetPrev;
+//   for(int i=0;i<2;i++){
+//     double timeConst = this->disturbanceCompensationTimeConst;
+//     if(std::abs(feedBackSbpOffset[i]) > std::abs(targetOffset[i])) timeConst *= 0.1; // 減る方向には速く
+//     feedBackSbpOffset[i] += (targetOffset[i] - feedBackSbpOffset[i]) * dt / timeConst;
+//     feedBackSbpOffset[i] = mathutil::clamp(feedBackSbpOffset[i], this->disturbanceCompensationLimit);
+//   }
+//   feedBackSbpOffset[2] = 0.0;
+//   this->feedBackSbpOffsetPrev = feedBackSbpOffset;
 
-  o_feedBackSbpOffset = feedBackSbpOffset;
-  return true;
-}
+//   o_feedBackSbpOffset = feedBackSbpOffset;
+//   return true;
+// }

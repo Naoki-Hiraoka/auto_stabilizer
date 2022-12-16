@@ -147,8 +147,6 @@ public:
   std::vector<cnoid::Vector6> abcEETargetAcc; // 要素数と順序はeeNameと同じ.generate frame. endeffector origin. abcで計算された目標加速度
 
   // Stabilizer
-  cnoid::Vector3 stTargetZmp; // generate frame. stで計算された目標ZMP
-  std::vector<cnoid::Vector6> stEETargetWrench; // 要素数と順序はeeNameと同じ.generate frame. EndEffector origin. ロボットが受ける力
   std::vector<cpp_filters::TwoPointInterpolator<double> > stServoPGainPercentage; // 要素数と順序はrobot->numJoints()と同じ. 0~100. 現状, setGoal(*,dt)以下の時間でgoal指定するとwriteOutPortDataが破綻する
   std::vector<cpp_filters::TwoPointInterpolator<double> > stServoDGainPercentage; // 要素数と順序はrobot->numJoints()と同じ. 0~100. 現状, setGoal(*,dt)以下の時間でgoal指定するとwriteOutPortDataが破綻する
   cnoid::BodyPtr actRobotTqc; // output. 関節トルク制御用. (actRobotと同じだが、uの値として指令関節トルクが入っている)
@@ -159,9 +157,14 @@ public:
   // for debug data
   class DebugData {
   public:
+    // FootStepGenerator
     std::vector<cnoid::Vector3> strideLimitationHull = std::vector<cnoid::Vector3>(); // generate frame. overwritableStrideLimitationHullの範囲内の着地位置(自己干渉・IKの考慮が含まれる). Z成分には0を入れる
     std::vector<std::vector<cnoid::Vector3> > capturableHulls = std::vector<std::vector<cnoid::Vector3> >(); // generate frame. 要素数と順番はcandidatesに対応
     std::vector<double> cpViewerLog = std::vector<double>(37, 0.0);
+
+    // Stabilizer
+    cnoid::Vector3 stTargetZmp; // generate frame. stで計算された目標ZMP
+    std::vector<cnoid::Vector6> stEETargetWrench; // 要素数と順序はeeNameと同じ.generate frame. EndEffector origin. ロボットが受ける力
   };
   DebugData debugData; // デバッグ用のOutPortから出力するためのデータ. AutoStabilizer内の制御処理では使われることは無い. そのため、モード遷移や初期化等の処理にはあまり注意を払わなくて良い
 
@@ -207,7 +210,7 @@ public:
     abcEETargetPose.push_back(cnoid::Position::Identity());
     abcEETargetVel.push_back(cnoid::Vector6::Zero());
     abcEETargetAcc.push_back(cnoid::Vector6::Zero());
-    stEETargetWrench.push_back(cnoid::Vector6::Zero());
+    debugData.stEETargetWrench.push_back(cnoid::Vector6::Zero());
   }
 
   // startAutoStabilizer時に呼ばれる

@@ -40,8 +40,8 @@ public:
 protected:
   bool handleFeedForwardExternalForce(const GaitParam& gaitParam,
                                       double& o_omega, cnoid::Vector3& o_l) const;
-  bool handleFeedBackExternalForce(const GaitParam& gaitParam, bool useActState, double dt, double omega, const cnoid::Vector3& feedForwardSbpOffset,
-                                   cnoid::Vector3& o_feedBackSbpOffset) const;
+  // bool handleFeedBackExternalForce(const GaitParam& gaitParam, bool useActState, double dt, double omega, const cnoid::Vector3& feedForwardSbpOffset,
+  //                                  cnoid::Vector3& o_feedBackSbpOffset) const;
 };
 
 #endif

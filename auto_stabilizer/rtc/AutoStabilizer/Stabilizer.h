@@ -73,17 +73,18 @@ protected:
   mutable std::vector<std::shared_ptr<prioritized_qp_base::Task> > tasks;
 public:
   void initStabilizerOutput(const GaitParam& gaitParam,
-                            cnoid::Vector3& o_stTargetZmp, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage) const;
+                            std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage) const;
 
   bool execStabilizer(const GaitParam& gaitParam, double dt, bool useActState,
-                      cnoid::BodyPtr& actRobotTqc, cnoid::Vector3& o_stTargetZmp, std::vector<cnoid::Vector6>& o_stEETargetWrench, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPgainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDgainPercentage) const;
+                      GaitParam::DebugData& debugData, //for Log
+                      cnoid::BodyPtr& actRobotTqc, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPgainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDgainPercentage) const;
 
 protected:
   bool calcZMP(const GaitParam& gaitParam, double dt, bool useActState,
                cnoid::Vector3& o_tgtZmp/*generate座標系*/, cnoid::Vector3& o_tgtCogAcc/*generate座標系*/) const;
   bool calcResolvedAccelerationControl(const GaitParam& gaitParam, double dt, cnoid::Vector3& tgtCogAcc/*generate座標系*/, bool useActState,
                                        cnoid::BodyPtr& actRobotTqc) const;
-  bool calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tgtZmp/*generate座標系*/, bool useActState,
+  bool calcWrench(const GaitParam& gaitParam, bool useActState,
                   std::vector<cnoid::Vector6>& o_tgtEEWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/, cnoid::BodyPtr& actRobotTqc) const;
 };
 

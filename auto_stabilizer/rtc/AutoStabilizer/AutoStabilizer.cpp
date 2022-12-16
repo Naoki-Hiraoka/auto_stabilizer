@@ -604,7 +604,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
     legCoordsGenerator.initLegCoords(gaitParam,
                                      gaitParam.refZmpTraj, gaitParam.genCoords);
     stabilizer.initStabilizerOutput(gaitParam,
-                                    gaitParam.stTargetZmp, gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage);
+                                    gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage);
   }
 
   // FootOrigin座標系を用いてrefRobotRawをgenerate frameに投影しrefRobotとする
@@ -652,7 +652,8 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
     }
   }
   stabilizer.execStabilizer(gaitParam, dt, mode.isSTRunning(),
-                            gaitParam.actRobotTqc, gaitParam.stTargetZmp, gaitParam.stEETargetWrench, gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage);
+                            gaitParam.debugData, //for log
+                            gaitParam.actRobotTqc, gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage);
 
   // FullbodyIKSolver
   fullbodyIKSolver.solveFullbodyIK(dt, gaitParam,// input
@@ -885,9 +886,9 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
     ports.m_genZmp_.data.z = gaitParam.refZmpTraj[0].getStart()[2];
     ports.m_genZmpOut_.write();
     ports.m_tgtZmp_.tm = ports.m_qRef_.tm;
-    ports.m_tgtZmp_.data.x = gaitParam.stTargetZmp[0];
-    ports.m_tgtZmp_.data.y = gaitParam.stTargetZmp[1];
-    ports.m_tgtZmp_.data.z = gaitParam.stTargetZmp[2];
+    ports.m_tgtZmp_.data.x = gaitParam.debugData.stTargetZmp[0];
+    ports.m_tgtZmp_.data.y = gaitParam.debugData.stTargetZmp[1];
+    ports.m_tgtZmp_.data.z = gaitParam.debugData.stTargetZmp[2];
     ports.m_tgtZmpOut_.write();
     ports.m_actCog_.tm = ports.m_qRef_.tm;
     ports.m_actCog_.data.x = gaitParam.actCog[0];
@@ -972,7 +973,7 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
     for(int i=0;i<gaitParam.eeName.size();i++){
       ports.m_tgtEEWrench_[i].tm = ports.m_qRef_.tm;
       ports.m_tgtEEWrench_[i].data.length(6);
-      for(int j=0;j<6;j++) ports.m_tgtEEWrench_[i].data[j] = gaitParam.stEETargetWrench[i][j];
+      for(int j=0;j<6;j++) ports.m_tgtEEWrench_[i].data[j] = gaitParam.debugData.stEETargetWrench[i][j];
       ports.m_tgtEEWrenchOut_[i]->write();
     }
   }
