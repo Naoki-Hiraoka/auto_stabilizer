@@ -1705,9 +1705,9 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
   i_param.ee_p.length(this->gaitParam_.eeName.size());
   i_param.ee_d.length(this->gaitParam_.eeName.size());
   for(int i=0;i<this->gaitParam_.eeName.size();i++){
-    i_param.ee_p[i].length(this->stabilizer_.ee_K[i].size());
-    i_param.ee_d[i].length(this->stabilizer_.ee_D[i].size());
-    for(int j=0;j<this->stabilizer_.ee_K[i].size();j++){
+    i_param.ee_p[i].length(6);
+    i_param.ee_d[i].length(6);
+    for(int j=0;j<6;j++){
       i_param.ee_p[i][j] = this->stabilizer_.ee_K[i][j];
       i_param.ee_d[i][j] = this->stabilizer_.ee_D[i][j];
     }
@@ -1718,12 +1718,12 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
   i_param.ee_swing_p.length(NUM_LEGS);
   i_param.ee_swing_d.length(NUM_LEGS);
   for(int i=0;i<NUM_LEGS;i++){
-    i_param.ee_support_d[i].length(this->stabilizer_.ee_support_D[i].size());
-    i_param.ee_landing_p[i].length(this->stabilizer_.ee_landing_K[i].size());
-    i_param.ee_landing_d[i].length(this->stabilizer_.ee_landing_D[i].size());
-    i_param.ee_swing_p[i].length(this->stabilizer_.ee_swing_K[i].size());
-    i_param.ee_swing_d[i].length(this->stabilizer_.ee_swing_D[i].size());
-    for(int j=0;j<this->stabilizer_.ee_support_D[i].size();j++){
+    i_param.ee_support_d[i].length(6);
+    i_param.ee_landing_p[i].length(6);
+    i_param.ee_landing_d[i].length(6);
+    i_param.ee_swing_p[i].length(6);
+    i_param.ee_swing_d[i].length(6);
+    for(int j=0;j<6;j++){
       i_param.ee_support_d[i][j] = this->stabilizer_.ee_support_D[i][j];
       i_param.ee_landing_p[i][j] = this->stabilizer_.ee_landing_K[i][j];
       i_param.ee_landing_d[i][j] = this->stabilizer_.ee_landing_D[i][j];

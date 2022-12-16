@@ -204,9 +204,9 @@ module OpenHRP
 
       // Stabilizer
       /// 要素数endeffectors. EndEffector frame. endEffector origin. 0以上
-      sequence<sequence<double, 6>, 2> ee_p;
+      sequence<sequence<double, 6> > ee_p;
       /// 要素数endeffectors. EndEffector frame. endEffector origin. 0以上
-      sequence<sequence<double, 6>, 2> ee_d;
+      sequence<sequence<double, 6> > ee_d;
       /// 要素数2. [rleg, lleg]. EndEffector frame. endEffector origin. 0以上
       sequence<sequence<double, 6>,2 > ee_support_d;
       /// 要素数2. [rleg, lleg]. EndEffector frame. endEffector origin. 0以上

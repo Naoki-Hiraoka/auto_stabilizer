@@ -143,7 +143,7 @@ class JAXON_RED_HrpsysConfigurator(ChoreonoidHrpsysConfigurator):
         self.ast_svc.startAutoBalancer()
         # Suppress limit over message and behave like real robot that always angle-vector is in seq.
         # Latter four 0.0 are for hands.
-        self.seq_svc.setJointAngles(self.jaxonResetPose()+[0.0, 0.0, 0.0, 0.0] , 1.0)
+        self.seq_svc.setJointAngles([0.000128, -0.002474, -0.488908, 1.01524, -0.526335, 0.002474, 0.000128, -0.002474, -0.488869, 1.01524, -0.526374, 0.002474, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.698132, -0.349066, -0.087266, -1.39626, 0.0, 0.0, -0.349066, 0.0, 0.698132, 0.349066, 0.087266, -1.39626, 0.0, 0.0, -0.349066]+[0.0, 0.0, 0.0, 0.0] , 1.0)
         #self.ast_svc.startImpedanceController("larm")
         #self.ast_svc.startImpedanceController("rarm")
         self.ast_svc.startStabilizer()
