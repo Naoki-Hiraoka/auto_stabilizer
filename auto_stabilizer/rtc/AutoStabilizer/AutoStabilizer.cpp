@@ -338,7 +338,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
   for(int i=0;i<this->gaitParam_.eeName.size();i++) this->impedanceController_.push_backEE();
 
   // init Stabilizer
-  this->stabilizer_.init(this->gaitParam_, this->gaitParam_.actRobotTqc);
+  this->stabilizer_.init(this->gaitParam_, this->gaitParam_.actRobotTqc, this->gaitParam_.genRobot);
 
   // init FullbodyIKSolver
   this->fullbodyIKSolver_.init(this->gaitParam_.genRobot, this->gaitParam_);
@@ -653,7 +653,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
   }
   stabilizer.execStabilizer(gaitParam, dt, mode.isSTRunning(),
                             gaitParam.debugData, //for log
-                            gaitParam.actRobotTqc, gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage);
+                            gaitParam.actRobotTqc, gaitParam.genRobot, gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage);
 
   // FullbodyIKSolver
   fullbodyIKSolver.solveFullbodyIK(dt, gaitParam,// input
@@ -989,9 +989,11 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
 
   if(!AutoStabilizer::readInPortData(this->dt_, this->gaitParam_, this->mode_, this->ports_, this->gaitParam_.refRobotRaw, this->gaitParam_.actRobotRaw, this->gaitParam_.refEEWrenchOrigin, this->gaitParam_.refEEPoseRaw, this->gaitParam_.selfCollision, this->gaitParam_.steppableRegion, this->gaitParam_.steppableHeight, this->gaitParam_.relLandingHeight, this->gaitParam_.relLandingNormal)) return RTC::RTC_OK;  // qRef が届かなければ何もしない
 
+  // 内部補間器を進める
   this->mode_.update(this->dt_);
   this->gaitParam_.update(this->dt_);
   this->refToGenFrameConverter_.update(this->dt_);
+  this->stabilizer_.update(this->dt_);
   this->fullbodyIKSolver_.update(this->dt_);
 
   if(this->mode_.isABCRunning()) {
@@ -1003,6 +1005,7 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
       this->footStepGenerator_.reset();
       this->impedanceController_.reset();
       this->legCoordsGenerator_.reset();
+      this->stabilizer_.reset();
       this->fullbodyIKSolver_.reset();
     }
     AutoStabilizer::execAutoStabilizer(this->mode_, this->gaitParam_, this->dt_, this->footStepGenerator_, this->legCoordsGenerator_, this->refToGenFrameConverter_, this->actToGenFrameConverter_, this->impedanceController_, this->stabilizer_,this->externalForceHandler_, this->fullbodyIKSolver_, this->legManualController_, this->cmdVelGenerator_);
@@ -1520,10 +1523,10 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
   }
   this->stabilizer_.joint_K = std::max(i_param.joint_p, 0.0);
   this->stabilizer_.joint_D = std::max(i_param.joint_d, 0.0);
-  if(i_param.st_dq_weight.length() == this->stabilizer_.dqWeight.size()){
-    for(int i=0;i<this->stabilizer_.dqWeight.size();i++){
+  if(i_param.st_dq_weight.length() == this->stabilizer_.aikdqWeight.size()){
+    for(int i=0;i<this->stabilizer_.aikdqWeight.size();i++){
       double value = std::max(0.01, i_param.st_dq_weight[i]);
-      if(value != this->stabilizer_.dqWeight[i].getGoal()) this->stabilizer_.dqWeight[i].setGoal(value, 2.0); // 2秒で遷移
+      if(value != this->stabilizer_.aikdqWeight[i].getGoal()) this->stabilizer_.aikdqWeight[i].setGoal(value, 2.0); // 2秒で遷移
     }
   }
 
@@ -1738,9 +1741,9 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
   for(int i=0;i<3;i++) i_param.root_d[i] = this->stabilizer_.root_D[i];
   i_param.joint_p = this->stabilizer_.joint_K;
   i_param.joint_d = this->stabilizer_.joint_D;
-  i_param.st_dq_weight.length(this->stabilizer_.dqWeight.size());
-  for(int i=0;i<this->stabilizer_.dqWeight.size();i++){
-    i_param.st_dq_weight[i] = this->stabilizer_.dqWeight[i].getGoal();
+  i_param.st_dq_weight.length(this->stabilizer_.aikdqWeight.size());
+  for(int i=0;i<this->stabilizer_.aikdqWeight.size();i++){
+    i_param.st_dq_weight[i] = this->stabilizer_.aikdqWeight[i].getGoal();
   }
 
   i_param.dq_weight.length(this->fullbodyIKSolver_.dqWeight.size());

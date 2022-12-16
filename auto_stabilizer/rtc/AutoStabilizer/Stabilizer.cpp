@@ -15,7 +15,17 @@ void Stabilizer::initStabilizerOutput(const GaitParam& gaitParam,
 
 bool Stabilizer::execStabilizer(const GaitParam& gaitParam, double dt, bool useActState,
                                 GaitParam::DebugData& debugData, //for Log
-                                cnoid::BodyPtr& actRobotTqc, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage) const{
+                                cnoid::BodyPtr& actRobotTqc, cnoid::BodyPtr& genRobot, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage) const{
+  /* useActStateがtrueなら、
+       - actRobotTqcはフィードバックによって次の周期の目標加速度・目標トルクが入る
+       - genRobotはactRobotの値に緩やかに従う
+       - 位置制御ゲインを0へ.
+     useActStateがfalseなら、
+       - actRobotTqcは0が入る
+       - genRobotは逆運動学によってフィードフォワードに動く
+       - 位置制御ゲインを100へ.
+   */
+
   // - 現在のactual重心位置から、目標重心加速を計算
   // - 目標重心加速を満たすように全身の加速度を計算
   // - 全身の加速度と重力に釣り合うように目標足裏反力を計算. 関節トルクも求まる
@@ -37,16 +47,21 @@ bool Stabilizer::execStabilizer(const GaitParam& gaitParam, double dt, bool useA
   // masterのhrpsysやもとのauto_stabilizerでは位置制御+DampingControlをサポートしていたが、位置制御+DampingControlは実機での目標接触力への追従に遅れがある. FootGuidedControlでは、目標ZMPの位相を進めたり、ZMPの追従遅れを考慮した目標ZMP計算を行ったりをしていないので、遅れに弱い. そのため、位置制御+DampingControlは削除し、所謂TorqueControlのみをサポートしている.
 
 
-  // 現在のactual重心位置から、目標重心Accを計算
+  // useActState==true: 現在のactCogから、目標重心Accを計算
+  // useActState==false: 現在のgenCogから、目標重心Accを計算
   cnoid::Vector3 tgtCogAcc; // generate frame
   this->calcZMP(gaitParam, dt, useActState, // input
-                debugData.stTargetZmp, tgtCogAcc); // output
+                debugData, // debug
+                tgtCogAcc); // output
 
-  // actRobotTqcのq,dqにactualの値を入れ、ddqに今回の目標値を求めて入れる
+  // actRobotTqcのq,dqにactualの値を入れ、
+  // useActState==true: actRobotTqcのddqに今回の目標値を求めて入れる. genRobotのqはactRobotの値に緩やかに従う
+  // useActState==false: actRobotTqcのddqはゼロ. genRobotのqはフィードフォワードにIKを解く.
   this->calcResolvedAccelerationControl(gaitParam, dt, tgtCogAcc, useActState,
                                         actRobotTqc);
 
-  // actRobotTqcの自重と加速に要する力と、manipulati0on arm/legのrefForceに釣り合うように、目標支持脚反力を計算. actRobotTqcのuを求める
+  // useActState==true: actRobotTqcの自重と加速に要する力と、manipulati0on arm/legのrefForceに釣り合うように、目標支持脚反力を計算. actRobotTqcのuを求める.
+  // useActState==false: genRobotの自重と加速に要する力に釣り合うように、目標支持脚反力を計算. actRobotTqcのuは0.
   this->calcWrench(gaitParam, useActState,// input
                    debugData.stEETargetWrench, actRobotTqc); // output
 
@@ -69,7 +84,8 @@ bool Stabilizer::execStabilizer(const GaitParam& gaitParam, double dt, bool useA
 }
 
 bool Stabilizer::calcZMP(const GaitParam& gaitParam, double dt, bool useActState,
-                         cnoid::Vector3& o_tgtZmp, cnoid::Vector3& o_tgtCogAcc) const{
+                         GaitParam::DebugData& debugData, //for Log
+                         cnoid::Vector3& o_tgtCogAcc) const{
   cnoid::Vector3 cog = useActState ? gaitParam.actCog : gaitParam.genCog;
   cnoid::Vector3 cogVel = useActState ? gaitParam.actCogVel.value() : gaitParam.genCogVel;
   cnoid::Vector3 DCM = cog + cogVel / gaitParam.omega;
@@ -100,8 +116,9 @@ bool Stabilizer::calcZMP(const GaitParam& gaitParam, double dt, bool useActState
   footguidedcontroller::updateState(gaitParam.omega,gaitParam.l,cog,cogVel,tgtZmp,gaitParam.genRobot->mass(),dt,
                                       tgtCog, tgtCogVel, tgtCogAcc, tgtForce);
 
-  o_tgtZmp = tgtZmp;
   o_tgtCogAcc = tgtCogAcc;
+
+  debugData.stTargetZmp = tgtZmp;
   return true;
 }
 
@@ -143,13 +160,13 @@ bool Stabilizer::calcResolvedAccelerationControl(const GaitParam& gaitParam, dou
   // joint limit
   for(size_t i=0;i<actRobotTqc->numJoints();i++){
     if(!gaitParam.jointControllable[i]) continue;
-    this->jointLimitConstraint[i]->joint() = actRobotTqc->joint(i);
-    this->jointLimitConstraint[i]->jointLimitTables() = gaitParam.jointLimitTablesTqc[i];
-    this->jointLimitConstraint[i]->pgain() = 400;
-    this->jointLimitConstraint[i]->dgain() = 100;
-    this->jointLimitConstraint[i]->maxAccByVelError() = 20.0;
-    this->jointLimitConstraint[i]->weight() = 0.1;
-    ikConstraint0.push_back(this->jointLimitConstraint[i]);
+    this->aikJointLimitConstraint[i]->joint() = actRobotTqc->joint(i);
+    this->aikJointLimitConstraint[i]->jointLimitTables() = gaitParam.jointLimitTablesTqc[i];
+    this->aikJointLimitConstraint[i]->pgain() = 400;
+    this->aikJointLimitConstraint[i]->dgain() = 100;
+    this->aikJointLimitConstraint[i]->maxAccByVelError() = 20.0;
+    this->aikJointLimitConstraint[i]->weight() = 0.1;
+    ikConstraint0.push_back(this->aikJointLimitConstraint[i]);
   }
 
   std::vector<std::shared_ptr<aik_constraint::IKConstraint> > ikConstraint1;
@@ -159,95 +176,95 @@ bool Stabilizer::calcResolvedAccelerationControl(const GaitParam& gaitParam, dou
   std::vector<std::shared_ptr<aik_constraint::IKConstraint> > ikConstraint3;
 
   for(int i=0;i<gaitParam.eeName.size();i++){
-    this->ikEEPositionConstraint[i]->A_link() = actRobotTqc->link(gaitParam.eeParentLink[i]);
-    this->ikEEPositionConstraint[i]->A_localpos() = gaitParam.eeLocalT[i];
-    this->ikEEPositionConstraint[i]->B_link() = nullptr;
-    this->ikEEPositionConstraint[i]->eval_link() = actRobotTqc->link(gaitParam.eeParentLink[i]); // local 座標系でerrorやgainを評価
-    this->ikEEPositionConstraint[i]->eval_localR() = gaitParam.eeLocalT[i].linear(); // local 座標系でerrorやgainを評価
+    this->aikEEPositionConstraint[i]->A_link() = actRobotTqc->link(gaitParam.eeParentLink[i]);
+    this->aikEEPositionConstraint[i]->A_localpos() = gaitParam.eeLocalT[i];
+    this->aikEEPositionConstraint[i]->B_link() = nullptr;
+    this->aikEEPositionConstraint[i]->eval_link() = actRobotTqc->link(gaitParam.eeParentLink[i]); // local 座標系でerrorやgainを評価
+    this->aikEEPositionConstraint[i]->eval_localR() = gaitParam.eeLocalT[i].linear(); // local 座標系でerrorやgainを評価
 
     if(i < NUM_LEGS &&
        (gaitParam.footstepNodesList[0].isSupportPhase[i] || // 支持脚
         gaitParam.footstepNodesList[0].stopCurrentPosition[i])) { // 早付き
       // 加速させない
-      this->ikEEPositionConstraint[i]->pgain().setZero();
-      this->ikEEPositionConstraint[i]->B_localvel().setZero();
-      this->ikEEPositionConstraint[i]->dgain() = this->ee_support_D[i]; // 着地の瞬間には脚は速度をもっているので、適切に吸収してやらないと外乱として重心に加わってしまう
-      this->ikEEPositionConstraint[i]->maxAccByVelError() = 20.0 * cnoid::Vector6::Ones();
-      this->ikEEPositionConstraint[i]->ref_acc().setZero();
-      this->ikEEPositionConstraint[i]->weight() = 3.0 * cnoid::Vector6::Ones();
-      ikConstraint2.push_back(this->ikEEPositionConstraint[i]);
+      this->aikEEPositionConstraint[i]->pgain().setZero();
+      this->aikEEPositionConstraint[i]->B_localvel().setZero();
+      this->aikEEPositionConstraint[i]->dgain() = this->ee_support_D[i]; // 着地の瞬間には脚は速度をもっているので、適切に吸収してやらないと外乱として重心に加わってしまう
+      this->aikEEPositionConstraint[i]->maxAccByVelError() = 20.0 * cnoid::Vector6::Ones();
+      this->aikEEPositionConstraint[i]->ref_acc().setZero();
+      this->aikEEPositionConstraint[i]->weight() = 3.0 * cnoid::Vector6::Ones();
+      ikConstraint2.push_back(this->aikEEPositionConstraint[i]);
     }else if(i < NUM_LEGS &&
              gaitParam.isManualControlMode[i].getGoal() == 0.0){ // 遊脚
       if(gaitParam.swingState[i] == GaitParam::DOWN_PHASE){
-        this->ikEEPositionConstraint[i]->pgain() = this->ee_landing_K[i];
-        this->ikEEPositionConstraint[i]->dgain() = this->ee_landing_D[i];
+        this->aikEEPositionConstraint[i]->pgain() = this->ee_landing_K[i];
+        this->aikEEPositionConstraint[i]->dgain() = this->ee_landing_D[i];
       }else{
-        this->ikEEPositionConstraint[i]->pgain() = this->ee_swing_K[i];
-        this->ikEEPositionConstraint[i]->dgain() = this->ee_swing_D[i];
+        this->aikEEPositionConstraint[i]->pgain() = this->ee_swing_K[i];
+        this->aikEEPositionConstraint[i]->dgain() = this->ee_swing_D[i];
       }
-      this->ikEEPositionConstraint[i]->B_localpos() = gaitParam.abcEETargetPose[i];
-      this->ikEEPositionConstraint[i]->B_localvel() = gaitParam.abcEETargetVel[i];
-      this->ikEEPositionConstraint[i]->ref_acc() = gaitParam.abcEETargetAcc[i];
-      this->ikEEPositionConstraint[i]->weight() = 1.0 * cnoid::Vector6::Ones();
-      ikConstraint2.push_back(this->ikEEPositionConstraint[i]);
+      this->aikEEPositionConstraint[i]->B_localpos() = gaitParam.abcEETargetPose[i];
+      this->aikEEPositionConstraint[i]->B_localvel() = gaitParam.abcEETargetVel[i];
+      this->aikEEPositionConstraint[i]->ref_acc() = gaitParam.abcEETargetAcc[i];
+      this->aikEEPositionConstraint[i]->weight() = 1.0 * cnoid::Vector6::Ones();
+      ikConstraint2.push_back(this->aikEEPositionConstraint[i]);
     }else{ // maniulation arm/leg
-      this->ikEEPositionConstraint[i]->pgain() = this->ee_K[i];
-      this->ikEEPositionConstraint[i]->dgain() = this->ee_D[i];
-      this->ikEEPositionConstraint[i]->B_localpos() = gaitParam.abcEETargetPose[i];
-      this->ikEEPositionConstraint[i]->B_localvel() = gaitParam.abcEETargetVel[i];
-      this->ikEEPositionConstraint[i]->ref_acc() = gaitParam.abcEETargetAcc[i];
-      this->ikEEPositionConstraint[i]->weight() = 0.3 * cnoid::Vector6::Ones();
-      ikConstraint3.push_back(this->ikEEPositionConstraint[i]); // low prioritiy
+      this->aikEEPositionConstraint[i]->pgain() = this->ee_K[i];
+      this->aikEEPositionConstraint[i]->dgain() = this->ee_D[i];
+      this->aikEEPositionConstraint[i]->B_localpos() = gaitParam.abcEETargetPose[i];
+      this->aikEEPositionConstraint[i]->B_localvel() = gaitParam.abcEETargetVel[i];
+      this->aikEEPositionConstraint[i]->ref_acc() = gaitParam.abcEETargetAcc[i];
+      this->aikEEPositionConstraint[i]->weight() = 0.3 * cnoid::Vector6::Ones();
+      ikConstraint3.push_back(this->aikEEPositionConstraint[i]); // low prioritiy
     }
   }
 
   {
     // task: COM to target
-    this->comConstraint->A_robot() = actRobotTqc;
-    this->comConstraint->pgain().setZero(); // footguidedで計算された加速をそのまま使う
-    this->comConstraint->dgain().setZero(); // footguidedで計算された加速をそのまま使う
-    this->comConstraint->ref_acc() = tgtCogAcc; // footguidedで計算された加速をそのまま使う
-    this->comConstraint->weight() << 3.0, 3.0, 0.3; // 0.1, wn=1e-4だと、wnに負けて不正確になる
-    ikConstraint2.push_back(this->comConstraint);
+    this->aikComConstraint->A_robot() = actRobotTqc;
+    this->aikComConstraint->pgain().setZero(); // footguidedで計算された加速をそのまま使う
+    this->aikComConstraint->dgain().setZero(); // footguidedで計算された加速をそのまま使う
+    this->aikComConstraint->ref_acc() = tgtCogAcc; // footguidedで計算された加速をそのまま使う
+    this->aikComConstraint->weight() << 3.0, 3.0, 0.3; // 0.1, wn=1e-4だと、wnに負けて不正確になる
+    ikConstraint2.push_back(this->aikComConstraint);
   }
   {
     // root
-    this->rootPositionConstraint->A_link() = actRobotTqc->rootLink();
-    this->rootPositionConstraint->B_link() = nullptr;
-    this->rootPositionConstraint->pgain().head<3>().setZero(); // 傾きのみ
-    this->rootPositionConstraint->pgain().tail<3>() = this->root_K;
-    this->rootPositionConstraint->dgain().head<3>().setZero(); // 傾きのみ
-    this->rootPositionConstraint->dgain().tail<3>() = this->root_D;
-    this->rootPositionConstraint->B_localpos() = gaitParam.refRobot->rootLink()->T();
-    this->rootPositionConstraint->B_localvel().tail<3>() = gaitParam.refRobot->rootLink()->w();
-    this->rootPositionConstraint->ref_acc().tail<3>() = gaitParam.refRobot->rootLink()->dw();
-    this->rootPositionConstraint->eval_link() = actRobotTqc->rootLink(); // local 座標系でerrorやgainを評価
-    this->rootPositionConstraint->weight().head<3>().setZero(); // 傾きのみ
-    this->rootPositionConstraint->weight().tail<3>() = 0.3 * cnoid::Vector3::Ones();
-    ikConstraint2.push_back(this->rootPositionConstraint);
+    this->aikRootPositionConstraint->A_link() = actRobotTqc->rootLink();
+    this->aikRootPositionConstraint->B_link() = nullptr;
+    this->aikRootPositionConstraint->pgain().head<3>().setZero(); // 傾きのみ
+    this->aikRootPositionConstraint->pgain().tail<3>() = this->root_K;
+    this->aikRootPositionConstraint->dgain().head<3>().setZero(); // 傾きのみ
+    this->aikRootPositionConstraint->dgain().tail<3>() = this->root_D;
+    this->aikRootPositionConstraint->B_localpos() = gaitParam.refRobot->rootLink()->T();
+    this->aikRootPositionConstraint->B_localvel().tail<3>() = gaitParam.refRobot->rootLink()->w();
+    this->aikRootPositionConstraint->ref_acc().tail<3>() = gaitParam.refRobot->rootLink()->dw();
+    this->aikRootPositionConstraint->eval_link() = actRobotTqc->rootLink(); // local 座標系でerrorやgainを評価
+    this->aikRootPositionConstraint->weight().head<3>().setZero(); // 傾きのみ
+    this->aikRootPositionConstraint->weight().tail<3>() = 0.3 * cnoid::Vector3::Ones();
+    ikConstraint2.push_back(this->aikRootPositionConstraint);
   }
 
   std::vector<std::shared_ptr<aik_constraint::IKConstraint> > ikConstraint4;
   {
     // task: angular momentum to zero
-    this->angularMomentumConstraint->robot() = actRobotTqc;
-    this->angularMomentumConstraint->weight() << 0.1, 0.1, 0.1; // yaw旋回歩行するときのために、Zは小さく. rollとpitchも、joint angle taskの方を優先したほうがよい
-    ikConstraint4.push_back(this->angularMomentumConstraint);
+    this->aikAngularMomentumConstraint->robot() = actRobotTqc;
+    this->aikAngularMomentumConstraint->weight() << 0.1, 0.1, 0.1; // yaw旋回歩行するときのために、Zは小さく. rollとpitchも、joint angle taskの方を優先したほうがよい
+    ikConstraint4.push_back(this->aikAngularMomentumConstraint);
   }
   {
     // task: joint angle to target
     for(int i=0;i<actRobotTqc->numJoints();i++){
       if(!gaitParam.jointControllable[i]) continue;
-      this->refJointAngleConstraint[i]->joint() = actRobotTqc->joint(i);
-      this->refJointAngleConstraint[i]->targetq() = gaitParam.refRobot->joint(i)->q();
-      this->refJointAngleConstraint[i]->targetdq() = gaitParam.refRobot->joint(i)->dq();
-      this->refJointAngleConstraint[i]->ref_acc() = gaitParam.refRobot->joint(i)->ddq();
-      this->refJointAngleConstraint[i]->pgain() = this->joint_K * std::pow(this->dqWeight[i].value(), 2);
-      this->refJointAngleConstraint[i]->maxAccByPosError() = 3.0;
-      this->refJointAngleConstraint[i]->dgain() = this->joint_D * this->dqWeight[i].value();
-      this->refJointAngleConstraint[i]->maxAccByVelError() = 10.0;
-      this->refJointAngleConstraint[i]->weight() = 0.3 * this->dqWeight[i].value();
-      ikConstraint4.push_back(this->refJointAngleConstraint[i]);
+      this->aikRefJointAngleConstraint[i]->joint() = actRobotTqc->joint(i);
+      this->aikRefJointAngleConstraint[i]->targetq() = gaitParam.refRobot->joint(i)->q();
+      this->aikRefJointAngleConstraint[i]->targetdq() = gaitParam.refRobot->joint(i)->dq();
+      this->aikRefJointAngleConstraint[i]->ref_acc() = gaitParam.refRobot->joint(i)->ddq();
+      this->aikRefJointAngleConstraint[i]->pgain() = this->joint_K * std::pow(this->aikdqWeight[i].value(), 2);
+      this->aikRefJointAngleConstraint[i]->maxAccByPosError() = 3.0;
+      this->aikRefJointAngleConstraint[i]->dgain() = this->joint_D * this->aikdqWeight[i].value();
+      this->aikRefJointAngleConstraint[i]->maxAccByVelError() = 10.0;
+      this->aikRefJointAngleConstraint[i]->weight() = 0.3 * this->aikdqWeight[i].value();
+      ikConstraint4.push_back(this->aikRefJointAngleConstraint[i]);
     }
   }
 
@@ -265,7 +282,7 @@ bool Stabilizer::calcResolvedAccelerationControl(const GaitParam& gaitParam, dou
   param.we = 1e-6;
   bool solved = prioritized_acc_inverse_kinematics_solver::solveAIK(variables,
                                                                     constraints,
-                                                                    tasks,
+                                                                    aikTasks,
                                                                     param);
   return true;
 }
