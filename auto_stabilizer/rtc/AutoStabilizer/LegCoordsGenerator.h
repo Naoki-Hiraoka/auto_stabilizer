@@ -29,9 +29,6 @@ public:
   void calcLegCoords(const GaitParam& gaitParam, double dt, bool useActStates,
                      std::vector<footguidedcontroller::LinearTrajectory<cnoid::Vector3> >& o_refZmpTraj, std::vector<cpp_filters::TwoPointInterpolatorSE3>& o_genCoords, std::vector<GaitParam::SwingState_enum>& o_swingState) const;
 
-  void calcCOMCoords(const GaitParam& gaitParam, double dt,
-                     cnoid::Vector3& o_genNextCog, cnoid::Vector3& o_genNextCogVel, cnoid::Vector3& o_genNextCogAcc) const;
-
   void calcEETargetPose(const GaitParam& gaitParam, double dt,
                         std::vector<cnoid::Position>& o_abcEETargetPose, std::vector<cnoid::Vector6>& o_abcEETargetVel, std::vector<cnoid::Vector6>& o_abcEETargetAcc) const;
 

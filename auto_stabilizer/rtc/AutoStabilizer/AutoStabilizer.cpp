@@ -340,9 +340,6 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
   // init Stabilizer
   this->stabilizer_.init(this->gaitParam_, this->gaitParam_.actRobotTqc, this->gaitParam_.genRobot);
 
-  // init FullbodyIKSolver
-  this->fullbodyIKSolver_.init(this->gaitParam_.genRobot, this->gaitParam_);
-
   // initialize parameters
   this->loop_ = 0;
 
@@ -589,7 +586,7 @@ bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam
 }
 
 // static function
-bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode, GaitParam& gaitParam, double dt, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ActToGenFrameConverter& actToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer, const ExternalForceHandler& externalForceHandler, const FullbodyIKSolver& fullbodyIKSolver,const LegManualController& legManualController, const CmdVelGenerator& cmdVelGenerator) {
+bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode, GaitParam& gaitParam, double dt, const FootStepGenerator& footStepGenerator, const LegCoordsGenerator& legCoordsGenerator, const RefToGenFrameConverter& refToGenFrameConverter, const ActToGenFrameConverter& actToGenFrameConverter, const ImpedanceController& impedanceController, const Stabilizer& stabilizer, const ExternalForceHandler& externalForceHandler, const LegManualController& legManualController, const CmdVelGenerator& cmdVelGenerator) {
   if(mode.isSyncToABCInit()){ // startAutoBalancer直後の初回. gaitParamのリセット
     refToGenFrameConverter.initGenRobot(gaitParam,
                                         gaitParam.genRobot, gaitParam.footMidCoords, gaitParam.genCog, gaitParam.genCogVel, gaitParam.genCogAcc);
@@ -637,19 +634,13 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
                                   gaitParam.footstepNodesList);
   legCoordsGenerator.calcLegCoords(gaitParam, dt, mode.isSTRunning(),
                                    gaitParam.refZmpTraj, gaitParam.genCoords, gaitParam.swingState);
-  legCoordsGenerator.calcCOMCoords(gaitParam, dt,
-                                   gaitParam.genCog, gaitParam.genCogVel, gaitParam.genCogAcc);
   legCoordsGenerator.calcEETargetPose(gaitParam, dt,
                                       gaitParam.abcEETargetPose, gaitParam.abcEETargetVel, gaitParam.abcEETargetAcc);
 
   // Stabilizer
   stabilizer.execStabilizer(gaitParam, dt, mode.isSTRunning(),
                             gaitParam.debugData, //for log
-                            gaitParam.actRobotTqc, gaitParam.genRobot);
-
-  // FullbodyIKSolver
-  fullbodyIKSolver.solveFullbodyIK(dt, gaitParam,// input
-                                   gaitParam.genRobot); // output
+                            gaitParam.actRobotTqc, gaitParam.genRobot, gaitParam.genCog, gaitParam.genCogVel, gaitParam.genCogAcc);
 
   return true;
 }
@@ -659,30 +650,28 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
   if(mode.isSyncToABC()){
     if(mode.isSyncToABCInit()){
       idleToAbcTransitionInterpolator.reset(0.0);
+      idleToAbcTransitionInterpolator.setGoal(1.0,mode.remainTime());
     }
-    idleToAbcTransitionInterpolator.setGoal(1.0,mode.remainTime());
-    idleToAbcTransitionInterpolator.interpolate(dt);
   }else if(mode.isSyncToIdle()){
     if(mode.isSyncToIdleInit()){
       idleToAbcTransitionInterpolator.reset(1.0);
+      idleToAbcTransitionInterpolator.setGoal(0.0,mode.remainTime());
     }
-    idleToAbcTransitionInterpolator.setGoal(0.0,mode.remainTime());
-    idleToAbcTransitionInterpolator.interpolate(dt);
   }
+  idleToAbcTransitionInterpolator.interpolate(dt);
 
-  if(mode.isSyncToABC()){
-    if(mode.isSyncToABCInit()){
+  if(mode.isSyncToST()){
+    if(mode.isSyncToSTInit()){
       abcToStTransitionInterpolator.reset(0.0);
+      abcToStTransitionInterpolator.setGoal(1.0,mode.remainTime());
     }
-    abcToStTransitionInterpolator.setGoal(1.0,mode.remainTime());
-    abcToStTransitionInterpolator.interpolate(dt);
-  }else if(mode.isSyncToIdle()){
-    if(mode.isSyncToIdleInit()){
+  }else if(mode.isSyncToStopST()){
+    if(mode.isSyncToStopSTInit()){
       abcToStTransitionInterpolator.reset(1.0);
+      abcToStTransitionInterpolator.setGoal(0.0,mode.remainTime());
     }
-    abcToStTransitionInterpolator.setGoal(0.0,mode.remainTime());
-    abcToStTransitionInterpolator.interpolate(dt);
   }
+  abcToStTransitionInterpolator.interpolate(dt);
 
   {
     // q
@@ -721,17 +710,12 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
         double value = gaitParam.refRobotRaw->joint(i)->u() * (1.0 - ratio);
         if(std::isfinite(value)) ports.m_genTau_.data[i] = value;
         else std::cerr << "m_genTau is not finite!" << std::endl;
-      }else if(mode.now() == AutoStabilizer::ControlMode::MODE_ABC){
-        ports.m_genTau_.data[i] = 0.0;
-      }else if(mode.isSyncToST() || mode.isSyncToStopST()){
-        double ratio = abcToStTransitionInterpolator.value();
-        double value = gaitParam.actRobotTqc->joint(i)->u() * ratio;
-        if(std::isfinite(value)) ports.m_genTau_.data[i] = value;
-        else std::cerr << "m_genTau is not finite!" << std::endl;
-      }else{
+      }else if(mode.isSTRunning()){
         double value = gaitParam.actRobotTqc->joint(i)->u();
         if(std::isfinite(value)) ports.m_genTau_.data[i] = value;
         else std::cerr << "m_genTau is not finite!" << std::endl;
+      }else{
+        ports.m_genTau_.data[i] = 0.0; // stopST補間中は、tauを少しずつ0に減らして行きたくなるが、吹っ飛ぶことがあるので一気に0にした方が安全
       }
     }
     ports.m_genTauOut_.write();
@@ -997,7 +981,6 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
   this->gaitParam_.update(this->dt_);
   this->refToGenFrameConverter_.update(this->dt_);
   this->stabilizer_.update(this->dt_);
-  this->fullbodyIKSolver_.update(this->dt_);
 
   if(this->mode_.isABCRunning()) {
     if(this->mode_.isSyncToABCInit()){ // startAutoBalancer直後の初回. 内部パラメータのリセット
@@ -1009,9 +992,8 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
       this->impedanceController_.reset();
       this->legCoordsGenerator_.reset();
       this->stabilizer_.reset();
-      this->fullbodyIKSolver_.reset();
     }
-    AutoStabilizer::execAutoStabilizer(this->mode_, this->gaitParam_, this->dt_, this->footStepGenerator_, this->legCoordsGenerator_, this->refToGenFrameConverter_, this->actToGenFrameConverter_, this->impedanceController_, this->stabilizer_,this->externalForceHandler_, this->fullbodyIKSolver_, this->legManualController_, this->cmdVelGenerator_);
+    AutoStabilizer::execAutoStabilizer(this->mode_, this->gaitParam_, this->dt_, this->footStepGenerator_, this->legCoordsGenerator_, this->refToGenFrameConverter_, this->actToGenFrameConverter_, this->impedanceController_, this->stabilizer_,this->externalForceHandler_, this->legManualController_, this->cmdVelGenerator_);
   }
 
   AutoStabilizer::writeOutPortData(this->ports_, this->mode_, this->idleToAbcTransitionInterpolator_, this->abcToStTransitionInterpolator_, this->dt_, this->gaitParam_);
@@ -1532,11 +1514,10 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
       if(value != this->stabilizer_.aikdqWeight[i].getGoal()) this->stabilizer_.aikdqWeight[i].setGoal(value, 2.0); // 2秒で遷移
     }
   }
-
-  if(i_param.dq_weight.length() == this->fullbodyIKSolver_.dqWeight.size()){
-    for(int i=0;i<this->fullbodyIKSolver_.dqWeight.size();i++){
+  if(i_param.dq_weight.length() == this->stabilizer_.ikdqWeight.size()){
+    for(int i=0;i<this->stabilizer_.ikdqWeight.size();i++){
       double value = std::max(0.01, i_param.dq_weight[i]);
-      if(value != this->fullbodyIKSolver_.dqWeight[i].getGoal()) this->fullbodyIKSolver_.dqWeight[i].setGoal(value, 2.0); // 2秒で遷移
+      if(value != this->stabilizer_.ikdqWeight[i].getGoal()) this->stabilizer_.ikdqWeight[i].setGoal(value, 2.0); // 2秒で遷移
     }
   }
 
@@ -1749,9 +1730,9 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
     i_param.st_dq_weight[i] = this->stabilizer_.aikdqWeight[i].getGoal();
   }
 
-  i_param.dq_weight.length(this->fullbodyIKSolver_.dqWeight.size());
-  for(int i=0;i<this->fullbodyIKSolver_.dqWeight.size();i++){
-    i_param.dq_weight[i] = this->fullbodyIKSolver_.dqWeight[i].getGoal();
+  i_param.dq_weight.length(this->stabilizer_.ikdqWeight.size());
+  for(int i=0;i<this->stabilizer_.ikdqWeight.size();i++){
+    i_param.dq_weight[i] = this->stabilizer_.ikdqWeight[i].getGoal();
   }
 
   return true;

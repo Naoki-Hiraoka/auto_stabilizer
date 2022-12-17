@@ -125,7 +125,7 @@ protected:
 public:
   bool execStabilizer(const GaitParam& gaitParam, double dt, bool useActState,
                       GaitParam::DebugData& debugData, //for Log
-                      cnoid::BodyPtr& actRobotTqc, cnoid::BodyPtr& genRobot) const;
+                      cnoid::BodyPtr& actRobotTqc, cnoid::BodyPtr& genRobot, cnoid::Vector3& o_genNextCog, cnoid::Vector3& o_genNextCogVel, cnoid::Vector3& o_genNextCogAcc) const;
 
 protected:
   bool calcCogAcc(const GaitParam& gaitParam, double dt, bool useActState,

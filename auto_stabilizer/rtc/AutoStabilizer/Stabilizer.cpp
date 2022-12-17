@@ -6,7 +6,7 @@
 
 bool Stabilizer::execStabilizer(const GaitParam& gaitParam, double dt, bool useActState,
                                 GaitParam::DebugData& debugData, //for Log
-                                cnoid::BodyPtr& actRobotTqc, cnoid::BodyPtr& genRobot) const{
+                                cnoid::BodyPtr& actRobotTqc, cnoid::BodyPtr& genRobot, cnoid::Vector3& o_genNextCog, cnoid::Vector3& o_genNextCogVel, cnoid::Vector3& o_genNextCogAcc) const{
   /* useActStateがtrueなら、
        - actRobotTqcはフィードバックによって次の周期の目標加速度・目標トルクが入る
        - genRobotはactRobotの値に緩やかに従う
@@ -57,6 +57,10 @@ bool Stabilizer::execStabilizer(const GaitParam& gaitParam, double dt, bool useA
   // useActState==false: genRobotの自重と加速に要する力と、manipulation arm/legのrefForceに釣り合うように、目標支持脚反力を計算. actRobotTqcのuは0.
   this->calcWrench(gaitParam, genNextForce, useActState,// input
                    debugData.stEETargetWrench, actRobotTqc); // output
+
+  o_genNextCog = genNextCog;
+  o_genNextCogVel = genNextCogVel;
+  o_genNextCogAcc = genNextCogAcc;
 
   return true;
 }
@@ -202,9 +206,7 @@ bool Stabilizer::calcResolvedAccelerationControl(const GaitParam& gaitParam, dou
           gaitParam.footstepNodesList[0].stopCurrentPosition[i])) { // 早付き
         // 加速させない
         this->aikEEPositionConstraint[i]->pgain().setZero();
-        this->aikEEPositionConstraint[i]->B_localvel().setZero();
-        this->aikEEPositionConstraint[i]->dgain() = this->ee_support_D[i]; // 着地の瞬間には脚は速度をもっているので、適切に吸収してやらないと外乱として重心に加わってしまう
-        this->aikEEPositionConstraint[i]->maxAccByVelError() = 20.0 * cnoid::Vector6::Ones();
+        this->aikEEPositionConstraint[i]->dgain().setZero();
         this->aikEEPositionConstraint[i]->ref_acc().setZero();
         this->aikEEPositionConstraint[i]->weight() = 3.0 * cnoid::Vector6::Ones();
         ikConstraint2.push_back(this->aikEEPositionConstraint[i]);
@@ -538,7 +540,7 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& ge
     for(int i = 0;i<gaitParam.eeName.size();i++){
       tgtSupWrench.head<3>() -= tgtEEManipWrench[i].head<3>();
       tgtSupWrench.tail<3>() -= tgtEEManipWrench[i].tail<3>();
-      tgtSupWrench.tail<3>() -= (gaitParam.abcEETargetPose[i].translation()-gaitParam.genRobot->centerOfMass()).cross(tgtEEManipWrench[i].tail<3>());
+      tgtSupWrench.tail<3>() -= (gaitParam.abcEETargetPose[i].translation()-gaitParam.genCog).cross(tgtEEManipWrench[i].tail<3>());
     }
   }
 
