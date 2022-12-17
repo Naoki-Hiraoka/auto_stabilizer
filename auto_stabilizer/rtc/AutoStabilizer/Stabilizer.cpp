@@ -91,7 +91,7 @@ bool Stabilizer::calcZMP(const GaitParam& gaitParam, double dt, bool useActState
   cnoid::Vector3 tgtZmp;
   if(gaitParam.footstepNodesList[0].isSupportPhase[RLEG] || gaitParam.footstepNodesList[0].isSupportPhase[LLEG]){
     tgtZmp = footguidedcontroller::calcFootGuidedControl(gaitParam.omega,gaitParam.l,DCM,gaitParam.refZmpTraj);
-    if(tgtZmp[2] >= gaitParam.actCog[2]) tgtZmp = gaitParam.actCog - cnoid::Vector3(gaitParam.l[0],gaitParam.l[1], 0.0); // 下向きの力は受けられないので
+    if(tgtZmp[2] >= cog[2]) tgtZmp = cog - cnoid::Vector3(gaitParam.l[0],gaitParam.l[1], 0.0); // 下向きの力は受けられないので
     else{
       // truncate zmp inside polygon. actual robotの関節角度を用いて計算する
       std::vector<cnoid::Vector3> vertices; // generate frame. 支持点の集合
@@ -99,11 +99,11 @@ bool Stabilizer::calcZMP(const GaitParam& gaitParam, double dt, bool useActState
         if(!gaitParam.footstepNodesList[0].isSupportPhase[i]) continue;
         for(int j=0;j<gaitParam.legHull[i].size();j++){
           cnoid::Vector3 p = EEPose[i]*gaitParam.legHull[i][j];
-          if(p[2] > gaitParam.actCog[2] - 1e-2) p[2] = gaitParam.actCog[2] - 1e-2; // 重心よりも支持点が高いと射影が破綻するので 
+          if(p[2] > cog[2] - 1e-2) p[2] = cog[2] - 1e-2; // 重心よりも支持点が高いと射影が破綻するので 
           vertices.push_back(p);
         }
       }
-      tgtZmp = mathutil::calcInsidePointOfPolygon3D(tgtZmp,vertices,gaitParam.actCog - cnoid::Vector3(gaitParam.l[0],gaitParam.l[1], 0.0));
+      tgtZmp = mathutil::calcInsidePointOfPolygon3D(tgtZmp,vertices,cog - cnoid::Vector3(gaitParam.l[0],gaitParam.l[1], 0.0));
       // TODO. 角運動量オフセット.
     }
   }else{ // 跳躍期
