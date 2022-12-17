@@ -147,8 +147,6 @@ public:
   std::vector<cnoid::Vector6> abcEETargetAcc; // 要素数と順序はeeNameと同じ.generate frame. endeffector origin. abcで計算された目標加速度
 
   // Stabilizer
-  std::vector<cpp_filters::TwoPointInterpolator<double> > stServoPGainPercentage; // 要素数と順序はrobot->numJoints()と同じ. 0~100. 現状, setGoal(*,dt)以下の時間でgoal指定するとwriteOutPortDataが破綻する
-  std::vector<cpp_filters::TwoPointInterpolator<double> > stServoDGainPercentage; // 要素数と順序はrobot->numJoints()と同じ. 0~100. 現状, setGoal(*,dt)以下の時間でgoal指定するとwriteOutPortDataが破綻する
   cnoid::BodyPtr actRobotTqc; // output. 関節トルク制御用. (actRobotと同じだが、uの値として指令関節トルクが入っている)
 
   // FullbodyIKSolver
@@ -187,8 +185,6 @@ public:
     refRobot->calcForwardKinematics(); refRobot->calcCenterOfMass();
     actRobot = robot->clone();
     actRobot->calcForwardKinematics(); actRobot->calcCenterOfMass();
-    stServoPGainPercentage.resize(robot->numJoints(), cpp_filters::TwoPointInterpolator<double>(100.0, 0.0, 0.0, cpp_filters::LINEAR));
-    stServoDGainPercentage.resize(robot->numJoints(), cpp_filters::TwoPointInterpolator<double>(100.0, 0.0, 0.0, cpp_filters::LINEAR));
     actRobotTqc = robot->clone();
     actRobotTqc->calcForwardKinematics(); actRobotTqc->calcCenterOfMass();
     genRobot = robot->clone();

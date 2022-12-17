@@ -603,8 +603,6 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
                                             gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.dstCoordsOrg, gaitParam.remainTimeOrg, gaitParam.swingState, gaitParam.elapsedTime, gaitParam.prevSupportPhase);
     legCoordsGenerator.initLegCoords(gaitParam,
                                      gaitParam.refZmpTraj, gaitParam.genCoords);
-    stabilizer.initStabilizerOutput(gaitParam,
-                                    gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage);
   }
 
   // FootOrigin座標系を用いてrefRobotRawをgenerate frameに投影しrefRobotとする
@@ -645,15 +643,9 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
                                       gaitParam.abcEETargetPose, gaitParam.abcEETargetVel, gaitParam.abcEETargetAcc);
 
   // Stabilizer
-  if(mode.isSyncToStopSTInit()){ // stopST直後の初回
-    for(int i=0;i<gaitParam.genRobot->numJoints();i++){
-      if(gaitParam.stServoPGainPercentage[i].getGoal() != 100.0) gaitParam.stServoPGainPercentage[i].setGoal(100.0, mode.remainTime());
-      if(gaitParam.stServoDGainPercentage[i].getGoal() != 100.0) gaitParam.stServoDGainPercentage[i].setGoal(100.0, mode.remainTime());
-    }
-  }
   stabilizer.execStabilizer(gaitParam, dt, mode.isSTRunning(),
                             gaitParam.debugData, //for log
-                            gaitParam.actRobotTqc, gaitParam.genRobot, gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage);
+                            gaitParam.actRobotTqc, gaitParam.genRobot);
 
   // FullbodyIKSolver
   fullbodyIKSolver.solveFullbodyIK(dt, gaitParam,// input
@@ -663,7 +655,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
 }
 
 // static function
-bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoStabilizer::ControlMode& mode, cpp_filters::TwoPointInterpolator<double>& idleToAbcTransitionInterpolator, double dt, const GaitParam& gaitParam){
+bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoStabilizer::ControlMode& mode, cpp_filters::TwoPointInterpolator<double>& idleToAbcTransitionInterpolator, cpp_filters::TwoPointInterpolator<double>& abcToStTransitionInterpolator, double dt, const GaitParam& gaitParam){
   if(mode.isSyncToABC()){
     if(mode.isSyncToABCInit()){
       idleToAbcTransitionInterpolator.reset(0.0);
@@ -676,6 +668,20 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
     }
     idleToAbcTransitionInterpolator.setGoal(0.0,mode.remainTime());
     idleToAbcTransitionInterpolator.interpolate(dt);
+  }
+
+  if(mode.isSyncToABC()){
+    if(mode.isSyncToABCInit()){
+      abcToStTransitionInterpolator.reset(0.0);
+    }
+    abcToStTransitionInterpolator.setGoal(1.0,mode.remainTime());
+    abcToStTransitionInterpolator.interpolate(dt);
+  }else if(mode.isSyncToIdle()){
+    if(mode.isSyncToIdleInit()){
+      abcToStTransitionInterpolator.reset(1.0);
+    }
+    abcToStTransitionInterpolator.setGoal(0.0,mode.remainTime());
+    abcToStTransitionInterpolator.interpolate(dt);
   }
 
   {
@@ -712,7 +718,14 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
         else std::cerr << "m_genTau is not finite!" << std::endl;
       }else if(mode.isSyncToABC() || mode.isSyncToIdle()){
         double ratio = idleToAbcTransitionInterpolator.value();
-        double value = gaitParam.refRobotRaw->joint(i)->u() * (1.0 - ratio) + gaitParam.actRobotTqc->joint(i)->u() * ratio;
+        double value = gaitParam.refRobotRaw->joint(i)->u() * (1.0 - ratio);
+        if(std::isfinite(value)) ports.m_genTau_.data[i] = value;
+        else std::cerr << "m_genTau is not finite!" << std::endl;
+      }else if(mode.now() == AutoStabilizer::ControlMode::MODE_ABC){
+        ports.m_genTau_.data[i] = 0.0;
+      }else if(mode.isSyncToST() || mode.isSyncToStopST()){
+        double ratio = abcToStTransitionInterpolator.value();
+        double value = gaitParam.actRobotTqc->joint(i)->u() * ratio;
         if(std::isfinite(value)) ports.m_genTau_.data[i] = value;
         else std::cerr << "m_genTau is not finite!" << std::endl;
       }else{
@@ -810,19 +823,9 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
         // pass
       }else{
         // Stabilizerが動いている間にonDeactivated()->onActivated()が呼ばれると、ゲインがもとに戻らない. onDeactivated()->onActivated()が呼ばれるのはサーボオン直前で、通常、サーボオン時にゲインを指令するので、問題ない.
-        if(gaitParam.stServoPGainPercentage[i].remain_time() > 0.0 && gaitParam.stServoPGainPercentage[i].current_time() <= dt) { // 補間が始まった初回
-          if(std::isfinite(gaitParam.stServoPGainPercentage[i].getGoal()) && std::isfinite(gaitParam.stServoPGainPercentage[i].goal_time())){
-            ports.m_robotHardwareService0_->setServoPGainPercentageWithTime(gaitParam.actRobotTqc->joint(i)->name().c_str(),gaitParam.stServoPGainPercentage[i].getGoal(),gaitParam.stServoPGainPercentage[i].goal_time());
-          }else{
-            std::cerr << "setServoPGainPercentageWithTime is not finite!" << std::endl;
-          }
-        }
-        if(gaitParam.stServoDGainPercentage[i].remain_time() > 0.0 && gaitParam.stServoDGainPercentage[i].current_time() <= dt) { // 補間が始まった初回
-          if(std::isfinite(gaitParam.stServoDGainPercentage[i].getGoal()) && std::isfinite(gaitParam.stServoDGainPercentage[i].goal_time())){
-            ports.m_robotHardwareService0_->setServoDGainPercentageWithTime(gaitParam.actRobotTqc->joint(i)->name().c_str(),gaitParam.stServoDGainPercentage[i].getGoal(),gaitParam.stServoDGainPercentage[i].goal_time());
-          }else{
-            std::cerr << "setServoDGainPercentageWithTime is not finite!" << std::endl;
-          }
+        if(abcToStTransitionInterpolator.remain_time() > 0.0 && abcToStTransitionInterpolator.current_time() <= dt) { // 補間が始まった初回
+          ports.m_robotHardwareService0_->setServoPGainPercentageWithTime(gaitParam.actRobotTqc->joint(i)->name().c_str(),(1.0-abcToStTransitionInterpolator.getGoal())*100.0,abcToStTransitionInterpolator.goal_time());
+          ports.m_robotHardwareService0_->setServoDGainPercentageWithTime(gaitParam.actRobotTqc->joint(i)->name().c_str(),(1.0-abcToStTransitionInterpolator.getGoal())*100.0,abcToStTransitionInterpolator.goal_time());
         }
       }
     }
@@ -1011,7 +1014,7 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
     AutoStabilizer::execAutoStabilizer(this->mode_, this->gaitParam_, this->dt_, this->footStepGenerator_, this->legCoordsGenerator_, this->refToGenFrameConverter_, this->actToGenFrameConverter_, this->impedanceController_, this->stabilizer_,this->externalForceHandler_, this->fullbodyIKSolver_, this->legManualController_, this->cmdVelGenerator_);
   }
 
-  AutoStabilizer::writeOutPortData(this->ports_, this->mode_, this->idleToAbcTransitionInterpolator_, this->dt_, this->gaitParam_);
+  AutoStabilizer::writeOutPortData(this->ports_, this->mode_, this->idleToAbcTransitionInterpolator_, this->abcToStTransitionInterpolator_, this->dt_, this->gaitParam_);
 
   return RTC::RTC_OK;
 }

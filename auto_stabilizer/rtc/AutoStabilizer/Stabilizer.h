@@ -75,6 +75,8 @@ public:
     for(int i=0;i<genRobot->numJoints();i++) ikJointLimitConstraint.push_back(std::make_shared<ik_constraint_joint_limit_table::JointLimitMinMaxTableConstraint>());
     ikSelfCollisionConstraint.clear();
     for(int i=0;i<gaitParam.selfCollision.size();i++) ikSelfCollisionConstraint.push_back(std::make_shared<IK::ClientCollisionConstraint>());
+
+    commandJointAngleFilter.resize(genRobot->numJoints(), cpp_filters::TwoPointInterpolator<double>(0.0, 0.0, 0.0, cpp_filters::HOFFARBIB));
   }
 
   // startAutoBalancer時に一回呼ばれる
@@ -96,7 +98,6 @@ protected:
   mutable std::shared_ptr<prioritized_qp_osqp::Task> tgtTorqueTask_ = std::make_shared<prioritized_qp_osqp::Task>();
   mutable std::shared_ptr<prioritized_qp_osqp::Task> normTask_ = std::make_shared<prioritized_qp_osqp::Task>();
 
-  // Stabilizerでのみ使うキャッシュ
   // 内部にヤコビアンの情報をキャッシュするが、クリアしなくても副作用はあまりない
   // ik
   mutable std::vector<std::shared_ptr<IK::PositionConstraint> > ikEEPositionConstraint; // 要素数と順序はeeNameと同じ.
@@ -107,6 +108,7 @@ protected:
   mutable std::vector<std::shared_ptr<ik_constraint_joint_limit_table::JointLimitMinMaxTableConstraint> > ikJointLimitConstraint;
   mutable std::vector<std::shared_ptr<IK::JointVelocityConstraint> > ikJointVelocityConstraint;
   mutable std::vector<std::shared_ptr<IK::ClientCollisionConstraint> > ikSelfCollisionConstraint;
+  mutable std::vector<std::shared_ptr<prioritized_qp_base::Task> > ikTasks;
   // aik
   mutable std::vector<std::shared_ptr<aik_constraint::PositionConstraint> > aikEEPositionConstraint; // 要素数と順序はeeNameと同じ.
   mutable std::vector<std::shared_ptr<aik_constraint::JointAngleConstraint> > aikRefJointAngleConstraint; // 要素数と順序はrobot->numJoints()と同じ
@@ -116,21 +118,24 @@ protected:
   mutable std::vector<std::shared_ptr<aik_constraint_joint_limit_table::JointLimitMinMaxTableConstraint> > aikJointLimitConstraint;
   mutable std::vector<std::shared_ptr<aik_constraint::ClientCollisionConstraint> > aikSelfCollisionConstraint;
   mutable std::vector<std::shared_ptr<prioritized_qp_base::Task> > aikTasks;
-public:
-  void initStabilizerOutput(const GaitParam& gaitParam,
-                            std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage) const;
 
+  // mode_ST時に、指令関節角度をactual角度に緩やかに従わせるためのフィルター. stがオフのときは今の指令関節角度で毎回リセットされるので、クリアしなくても副作用はあまりない
+  mutable cpp_filters::TwoPointInterpolatorSE3 commandRootPoseFilter = cpp_filters::TwoPointInterpolatorSE3(cnoid::Position::Identity(),cnoid::Vector6::Zero(),cnoid::Vector6::Zero(),cpp_filters::HOFFARBIB);
+  mutable std::vector<cpp_filters::TwoPointInterpolator<double> > commandJointAngleFilter;
+public:
   bool execStabilizer(const GaitParam& gaitParam, double dt, bool useActState,
                       GaitParam::DebugData& debugData, //for Log
-                      cnoid::BodyPtr& actRobotTqc, cnoid::BodyPtr& genRobot, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPgainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDgainPercentage) const;
+                      cnoid::BodyPtr& actRobotTqc, cnoid::BodyPtr& genRobot) const;
 
 protected:
-  bool calcZMP(const GaitParam& gaitParam, double dt, bool useActState,
-               GaitParam::DebugData& debugData, //for Log
-               cnoid::Vector3& o_tgtCogAcc/*generate座標系*/) const;
-  bool calcResolvedAccelerationControl(const GaitParam& gaitParam, double dt, cnoid::Vector3& tgtCogAcc/*generate座標系*/, bool useActState,
-                                       cnoid::BodyPtr& actRobotTqc) const;
-  bool calcWrench(const GaitParam& gaitParam, bool useActState,
+  bool calcCogAcc(const GaitParam& gaitParam, double dt, bool useActState,
+                  GaitParam::DebugData& debugData, //for Log
+                  cnoid::Vector3& o_tgtCogAcc/*generate座標系*/, cnoid::Vector3& o_genNextCog, cnoid::Vector3& o_genNextCogVel, cnoid::Vector3& o_genNextCogAcc, cnoid::Vector3& o_genNextForce) const;
+  bool calcZmp(const GaitParam& gaitParam, const cnoid::Vector3& cog, const cnoid::Vector3& DCM, const std::vector<cnoid::Position>& EEPose, const bool& useSoftLimit,
+               cnoid::Vector3& o_zmp) const;
+  bool calcResolvedAccelerationControl(const GaitParam& gaitParam, double dt, const cnoid::Vector3& tgtCogAcc/*generate座標系*/, const cnoid::Vector3& genNextCog, bool useActState,
+                                       cnoid::BodyPtr& actRobotTqc, cnoid::BodyPtr& o_genRobot) const;
+  bool calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& genNextForce, bool useActState,
                   std::vector<cnoid::Vector6>& o_tgtEEWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/, cnoid::BodyPtr& actRobotTqc) const;
 };
 
