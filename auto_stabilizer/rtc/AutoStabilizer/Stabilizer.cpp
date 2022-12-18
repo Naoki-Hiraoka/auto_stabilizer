@@ -206,7 +206,8 @@ bool Stabilizer::calcResolvedAccelerationControl(const GaitParam& gaitParam, dou
           gaitParam.footstepNodesList[0].stopCurrentPosition[i])) { // 早付き
         // 加速させない
         this->aikEEPositionConstraint[i]->pgain().setZero();
-        this->aikEEPositionConstraint[i]->dgain().setZero();
+        this->aikEEPositionConstraint[i]->B_localvel().setZero();
+        this->aikEEPositionConstraint[i]->dgain() = this->ee_support_D[i];
         this->aikEEPositionConstraint[i]->ref_acc().setZero();
         this->aikEEPositionConstraint[i]->weight() = 3.0 * cnoid::Vector6::Ones();
         ikConstraint2.push_back(this->aikEEPositionConstraint[i]);
@@ -312,7 +313,16 @@ bool Stabilizer::calcResolvedAccelerationControl(const GaitParam& gaitParam, dou
       if(gaitParam.jointControllable[i]){
         this->commandJointAngleFilter[i].setGoal(actRobotTqc->joint(i)->q(), 0.3); // 0.3秒で補間
         this->commandJointAngleFilter[i].interpolate(dt);
-        genRobot->joint(i)->q() = this->commandJointAngleFilter[i].value();
+
+        // limit check
+        cnoid::LinkPtr joint = genRobot->joint(i);
+        double u = gaitParam.genRobot->joint(i)->q_upper();
+        double l = gaitParam.genRobot->joint(i)->q_lower();
+        for(int j=0;j<gaitParam.jointLimitTables[i].size();j++){
+          u = std::min(u,gaitParam.jointLimitTables[i][j]->getUlimit());
+          l = std::max(l,gaitParam.jointLimitTables[i][j]->getLlimit());
+        }
+        joint->q() = std::min(u, std::max(l, this->commandJointAngleFilter[i].value()));
       }else{
         // !jointControllableの関節は指令値をそのまま入れる
         genRobot->joint(i)->q() = gaitParam.refRobot->joint(i)->q();
