@@ -43,10 +43,10 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
     for(int i=0;i<gaitParam.footstepNodesList.size();i++){
       cnoid::Vector3 zmpGoalPos;
 
-      if(gaitParam.footstepNodesList[i].endRefZmpState == GaitParam::FootStepNodes::refZmpState_enum::RLEG){
+      if(gaitParam.footstepNodesList[i].endRefZmpState[RLEG] && !gaitParam.footstepNodesList[i].endRefZmpState[LLEG]){ // 右脚の上にrefZmp
         cnoid::Position rlegGoalCoords = gaitParam.footstepNodesList[i].dstCoords[RLEG]; // このfootstepNode終了時にdstCoordsに行くように線形補間
         zmpGoalPos = rlegGoalCoords.translation() + rlegGoalCoords.linear()*gaitParam.copOffset[RLEG].value();
-      }else if(gaitParam.footstepNodesList[i].endRefZmpState == GaitParam::FootStepNodes::refZmpState_enum::LLEG){
+      }else if(!gaitParam.footstepNodesList[i].endRefZmpState[RLEG] && gaitParam.footstepNodesList[i].endRefZmpState[LLEG]){ // 左脚の上にrefZmp
         cnoid::Position llegGoalCoords = gaitParam.footstepNodesList[i].dstCoords[LLEG]; // このfootstepNode終了時にdstCoordsに行くように線形補間
         zmpGoalPos = llegGoalCoords.translation() + llegGoalCoords.linear()*gaitParam.copOffset[LLEG].value();
       }else{ //gaitParam.footstepNodesList[i].endRefZmpState == GaitParam::FootStepNodes::refZmpState_enum::MIDDLE

@@ -91,7 +91,33 @@ public:
   cnoid::Vector3 cmdVel = cnoid::Vector3::Zero(); // X[m/s] Y[m/s] theta[rad/s]. Z軸はgenerate frame鉛直. support leg frame. 不連続に変化する
 
   // FootStepGenerator
-  class FootStepNodes {
+  /*
+    FootStepActionList[0], [1], [2] ...はそれぞれ、FootStepNodesList[0]終了時, [1]終了時, [2]終了時のタイミングに作用する
+    FootStepActionList.size()==0なら、FootStepNodesListは今のnodeが終了したらその状態で止まる(isStatic)
+
+    FootStepActionList[0]は、原則変更されない.
+    FootStepActionList[0]のdstCoordsやremainTimeが、着地位置時刻修正などによって直接編集される. FootStepActionList[0]のremainTimeが突然0近くに減ることはない(突然FootStepNodesList[0]が終了しFootStepNodesList[1]に移ることはある)ので、FootStepNodesList[0]のremainTimeの時間で補間するようなプログラムは安全
+    FootStepNodesList.size()==1の場合は、FootStepActionList[0]が変更可.
+    FootStepActionListの末尾の要素は、KEEP_PREVIOUS
+  */
+  class FootStepAction { // footstepnode切り替わりのタイミングでの目標
+  public:
+    enum class SupportChange_enum{KEEP_PREVIOUS, STOP_SUPPORT, START_SUPPORT}; // isSupportPhaseがfalseの脚がSTART_SUPPORTになることはない. FootStepActionList末尾の状態で両脚がSUPPORTしていないことはない. FootStepCoomandList末尾は必ず両足ともKEEP_PREVIOUS
+    std::vector<SupportChange_enum> supportChange = std::vector<SupportChange_enum>(NUM_LEGS,SupportChange_enum::KEEP_PREVIOUS); // 要素数2. rleg: 0. lleg: 1. 前のnode終了時のrefZmpの位置.
+    enum class ContactChange_enum{KEEP_PREVIOUS, BREAK_CONTACT, MAKE_CONTACT}; // BREAK_CONTACTならisSupportPhaseがtrue->falseに変わる. MAKE_CONTACTならisSupportPhaseがfalse->trueに変わる. endSupportStateがtrueの脚がBREAK_CONTACTになることはない. FootStepActionList末尾の状態で両脚が浮いていることはない. FootStepCoomandList末尾は必ず両足ともKEEP_PREVIOUS
+    std::vector<ContactChange_enum> contactChange = std::vector<ContactChange_enum>(NUM_LEGS, ContactChange_enum::KEEP_PREVIOUS); // 要素数2. rleg: 0. lleg: 1.
+    double remainTime = 0.0; // 前のnodeの時間
+    std::vector<cnoid::Position> dstCoordsLocal = std::vector<cnoid::Position>(NUM_LEGS,cnoid::Position::Identity()); // 要素数2. rleg: 0. lleg: 1. dstCoordsFrame local. 前のnode終了時の位置.
+    enum class DstCoordsFrame_enum{DST_OPPOSITE_HORIZONTAL, CUR_SELF}; // 左右の足がお互いの足を循環参照することはない. CUR: 現在の足の位置 DSt: dstCoords SRC: 前のnode開始時の足の位置
+    std::vector<DstCoordsFrame_enum> dstCoordsFrame = std::vector<dstCoordsFrame_enum>{DstCoordsFrame_enum::CUR_SELF,DstCoordsFrame_enum::CUR_SELF}; // 要素数2. rleg: 0. lleg: 1.
+
+    std::vector<double> stepHeight = std::vector<double>(NUM_LEGS, 0.0); // 要素数2. rleg: 0. lleg: 0. BREAK_CONTACT, MAKE_CONTACTする場合の脚上げ高さ
+    std::vector<double> touchVel = std::vector<double>(NUM_LEGS, 0.0); // 要素数2. rleg: 0. lleg: 0. MAKE_CONTACTする場合の着地の瞬間の速度
+
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+  };
+  std::vector<FootStepAction> footStepActionList; // 上位から与えられた目標FootStep
+  class FootStepNodes { // footstepの状態を表す
   public:
     /*
       各足につきそれぞれ、remainTime 後に dstCoordsに動く.
@@ -101,7 +127,6 @@ public:
       footstepNodesList[0]は、!footstepNodesList[0].isSupportPhase && footstepNodesList[1].isSupportPhaseの足がある場合に、突然footstepNodesList[1]に遷移する場合がある(footStepGeneratorのearlyTouchDown)
       それ以外には、footstepNodesList[0]のremainTimeが突然0になることはない
       footstepNodesList[1]のisSupportPhaseは、footstepNodesListのサイズが1である場合を除いて変更されない.
-      両足支持期の次のstepのisSupportPhaseを変えたり、後ろに新たにfootstepNodesを追加する場合、必ず両足支持期のremainTimeをそれなりに長い時間にする(片足に重心やrefZmpを移す補間の時間のため)
 
       右脚支持期の直前のnodeのendRefZmpStateはRLEGでなければならない
       右脚支持期のnodeのendRefZmpStateはRLEGでなければならない
@@ -112,16 +137,15 @@ public:
       footstepNodesList[0]のendRefZmpStateは変更されない.
       footstepNodesList[0]のendRefZmpStateは、isStatic()である場合を除いて変更されない.
     */
-    std::vector<cnoid::Position> dstCoords = std::vector<cnoid::Position>(NUM_LEGS,cnoid::Position::Identity()); // 要素数2. rleg: 0. lleg: 1. generate frame.
-    std::vector<bool> isSupportPhase = std::vector<bool>(NUM_LEGS, true); // 要素数2. rleg: 0. lleg: 1. footstepNodesListの末尾の要素が両方falseであることは無い
-    double remainTime = 0.0;
-    enum class refZmpState_enum{RLEG, LLEG, MIDDLE};
-    refZmpState_enum endRefZmpState = refZmpState_enum::MIDDLE; // このnode終了時のrefZmpの位置.
+    std::vector<cnoid::Position> dstCoords = std::vector<cnoid::Position>(NUM_LEGS,cnoid::Position::Identity()); // 要素数2. rleg: 0. lleg: 1. generate frame. このnode終了時の位置.
+    std::vector<bool> isSupportPhase = std::vector<bool>(NUM_LEGS, true); // 要素数2. rleg: 0. lleg: 1. このnode開始時から終了時まで、地面に接触して接触力を発揮しているかどうか. footstepNodesListの末尾の要素が両方falseであることは無い
+    double remainTime = 0.0; // このnodeの残り時間
+    std::vector<bool> endRefZmpState = std::vector<bool>(NUM_LEGS, true); // 要素数2. rleg: 0. lleg: 1. このnode終了時のrefZmpの位置.
 
     // 遊脚軌道用パラメータ
     std::vector<std::vector<double> > stepHeight = std::vector<std::vector<double> >(NUM_LEGS,std::vector<double>(2,0)); // 要素数2. rleg: 0. lleg: 1. swing期には、srcCoordsの高さ+[0]とdstCoordsの高さ+[1]の高い方に上げるような軌道を生成する
     std::vector<bool> stopCurrentPosition = std::vector<bool>(NUM_LEGS, false); // 現在の位置で強制的に止めるかどうか
-    std::vector<double> goalOffset = std::vector<double>(NUM_LEGS,0.0); // [m]. 遊脚軌道生成時に、遅づきの場合、generate frameで鉛直方向に, 目標着地位置に対して加えるオフセットの最大値. 0以下.
+    std::vector<double> goalOffset = std::vector<double>(NUM_LEGS,0.0); // [m]. 遊脚軌道生成時に、遅づきの場合、generate frameで鉛直方向に, 目標着地位置に対して加えるオフセット. 0から始まって少しずつ小さくなっていく. 0以下.
     std::vector<double> touchVel = std::vector<double>(NUM_LEGS,0.3); // 0より大きい. 単位[m/s]. 足を下ろすときの速さ
 
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
