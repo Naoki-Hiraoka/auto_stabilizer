@@ -147,14 +147,21 @@ protected:
   void transformFutureSteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, int index, const cnoid::Vector3& transform/*generate frame*/) const;
   // indexのsupportLegが次にswingするまでの間の位置を、generate frameで(左から)transformだけ動かす
   void transformCurrentSupportSteps(int leg, std::vector<GaitParam::FootStepNodes>& footstepNodesList, int index, const cnoid::Position& transform/*generate frame*/) const;
-  // footstepNodesの次の一歩を作る. RLEGとLLEGどちらをswingすべきかも決める
+
+  GaitParam::FootStepNodes calcDefaultDoubleSupportStep(const GaitParam::FootStepNodes& footstepNodes, double doubleSupportTime, std::vector<bool>& endRefZmpState) const;
+
+  // 一歩足を踏み出す. RLEGとLLEGどちらをswingすべきかも決める
   void calcDefaultNextStep(std::vector<GaitParam::FootStepAction>& footStepActionList, std::vector<GaitParam::FootStepNodes>& footStepNodesList,
                            const GaitParam& gaitParam, const cnoid::Vector3& offset = cnoid::Vector3::Zero() /*leg frame*/, bool stableStart = true) const;
-  // footstepNodesの次の一歩を作る.
-  GaitParam::FootStepNodes calcDefaultSwingStep(const int& swingLeg, const GaitParam::FootStepNodes& footstepNodes, const GaitParam& gaitParam, const cnoid::Vector3& offset = cnoid::Vector3::Zero(), bool startWithSingleSupport = false) const;
-  GaitParam::FootStepNodes calcDefaultDoubleSupportStep(const GaitParam::FootStepNodes& footstepNodes, double doubleSupportTime, std::vector<bool>& endRefZmpState) const;
-  void footStepActionToFootStepNodesList(const GaitParam& gaitParam, double dt, // input
-                                          std::vector<GaitParam::FootStepNodes>& footstepNodesList) const;
+  // swingLegをMAKE_CONTACTさせるActionを作る.
+  void calcDefaultMakeContactAction(const int& swingLeg, std::vector<GaitParam::FootStepAction>& footStepActionList, std::vector<GaitParam::FootStepNodes>& footStepNodesList,const GaitParam& gaitParam, const cnoid::Vector3& offset = cnoid::Vector3::Zero()) const;
+  // targetLegをSTART_SUPPORTさせるActionを作る.
+  void calcDefaultMakeContactAction(const int& targetLeg, std::vector<GaitParam::FootStepAction>& footStepActionList, std::vector<GaitParam::FootStepNodes>& footStepNodesList,const GaitParam& gaitParam) const;
+
+  void footStepActionListToFootStepNodesList(const GaitParam& gaitParam, // input
+                                             std::vector<GaitParam::FootStepNodes>& footstepNodesList) const;
+  // footstepNodesにfootStepActionを行った次のfootstepNodesを返す
+  GaitParam::FootStepNodes footStepActionToFootStepNodes(const GaitParam::FootStepAction& footStepAction, const GaitParam::FootStepNodes& footstepNodes) const;
 };
 
 #endif
