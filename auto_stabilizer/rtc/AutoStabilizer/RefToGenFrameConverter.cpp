@@ -64,7 +64,10 @@ bool RefToGenFrameConverter::convertFrame(const GaitParam& gaitParam, double dt,
   genFootMidCoords.linear() = footMidCoords.value().linear();
   genFootMidCoords.translation() = gaitParam.genCog - gaitParam.l; // 1周期前のlを使っているtが、lは不連続に変化するものではないので良い
   cnoid::Vector3 trans_footMidCoordsLocal = footMidCoords.value().linear().transpose() * (genFootMidCoords.translation() - footMidCoords.value().translation());
-  trans_footMidCoordsLocal[1] *= (1.0 - handFixMode.value());
+  //trans_footMidCoordsLocal[1] *= (1.0 - handFixMode.value());
+  trans_footMidCoordsLocal[0] = 0.0;
+  trans_footMidCoordsLocal[1] = 0.0;
+  trans_footMidCoordsLocal[2] = 0.0;
   genFootMidCoords.translation() = footMidCoords.value().translation() + footMidCoords.value().linear() * trans_footMidCoordsLocal;
 
   // refRobotRawのrefFootMidCoordsを求めてrefRobotに変換する

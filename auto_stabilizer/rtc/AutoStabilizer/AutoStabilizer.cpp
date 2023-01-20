@@ -997,6 +997,8 @@ RTC::ReturnCode_t AutoStabilizer::onDeactivated(RTC::UniqueId ec_id){
 RTC::ReturnCode_t AutoStabilizer::onFinalize(){ return RTC::RTC_OK; }
 
 bool AutoStabilizer::goPos(const double& x, const double& y, const double& th){
+  std::cerr << "goPos is not supported" << std::endl;
+  return false;
   std::lock_guard<std::mutex> guard(this->mutex_);
   if(this->mode_.isABCRunning()){
     if(std::isfinite(x) && std::isfinite(y) && std::isfinite(th)){
@@ -1011,6 +1013,8 @@ bool AutoStabilizer::goPos(const double& x, const double& y, const double& th){
   }
 }
 bool AutoStabilizer::goVelocity(const double& vx, const double& vy, const double& vth){
+  std::cerr << "goVelocity is not supported" << std::endl;
+  return false;
   std::lock_guard<std::mutex> guard(this->mutex_);
   if(this->mode_.isABCRunning()){
     if(std::isfinite(vx) && std::isfinite(vy) && std::isfinite(vth)){
@@ -1391,7 +1395,8 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
   this->footStepGenerator_.defaultDoubleSupportRatio = std::min(std::max(i_param.default_double_support_ratio, 0.01), 0.99);
   this->footStepGenerator_.defaultStepHeight = std::max(i_param.default_step_height, 0.0);
   this->footStepGenerator_.goVelocityStepNum = std::max(i_param.go_velocity_step_num, 1);
-  this->footStepGenerator_.isModifyFootSteps = i_param.modify_footsteps;
+  //this->footStepGenerator_.isModifyFootSteps = i_param.modify_footsteps;
+  this->footStepGenerator_.isModifyFootSteps = false;
   this->footStepGenerator_.overwritableRemainTime = std::max(i_param.overwritable_remain_time, std::max(i_param.swing_trajectory_delay_time_offset, 0.0));
   this->footStepGenerator_.overwritableMinTime = std::max(i_param.overwritable_min_time, 0.01);
   this->footStepGenerator_.overwritableMinStepTime = std::max(i_param.overwritable_min_step_time, 0.01);
