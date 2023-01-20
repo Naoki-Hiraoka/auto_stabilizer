@@ -38,7 +38,7 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
   std::vector<footguidedcontroller::LinearTrajectory<cnoid::Vector3> > refZmpTraj = gaitParam.refZmpTraj;
   {
     refZmpTraj.clear();
-    refZmpTraj.push_back(footguidedcontroller::LinearTrajectory<cnoid::Vector3>(gaitParam.refRobot->centerOfMass()-gaitParam.l,gaitParam.refRobot->centerOfMass()-gaitParam.l,0.0));
+    refZmpTraj.push_back(footguidedcontroller::LinearTrajectory<cnoid::Vector3>(gaitParam.refRobot->centerOfMass()-gaitParam.l-gaitParam.sbpOffset,gaitParam.refRobot->centerOfMass()-gaitParam.l-gaitParam.sbpOffset,0.0));
     cnoid::Vector3 refZmp = refZmpTraj[0].getStart(); // for文中の現在のrefzmp
   //   refZmpTraj.clear();
   //   // footstepNodesListのサイズが1, footstepNodesList[0].remainTimeが0のときに、copOffsetのパラメータが滑らかに変更になる場合がある. それに対応できるように
