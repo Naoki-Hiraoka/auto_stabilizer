@@ -570,7 +570,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
     impedanceController.initImpedanceOutput(gaitParam,
                                             gaitParam.icEEOffset);
     footStepGenerator.initFootStepNodesList(gaitParam,
-                                            gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.dstCoordsOrg, gaitParam.remainTimeOrg, gaitParam.swingState, gaitParam.elapsedTime, gaitParam.prevSupportPhase);
+                                            gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.dstCoordsOrg, gaitParam.remainTimeOrg, gaitParam.swingState, gaitParam.isLandingGainPhase, gaitParam.elapsedTime, gaitParam.prevSupportPhase);
     legCoordsGenerator.initLegCoords(gaitParam,
                                      gaitParam.refZmpTraj, gaitParam.genCoords);
     stabilizer.initStabilizerOutput(gaitParam,
@@ -603,12 +603,12 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
 
   // AutoBalancer
   footStepGenerator.procFootStepNodesList(gaitParam, dt, mode.isSTRunning(),
-                                          gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.dstCoordsOrg, gaitParam.remainTimeOrg, gaitParam.swingState, gaitParam.elapsedTime, gaitParam.prevSupportPhase, gaitParam.relLandingHeight);
+                                          gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.dstCoordsOrg, gaitParam.remainTimeOrg, gaitParam.swingState, gaitParam.isLandingGainPhase, gaitParam.elapsedTime, gaitParam.prevSupportPhase, gaitParam.relLandingHeight);
   footStepGenerator.calcFootSteps(gaitParam, dt, mode.isSTRunning(),
                                   gaitParam.debugData, //for log
-                                  gaitParam.footstepNodesList);
+                                  gaitParam.footstepNodesList, gaitParam.swingState);
   legCoordsGenerator.calcLegCoords(gaitParam, dt, mode.isSTRunning(),
-                                   gaitParam.refZmpTraj, gaitParam.genCoords, gaitParam.swingState);
+                                   gaitParam.refZmpTraj, gaitParam.genCoords, gaitParam.swingState, gaitParam.isLandingGainPhase);
   legCoordsGenerator.calcCOMCoords(gaitParam, dt,
                                    gaitParam.genCog, gaitParam.genCogVel, gaitParam.genCogAcc);
   for(int i=0;i<gaitParam.eeName.size();i++){
@@ -902,16 +902,10 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
     ports.m_genCoordsOut_.write();
     {
       ports.m_captureRegion_.tm = ports.m_qRef_.tm;
-      int sum = 0;
-      for (int i=0; i<gaitParam.debugData.capturableHulls.size(); i++) sum+=gaitParam.debugData.capturableHulls[i].size();
-      ports.m_captureRegion_.data.length(sum*2);
-      int index = 0;
-      for (int i=0; i<gaitParam.debugData.capturableHulls.size(); i++) {
-        for (int j=0; j<gaitParam.debugData.capturableHulls[i].size(); j++) {
-          ports.m_captureRegion_.data[index+0] = gaitParam.debugData.capturableHulls[i][j][0];
-          ports.m_captureRegion_.data[index+1] = gaitParam.debugData.capturableHulls[i][j][1];
-          index+=2;
-        }
+      ports.m_captureRegion_.data.length(gaitParam.debugData.reachableCaptureRegionHull.size()*2);
+      for (int i=0; i<gaitParam.debugData.reachableCaptureRegionHull.size(); i++) {
+        ports.m_captureRegion_.data[i*2+0] = gaitParam.debugData.reachableCaptureRegionHull[i][0];
+        ports.m_captureRegion_.data[i*2+1] = gaitParam.debugData.reachableCaptureRegionHull[i][1];
       }
       ports.m_captureRegionOut_.write();
     }
@@ -1445,9 +1439,9 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
   this->footStepGenerator_.touchVel = std::max(i_param.swing_trajectory_touch_vel, 0.001);
   if(!this->mode_.isABCRunning() || this->gaitParam_.isStatic()) this->footStepGenerator_.goalOffset = std::min(i_param.goal_offset, 0.0);
 
-  this->legCoordsGenerator_.delayTimeOffset = std::max(i_param.swing_trajectory_delay_time_offset, 0.0);
+  this->gaitParam_.delayTimeOffset = std::max(i_param.swing_trajectory_delay_time_offset, 0.0);
   this->legCoordsGenerator_.finalDistanceWeight = std::max(i_param.swing_trajectory_final_distance_weight, 0.01);
-  this->legCoordsGenerator_.previewStepNum = std::max(i_param.preview_step_num, 2);
+  this->legCoordsGenerator_.previewStepNum = std::max(i_param.preview_step_num, 1);
   this->legCoordsGenerator_.footGuidedBalanceTime = std::max(i_param.footguided_balance_time, 0.01);
 
   if(i_param.eefm_body_attitude_control_gain.length() == 2 &&
@@ -1658,7 +1652,7 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
   i_param.goal_offset = this->footStepGenerator_.goalOffset;
   i_param.swing_trajectory_touch_vel = this->footStepGenerator_.touchVel;
 
-  i_param.swing_trajectory_delay_time_offset = this->legCoordsGenerator_.delayTimeOffset;
+  i_param.swing_trajectory_delay_time_offset = this->gaitParam_.delayTimeOffset;
   i_param.swing_trajectory_final_distance_weight = this->legCoordsGenerator_.finalDistanceWeight;
   i_param.preview_step_num = this->legCoordsGenerator_.previewStepNum;
   i_param.footguided_balance_time = this->legCoordsGenerator_.footGuidedBalanceTime;
