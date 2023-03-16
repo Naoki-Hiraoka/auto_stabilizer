@@ -179,4 +179,12 @@ ServoState:
   data:
     - { log: RobotHardware0_servoState, column: [0-33] }
 
+genCoordsVel:
+  func: plot_vel
+  data:
+    - { log: ast_genCoordsOut, column: [0-11] }
 
+genCoordsAcc:
+  func: plot_acc
+  data:
+    - { log: ast_genCoordsOut, column: [0-11] }

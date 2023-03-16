@@ -59,8 +59,13 @@
   <node pkg="auto_stabilizer_ros_bridge" name="AutoStabilizerROSBridge" type="AutoStabilizerROSBridgeComp"
         output="screen" args ='-o "corba.master_manager:localhost:2810" -o "corba.nameservers:localhost:15005" -o "naming.formats:%n.rtc" -o "exec_cxt.periodic.rate:500"' />
   <rtconnect from="ast.rtc:landingTargetOut" to="AutoStabilizerROSBridge.rtc:landingTargetIn" subscription_type="new"/>
+  <rtconnect from="ast.rtc:legOdomOut" to="AutoStabilizerROSBridge.rtc:legOdomIn" subscription_type="new"/>
+  <rtconnect from="ast.rtc:actZmpOut" to="AutoStabilizerROSBridge.rtc:actZmpIn" subscription_type="new"/>
+  <rtconnect from="ast.rtc:tgtZmpOut" to="AutoStabilizerROSBridge.rtc:tgtZmpIn" subscription_type="new"/>
+  <rtconnect from="ast.rtc:actCogOut" to="AutoStabilizerROSBridge.rtc:actCogIn" subscription_type="new"/>
   <rtconnect from="ast.rtc:steppableRegionIn" to="AutoStabilizerROSBridge.rtc:steppableRegionOut" subscription_type="new"/>
   <rtconnect from="ast.rtc:landingHeightIn" to="AutoStabilizerROSBridge.rtc:landingHeightOut" subscription_type="new"/>
+  <rtconnect from="ast.rtc:wheelVelIn" to="AutoStabilizerROSBridge.rtc:wheelVelOut" subscription_type="new"/>
   <rtactivate component="AutoStabilizerROSBridge.rtc" />
   <!-- steppable region END -->
 

@@ -98,6 +98,8 @@ class JAXON_RED_HrpsysConfigurator(ChoreonoidHrpsysConfigurator):
             rtm.connectPorts(rtm.findRTC("ast").port("actCogOut"),rtm.findRTC("log").port("ast_actCogOut"))
             self.log_svc.add("TimedPoint3D","ast_actDcmOut")
             rtm.connectPorts(rtm.findRTC("ast").port("actDcmOut"),rtm.findRTC("log").port("ast_actDcmOut"))
+            self.log_svc.add("TimedPoint3D","ast_actZmpOut")
+            rtm.connectPorts(rtm.findRTC("ast").port("actZmpOut"),rtm.findRTC("log").port("ast_actZmpOut"))
             self.log_svc.add("TimedDoubleSeq","ast_dstLandingPosOut")
             rtm.connectPorts(rtm.findRTC("ast").port("dstLandingPosOut"),rtm.findRTC("log").port("ast_dstLandingPosOut"))
             self.log_svc.add("TimedDoubleSeq","ast_remainTimeOut")
@@ -114,6 +116,8 @@ class JAXON_RED_HrpsysConfigurator(ChoreonoidHrpsysConfigurator):
             rtm.connectPorts(rtm.findRTC("ast").port("strideLimitationHullOut"),rtm.findRTC("log").port("ast_strideLimitationHullOut"))
             self.log_svc.add("TimedDoubleSeq","ast_cpViewerLogOut")
             rtm.connectPorts(rtm.findRTC("ast").port("cpViewerLogOut"),rtm.findRTC("log").port("ast_cpViewerLogOut"))
+            self.log_svc.add("TimedPoint3D","ast_legDistanceOut")
+            rtm.connectPorts(rtm.findRTC("ast").port("legDistanceOut"),rtm.findRTC("log").port("ast_legDistanceOut"))
             for ee in ["rleg", "lleg", "rarm", "larm"]:
                 self.log_svc.add("TimedDoubleSeq","ast_tgt" + ee + "WrenchOut")
                 rtm.connectPorts(rtm.findRTC("ast").port("tgt" + ee + "WrenchOut"),rtm.findRTC("log").port("ast_tgt" + ee + "WrenchOut"))

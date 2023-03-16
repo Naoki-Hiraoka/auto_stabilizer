@@ -6,6 +6,7 @@ set(CMAKE_BUILD_TYPE Release)
 add_definitions(-Wno-deprecated)
 
 find_package(catkin REQUIRED COMPONENTS
+  tf
   roscpp
   auto_stabilizer_msgs)
 

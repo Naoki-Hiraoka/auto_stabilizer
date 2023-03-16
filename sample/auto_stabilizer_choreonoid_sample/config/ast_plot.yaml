@@ -24,6 +24,9 @@ ast_actCogOut:
 ast_actDcmOut:
   data:
     - { log: ast_actDcmOut, column: [0-2] }
+ast_actZmpOut:
+  data:
+    - { log: ast_actZmpOut, column: [0-2] }
 ast_dstLandingPosOut:
   data:
     - { log: ast_dstLandingPosOut, column: [0-5] }
@@ -33,6 +36,9 @@ ast_remainTimeOut:
 ast_genCoordsOut:
   data:
     - { log: ast_genCoordsOut, column: [0-11] }
+ast_legDistanceOut:
+  data:
+    - { log: ast_legDistanceOut, column: [0-2] }
 
 ast_tgtrlegWrenchOut:
   data:

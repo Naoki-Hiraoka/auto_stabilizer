@@ -11,29 +11,30 @@ public:
   double defaultStepTime = 0.8; // [s]. goPosやgoVelocityのときに自動生成されるfootstepの一歩の時間. 0より大きい
   std::vector<double> defaultStrideLimitationMaxTheta = std::vector<double>{0.261799,0.785398}; // 要素数2. rleg: 0. lleg: 1. leg frame. [rad]. goPosやgoVelocityのときに自動生成されるfootstepの上限. 支持脚相対. default 15,45[deg]. 0以上. 足裏同士の干渉は自動で回避できるが、膝同士の干渉はIK以外では回避できないので、内股方向には小さくすること.
   std::vector<double> defaultStrideLimitationMinTheta = std::vector<double>{-0.785398,-0.261799}; // 要素数2. rleg: 0. lleg: 1. leg frame. [rad]. goPosやgoVelocityのときに自動生成されるfootstepの下限. 支持脚相対. default 15,45[deg]. 0以下. 足裏同士の干渉は自動で回避できるが、膝同士の干渉はIK以外では回避できないので、内股方向には小さくすること.
-  std::vector<std::vector<cnoid::Vector3> > defaultStrideLimitationHull = std::vector<std::vector<cnoid::Vector3> >{std::vector<cnoid::Vector3>{cnoid::Vector3(0.15,-0.18,0),cnoid::Vector3(-0.15,-0.18,0),cnoid::Vector3(-0.15,-0.35,0),cnoid::Vector3(0.15,-0.35,0)},std::vector<cnoid::Vector3>{cnoid::Vector3(0.15,0.35,0),cnoid::Vector3(-0.15,0.35,0),cnoid::Vector3(-0.15,0.18,0),cnoid::Vector3(0.15,0.18,0)}}; // 要素数2. 0: rleg用, 1: lleg用. 単位[m]. goPosやgoVelocityのときに自動生成されるfootstepの、遊脚のエンドエフェクタの着地位置の範囲の凸包. 反対の脚のEndEffector frame(Z軸は鉛直)で表現した着地可能領域(自己干渉やIKの考慮が含まれる). あったほうが扱いやすいのでZ成分があるが、Z成分は0でないといけない. 凸形状で,上から見て半時計回り. thetaの影響はlegHullとlegCollisionMarginを用いて別で評価されるので、defaultStrideLimitationHullでは考慮しなくて良い. 左右方向にsteppable regionをまたぐ場合は、これのY成分が大きくないと後ろ足がまたげない
-  double defaultDoubleSupportRatio = 0.15; // defaultStepTimeのうちの、両足支持期の時間の割合. 0より大きく1未満
+  std::vector<std::vector<cnoid::Vector3> > defaultStrideLimitationHull = std::vector<std::vector<cnoid::Vector3> >{std::vector<cnoid::Vector3>{cnoid::Vector3(0.25,-0.18,0),cnoid::Vector3(-0.25,-0.18,0),cnoid::Vector3(-0.25,-0.45,0),cnoid::Vector3(0.25,-0.45,0)},std::vector<cnoid::Vector3>{cnoid::Vector3(0.25,0.35,0),cnoid::Vector3(-0.25,0.35,0),cnoid::Vector3(-0.25,0.18,0),cnoid::Vector3(0.25,0.18,0)}}; // 要素数2. 0: rleg用, 1: lleg用. 単位[m]. goPosやgoVelocityのときに自動生成されるfootstepの、遊脚のエンドエフェクタの着地位置の範囲の凸包. 反対の脚のEndEffector frame(Z軸は鉛直)で表現した着地可能領域(自己干渉やIKの考慮が含まれる). あったほうが扱いやすいのでZ成分があるが、Z成分は0でないといけない. 凸形状で,上から見て半時計回り. thetaの影響はlegHullとlegCollisionMarginを用いて別で評価されるので、defaultStrideLimitationHullでは考慮しなくて良い. 左右方向にsteppable regionをまたぐ場合は、これのY成分が大きくないと後ろ足がまたげない
+  double defaultDoubleSupportRatio = 0.2; // defaultStepTimeのうちの、両足支持期の時間の割合. 0より大きく1未満
   double defaultStepHeight = 0.05; // goPosやgoVelocityのときに自動生成されるfootstepの足上げ高さ[m]. 0以上
   unsigned int goVelocityStepNum = 6; // goVelocity中にfootStepNodesListの将来の何ステップぶんを常に生成するか. 1以上
   bool isModifyFootSteps = true; // 着地位置時間修正を行うかどうか
-  double overwritableRemainTime = 0.2; // 0以上. 単位[s]. 次indexまでの残り時間がこの値を下回っている場合、着地位置時間修正を行わない. DOWN_PHASEのときにfootstepNodesList[0]のdstCoordsはgenCoordsよりも高い位置に変更されることがないようにするために、LegCoordsGeneratorのdelayTimeOffset以上の値にせよ.
-  double overwritableMinTime = 0.3; // 0より大きい. 単位[s]. 次indexまでの残り時間がこの値を下回るようには着地時間修正を行わない. もともと下回っている場合には、その値を下回るようには着地時間修正を行わない. これが無いと脚を空中から下ろす時間が足りなくて急激に動く
-  double overwritableMinStepTime = 0.6; // 0より大きい. 単位[s]. 現index開始時からの経過時間がこの値を下回るようには着地時間修正を行わない. もともと下回っている場合には、その値を下回るようには着地時間修正を行わない. これが無いと脚を地面から上げて下ろす時間が足りなくて急激に動く
-  double overwritableMaxStepTime = 2.0; // overwritableMinStepTimeより大きい. 単位[s]. 現index開始時からの経過時間がこの値を上回るようには着地時間修正を行わない. もともと上回っている場合には、その値を上回るようには着地時間修正を行わない. これが無いと、DCMが片足のcopとほぼ一致しているときに、ずっと脚を浮かせたまま止まってしまう.
+  double overwritableRemainTime = 0.20; // 0以上. 単位[s]. 次indexまでの残り時間がこの値を下回っている場合、着地位置時間修正を行わない. DOWN_PHASEのときにfootstepNodesList[0]のdstCoordsはgenCoordsよりも高位置に変更されることがないようにするために、LegCoordsGeneratorのdelayTimeOffset以上の値にせよ.
+  double overwritableMinTime = 0.25; // 0より大きい. 単位[s]. 次indexまでの残り時間がこの値を下回るようには着地時間修正を行わない. もともと下回っている場合には、その値を下回るようには着地時間修正を行わない. これが無いと脚を空中から下ろす時間が足りなくて急激に動く
+  double overwritableMinStepTime = 0.6; // 0より大きい. 単位[s]. 現index開始時からの経過時間がこの値を下回るようには着地時間修正を行わない. もともと下回っている場合には、その値を下回るようには着地時間修正行わない. これが無いと脚を地面から上げて下ろす時間が足りなくて急激に動く
+  double overwritableMaxStepTime = 2.0; // overwritableMinStepTimeより大きい. 単位[s]. 現index開始時からの経過時間がこの値を上回るようには着地時間修正を行わない. もともと上回っている場合には、その値を上回ようには着地時間修正を行わない. これが無いと、DCMが片足のcopとほぼ一致しているときに、ずっと脚を浮かせたまま止まってしまう.
   double overwritableMaxSwingVelocity = 1.0; // 0より大きい. 単位[m/s]. 今の遊脚の位置のXYから着地位置のXYまで移動するための速度がこの値を上回るようには着地位置時間修正を行わない
-  std::vector<std::vector<cnoid::Vector3> > safeLegHull = std::vector<std::vector<cnoid::Vector3> >(2, std::vector<cnoid::Vector3>{cnoid::Vector3(0.075,0.055,0.0),cnoid::Vector3(-0.075,0.055,0.0),cnoid::Vector3(-0.075,-0.055,0.0),cnoid::Vector3(0.075,-0.055,0.0)}); // 要素数2. rleg: 0. lleg: 1. leg frame. 単位[m]. 凸形状で,上から見て半時計回り. Z成分はあったほうが計算上扱いやすいからありにしているが、0でなければならない. 大きさはgaitParam.legHull以下
+  double swingXYMarginTime = 0.05; //早着きに備えるためのマージン
+  std::vector<std::vector<cnoid::Vector3> > safeLegHull = std::vector<std::vector<cnoid::Vector3> >(2, std::vector<cnoid::Vector3>{cnoid::Vector3(0.075,0.055,0.0),cnoid::Vector3(-0.075,0.055,0.0),cnoid::Vector3(-0.075,-0.055,0.0),cnoid::Vector3(0.075,-0.055,0.0)}); // 要素数2. rleg: 0. lleg: 1. leg frame. 単位[m]. 凸形状で,上から見て半時計回り. 左前、左後、右後、右前の順番．Z成分はあったほうが計算上扱いやすいからありにしているが、0でなければならない. 大きさはgaitParam.legHull以下
   std::vector<double>  overwritableStrideLimitationMaxTheta = std::vector<double>{0.261799, 1.5708}; // 要素数2. rleg: 0. lleg: 1. leg frame. [rad]. 着地位置修正時に自動生成されるfootstepの上限. 支持脚相対. default 15,90[deg]. 0以上. 現状ではsetFootStepsのリミットとしてしか使われていない. 足裏同士の干渉は自動で回避できるが、膝同士の干渉はIK以外では回避できないので、内股方向には小さくすること.
   std::vector<double>  overwritableStrideLimitationMinTheta = std::vector<double>{-1.5708, -0.261799}; // 要素数2. rleg: 0. lleg: 1. leg frame. [rad]. 着地位置修正時に自動生成されるfootstepの下限. 支持脚相対. default 15,90[deg]. 0以下. 現状ではsetFootStepsのリミットとしてしか使われていない. 足裏同士の干渉は自動で回避できるが、膝同士の干渉はIK以外では回避できないので、内股方向には小さくすること.
-  std::vector<std::vector<cnoid::Vector3> > overwritableStrideLimitationHull = std::vector<std::vector<cnoid::Vector3> >{std::vector<cnoid::Vector3>{cnoid::Vector3(0.35,-0.15,0),cnoid::Vector3(-0.35,-0.15,0),cnoid::Vector3(-0.35,-0.350,0),cnoid::Vector3(-0.20,-0.45,0),cnoid::Vector3(0.20,-0.45,0),cnoid::Vector3(0.35,-0.350,0)},std::vector<cnoid::Vector3>{cnoid::Vector3(0.35,0.350,0),cnoid::Vector3(0.20,0.45,0),cnoid::Vector3(-0.20,0.45,0),cnoid::Vector3(-0.35,0.350,0),cnoid::Vector3(-0.35,0.15,0),cnoid::Vector3(0.35,0.15,0)}}; // 要素数2. 0: rleg用, 1: lleg用. 着地位置修正時に自動生成されるfootstepの上下限の凸包. 反対の脚のEndEffector frame(Z軸は鉛直)で表現した着地可能領域(自己干渉やIKの考慮が含まれる). あったほうが扱いやすいのでZ成分があるが、Z成分は0でないといけない. 凸形状で,上から見て半時計回り. thetaの影響はlegHullとlegCollisionMarginを用いて別で評価されるので、defaultStrideLimitationHullでは考慮しなくて良い. 斜め方向の角を削るなどして、IKが解けるようにせよ. 歩行中は急激に変更されない
+  std::vector<std::vector<cnoid::Vector3> > overwritableStrideLimitationHull = std::vector<std::vector<cnoid::Vector3> >{std::vector<cnoid::Vector3>{cnoid::Vector3(0.50,-0.20,0),cnoid::Vector3(-0.50,-0.20,0),cnoid::Vector3(-0.50,-0.40,0),cnoid::Vector3(-0.20,-0.50,0),cnoid::Vector3(0.20,-0.50,0),cnoid::Vector3(0.50,-0.40,0)},std::vector<cnoid::Vector3>{cnoid::Vector3(0.50,0.40,0),cnoid::Vector3(0.20,0.50,0),cnoid::Vector3(-0.20,0.50,0),cnoid::Vector3(-0.50,0.40,0),cnoid::Vector3(-0.50,0.20,0),cnoid::Vector3(0.50,0.20,0)}}; // 要素数2. 0: rleg用, 1: lleg用. 着地位置修正時に自動生成されるfootstepの上下限の凸包. 反対の脚のEndEffector frame(Z軸は鉛直)で表現した着地可能領域(自己干渉やIKの考慮が含まれる). あったほうが扱いやすいのでZ成分があるが、Z成分は0でないといけない. 凸形状で,上から見て半時計回り. thetaの影響はlegHullとlegCollisionMarginを用いて別で評価されるので、defaultStrideLimitationHullでは考慮しなくて良い. 斜め方向の角を削るなどして、IKが解けるようにせよ. 歩行中は急激に変更されない
   double overwritableMaxLandingHeight = 0.25; // [m]. 反対の脚のEndEffector frame(Z軸は鉛直)で表現した着地高さの上限(自己干渉やIKの考慮が含まれる).
   double overwritableMinLandingHeight = -0.25; // [m]. 反対の脚のEndEffector frame(Z軸は鉛直)で表現した着地高さの下限(自己干渉やIKの考慮が含まれる). overwritableMaxLandingHeight以下.
   double overwritableMaxGenGroundZVelocity = 0.5; // [m/s]. genCoords(のgoal)からdstCoordsまでの高さの差がこの速度を超えないように、remainTimeを長くする. 0より大きい. touchVelと同じくらい?
   double overwritableMaxSrcGroundZVelocity = 0.14; // [m/s]. srcCoordsからdstCoordsまでの高さの差がこの速度を超えないように、一歩の時間(現index開始時からの経過時間)を長くする. 0より大きい. 0.2m登るときに一歩あたり1.4sくらい?
   double contactDetectionThreshold = 25.0; // [N]. generate frameで遊脚が着地時に鉛直方向にこの大きさ以上の力を受けたら接地とみなして、EarlyTouchDown処理を行う. 実機では25N程度がよい?
   double contactModificationThreshold = 0.02; // [m]. 早づき・遅づき時に、ずれの大きさがこの値以上の場合に、以降の足の位置をそのぶんだけずらす. 位置制御指令関節角度と実機の角度の差の関係で平らな地面でも常に早づきするため、地面の高さを誤って認識することがないよう、普段はずらさない方が性能が良い. 一方で、ずれが大きい場合には、そのぶんだけずらしたほうが性能が良い. 0以上.
-  double goalOffset = -0.02; // [m]. 遊脚軌道生成時に、次に着地する場合、generate frameで鉛直方向に, 目標着地位置に対して加えるオフセット. 0以下. 歩行中は急激に変更されない. 遅づきに対応するためのもの. 位置制御だと着地の衝撃が大きいので0がよいが、トルク制御時や、高低差がある地形や、衝撃を気にする必要がないシミュレーションでは-0.05等にした方がよい.
+  double goalOffset = -0.08; // [m]. 遊脚軌道生成時に、次に着地する場合、generate frameで鉛直方向に, 目標着地位置に対して加えるオフセット. 0以下. 歩行中は急激に変更されない. 遅づきに対応するためのもの. 位置制御だと着地の衝撃が大きいので0がよいが、トルク制御時や、高低差がある地形や、衝撃を気にする必要がないシミュレーションでは-0.05等にした方がよい.
   double touchVel = 0.3; // 0より大きい. 単位[m/s]. この速さで足を下ろした場合に着地までに要する時間をremainTimeが下回るまで、足下げを始めない. 0.5だと実機では少し速すぎるか?
-  bool isEmergencyStepMode = true; // 現在静止状態で、CapturePointがsafeLegHullの外にあるまたは目標ZMPからemergencyStepCpCheckMargin以上離れているなら、footstepNodesListがemergencyStepNumのサイズになるまで歩くnodeが末尾に入る. (modifyFootSteps=trueのときのみ有効)
+  bool isEmergencyStepMode = false; // 現在静止状態で、CapturePointがsafeLegHullの外にあるまたは目標ZMPからemergencyStepCpCheckMargin以上離れているなら、footstepNodesListがemergencyStepNumのサイズになるまで歩くnodeが末尾に入る. (modifyFootSteps=trueのときのみ有効)
   double emergencyStepCpCheckMargin = 0.05; // [m]. EmergencyStepの閾値. 0以上
   bool isStableGoStopMode = true; // 現在非静止状態で、着地位置修正を行ったなら、footstepNodesListがemergencyStepNumのサイズになるまで歩くnodeが末尾に入る. (modifyFootSteps=trueのときのみ有効)
   unsigned int emergencyStepNum = 6; // 1以上
@@ -43,6 +44,9 @@ public:
 
 protected:
   mutable std::vector<cpp_filters::FirstOrderLowPassFilter<cnoid::Vector6> > actLegWrenchFilter = std::vector<cpp_filters::FirstOrderLowPassFilter<cnoid::Vector6> >(2, cpp_filters::FirstOrderLowPassFilter<cnoid::Vector6>(50.0, cnoid::Vector6::Zero()));  // 要素数2. rleg: 0. lleg: 1. generate frame. endeffector origin. cutoff 50hz. contactDecisionThresholdを用いた接触判定に用いる
+  mutable cnoid::Vector3 destFootstepOffset = cnoid::Vector3::Zero();
+  mutable double stairTime = 0;
+  mutable double steppableHeightError = 0;
 public:
   // startAutoBalancer時に呼ばれる
   void reset(){
@@ -68,7 +72,7 @@ public:
 public:
   // startAutoBalancer直後の初回で呼ばれる
   bool initFootStepNodesList(const GaitParam& gaitParam,
-                             std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<cnoid::Position>& o_dstCoordsOrg, double& o_remainTimeOrg, std::vector<GaitParam::SwingState_enum>& o_swingState, double& o_elapsedTime, std::vector<bool>& o_prevSupportPhase) const;
+                             std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<cnoid::Position>& o_dstCoordsOrg, double& o_remainTimeOrg, std::vector<GaitParam::SwingState_enum>& o_swingState, std::vector<bool>& o_isLandingGainPhase, double& o_elapsedTime, std::vector<bool>& o_prevSupportPhase) const;
 
   class StepNode {
   public:
@@ -108,7 +112,7 @@ public:
 
   // FootStepNodesListをdtすすめる
   bool procFootStepNodesList(const GaitParam& gaitParam, const double& dt, bool useActState,
-                             std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<cnoid::Position>& o_dstCoordsOrg, double& o_remainTimeOrg, std::vector<GaitParam::SwingState_enum>& o_swingState, double& o_elapsedTime, std::vector<bool>& o_prevSupportPhase, double& relLandingHeight) const;
+                             std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<cnoid::Position>& o_srcCoords, std::vector<cnoid::Position>& o_dstCoordsOrg, double& o_remainTimeOrg, std::vector<GaitParam::SwingState_enum>& o_swingState, std::vector<bool>& o_isLandingGainPhase, double& o_elapsedTime, std::vector<bool>& o_prevSupportPhase, double& relLandingHeight, double& wheelVel, cnoid::Vector3& doubleSupportZmpOffset, bool& legOdomUpdateFlag) const;
 
   /*
     footstepNodesList[1]開始時のsupport/swingの状態を上書きによって変更する場合は、footstepNodesList[0]の終了時の状態が両脚支持でかつその期間の時間がdefaultDoubleSupportTimeよりも短いなら延長する
@@ -122,22 +126,30 @@ public:
   */
   bool calcFootSteps(const GaitParam& gaitParam, const double& dt, bool useActState,
                      GaitParam::DebugData& debugData, //for Log
-                     std::vector<GaitParam::FootStepNodes>& o_footstepNodesList) const;
+                     std::vector<GaitParam::FootStepNodes>& o_footstepNodesList, std::vector<GaitParam::SwingState_enum>& o_swingState) const;
 
 protected:
   // 早づきしたらremainTimeをdtに減らしてすぐに次のnodeへ移る. この機能が無いと少しでもロボットが傾いて早づきするとジャンプするような挙動になる.
-  void checkEarlyTouchDown(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const GaitParam& gaitParam, double dt) const;
+  void checkEarlyTouchDown(std::vector<GaitParam::FootStepNodes>& footstepNodesList, cnoid::Vector3& doubleSupportZmpOffset, const GaitParam& gaitParam, double dt) const;
   // stableGoStop.
   void checkStableGoStop(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const GaitParam& gaitParam) const;
   // footstepNodesListをdtだけ進める
   bool goNextFootStepNodesList(const GaitParam& gaitParam, double dt,
-                               std::vector<GaitParam::FootStepNodes>& footstepNodesList, std::vector<cnoid::Position>& srcCoords, std::vector<cnoid::Position>& dstCoordsOrg, double& remainTimeOrg, std::vector<GaitParam::SwingState_enum>& swingState, double& elapsedTime, double& relLandingHeight) const;
+                               std::vector<GaitParam::FootStepNodes>& footstepNodesList, std::vector<cnoid::Position>& srcCoords, std::vector<cnoid::Position>& dstCoordsOrg, double& remainTimeOrg, std::vector<GaitParam::SwingState_enum>& swingState, std::vector<bool>& isLandingGainPhase, double& elapsedTime, double& relLandingHeight, double& wheelVel, bool& legOdomUpdateFlag) const;
   // emergengy step.
   void checkEmergencyStep(std::vector<GaitParam::FootStepNodes>& footstepNodesList, const GaitParam& gaitParam) const;
   // 着地位置・タイミング修正
-  void modifyFootSteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, // input & output
+  void modifyFootSteps(std::vector<GaitParam::FootStepNodes>& footstepNodesList, std::vector<GaitParam::SwingState_enum>& swingState, // input & output
                        GaitParam::DebugData& debugData, //for Log
                        const GaitParam& gaitParam) const;
+  double calcReachableCaptureRegion(std::vector<cnoid::Vector3>& reachableCaptureRegionHull, const double& stepHeight, const cnoid::Vector3& actDCM, const GaitParam& gaitParam, GaitParam::DebugData& debugData) const;
+  double fcp(double t, double omega, double cp, double zmp, double zmpv) const {return std::exp(omega * t) * (cp - (zmp + zmpv/omega)) + (zmp + zmpv * t + zmpv/omega);};
+  double fsw(double t, double tmin, double vmax, double sw) const {return (t - tmin) * vmax + sw;};
+  double dfcp(double t, double omega, double cp, double zmp, double zmpv) const {return omega * std::exp(omega * t) * (cp - (zmp + zmpv/omega)) + zmpv;};
+  double dfsw(double t, double vmax) const {return vmax;};
+  double calc_extTime(double omega, double cp, double zmp, double zmpv, double vmax) const {return std::log((vmax-zmpv)/(omega*(cp - (zmp + zmpv / omega)))) / omega;}; // vmax > zmpv が必要
+  double calcCRMinMaxTime(double& minTime, double& maxTime, double delta, double omega, double cp, double zmp, double zmpv, double tmin, double vmax, double sw) const;
+  double modifyTime(double& retTime, bool& phaseChangeFlag, const double& dstTime, const cnoid::Vector3& _dstPos, const cnoid::Vector3& actDCM, const GaitParam& gaitParam, GaitParam::DebugData& debugData) const; //返り値はエラー番号
 
   // thetaとlegHullとstrideLimitationHullから、実際のstrideLimitationhullを求める. 支持脚(水平)座標系. strideLimitationHullの要素数が1以上なら、返り値も必ず1以上
   std::vector<cnoid::Vector3> calcRealStrideLimitationHull(const int& swingLeg, const double& theta, const std::vector<std::vector<cnoid::Vector3> >& legHull, const std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector3> >& defaultTranslatePos, const std::vector<std::vector<cnoid::Vector3> >& strideLimitationHull) const;

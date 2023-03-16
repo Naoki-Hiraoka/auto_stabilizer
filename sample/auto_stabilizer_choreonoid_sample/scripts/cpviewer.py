@@ -63,12 +63,12 @@ def reshape_list(lst):
     lst = lst*scale+750
     lst = lst.astype(np.int64)
     lst = lst.reshape(int(lst.shape[0]/2), 2)
-    lst += np.array([center_x, center_y])
+    lst += np.array([center_x, -center_y])
     return lst
 
 def reshape_pos(pos):
     global center_x, center_y
-    return (int(pos[0]*scale+750+center_x), int(pos[1]*scale+750+center_y))
+    return (int(pos[0]*scale+750+center_x), int(pos[1]*scale+750-center_y))
 
 args = sys.argv
 
@@ -105,7 +105,7 @@ while True:
     img = np.zeros((1500, 1500, 3))
 
     capture_region = reshape_list(cr_data[i][1:])
-    capture_region = cv2.convexHull(capture_region)
+    #capture_region = cv2.convexHull(capture_region)
 
     steppable_region = []
     index = 1
@@ -128,16 +128,36 @@ while True:
     cv2.circle(img, reshape_pos(landingdata[i][4:6]), 10, (1, 0, 0), -1)
     cv2.circle(img, reshape_pos(gencoordsdata[i][1:3]), 10, (1, 1, 0), -1)
     cv2.circle(img, reshape_pos(gencoordsdata[i][4:6]), 10, (1, 1, 0), -1)
-    cv2.circle(img, reshape_pos(cpviewerdata[i][9:11]), 5, (1, 0, 0.5), -1)
+    cv2.circle(img, reshape_pos(cpviewerdata[i][11:13]), 5, (0.5, 0.5, 0), -1) #RLEG actEEPose
+    cv2.circle(img, reshape_pos(cpviewerdata[i][13:15]), 5, (0.5, 0.5, 0), -1) #LLEG actEEPose
+    cv2.circle(img, reshape_pos(cpviewerdata[i][9:11]), 5, (1, 0, 0.5), -1) #destPos
+    cv2.circle(img, reshape_pos(cpviewerdata[i][15:17]), 10, (1, 1, 0), -1) #root genRobot
+    cv2.circle(img, reshape_pos(cpviewerdata[i][17:19]), 5, (0.5, 0.5, 0), -1) #root actRobot
     #cv2.circle(img, reshape_pos(tmpdata[i][17:19]), 5, (255, 0, 255), -1)
     #cv2.line(img, reshape_pos(tmpdata[i][19:21]), reshape_pos(tmpdata[i][21:23]), (255, 100, 100), 3)
     #for j in range(zmplimit.shape[0]):
     #    cv2.circle(img, (zmplimit[j][0], zmplimit[j][1]), 5, (255, 0, 255), -1)
 
+    img = cv2.flip(img, 0)
     if mode == "play":
         cv2.circle(img, (10, 10), 5, (0, 1, 0), -1)
     elif mode == "stop":
         cv2.circle(img, (10, 10), 5, (0, 0, 1), -1)
+
+    swingstate = ""
+    if cpviewerdata[i][20] == 0:
+        swingstate = "swing"
+    elif cpviewerdata[i][20] == 1:
+        swingstate = "height_fix"
+    elif cpviewerdata[i][20] == 2:
+        swingstate = "down"
+    elif cpviewerdata[i][20] == 3:
+        swingstate = "ground"
+    else:
+        swingstate = str(cpviewerdata[i][20])
+    cv2.putText(img, text=str(cpviewerdata[i][19]), org=(20,40), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.8, color=(1,1,1), thickness=2)
+    cv2.putText(img, text=swingstate, org=(20,70), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.8, color=(1,1,1), thickness=2)
+    cv2.putText(img, str(cpviewerdata[i][21]), org=(20,100), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.8, color=(1,1,1), thickness=2)
     cv2.imshow('img', img)
     cv2.setMouseCallback("img", mousePoints)
     key = cv2.waitKey(1)
@@ -172,7 +192,8 @@ while True:
     elif key == 32:
         mode = "play"
     elif key == 13:
-        print(cpviewerdata[i][0]) #その他cpviewerdataのデバッグ情報表示
+        #print(cpviewerdata[i][0], int(1000* (gencoordsdata[i][1] - cpviewerdata[i][11])), int(1000*(cpviewerdata[i][15] - cpviewerdata[i][17])), int(1000*(gencoordsdata[i][4] - cpviewerdata[i][13])), " : ", int(1000*((cpviewerdata[i][15] - gencoordsdata[i][1]) - (cpviewerdata[i][17] - cpviewerdata[i][11]))), int(1000*((cpviewerdata[i][15] - gencoordsdata[i][4]) - (cpviewerdata[i][17] - cpviewerdata[i][13])))) #その他cpviewerdataのデバッグ情報表示
+        print(cpviewerdata[i][0], cpviewerdata[i][23:41])
     elif key == 27:
         break
     #if key != -1:

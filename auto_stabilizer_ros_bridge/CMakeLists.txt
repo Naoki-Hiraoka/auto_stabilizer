@@ -5,6 +5,7 @@ add_compile_options(-std=c++11)
 set(CMAKE_BUILD_TYPE Release)
 
 find_package(catkin REQUIRED rtmbuild2)
+find_package(catkin REQUIRED COMPONENTS tf)
 
 rtmbuild2_init()
 
@@ -13,6 +14,7 @@ catkin_package(
 #  LIBRARIES auto_stabilizer_tools
 #  CATKIN_DEPENDS auto_stabilizer_msgs roscpp rtmbuild2
 #  DEPENDS system_lib
+  CATKIN_DEPENDS tf
 )
 
 add_subdirectory(rtc)

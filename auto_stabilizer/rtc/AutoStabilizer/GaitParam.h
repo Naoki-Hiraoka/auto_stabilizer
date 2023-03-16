@@ -59,6 +59,9 @@ public:
   double relLandingHeight = -1e15; // generate frame. 現在の遊脚のfootstepNodesList[0]のdstCoordsのZ. -1e10未満なら、relLandingHeightとrelLandingNormalは無視される. footStepNodesListsの次のnodeに移るたびにFootStepGeneratorによって-1e15に上書きされる.
   cnoid::Vector3 relLandingNormal = cnoid::Vector3::UnitZ(); // generate frame. 現在の遊脚のfootstepNodesList[0]のdstCoordsのZ軸の方向. ノルムは常に1
 public:
+  cnoid::Position legOdom = cnoid::Position::Identity();
+  int legOdomSupportLeg = RLEG;
+  bool legOdomUpdateFlag = true;
   // AutoStabilizerの中で計算更新される.
 
   // refToGenFrameConverter
@@ -80,6 +83,7 @@ public:
   cnoid::Vector3 l = cnoid::Vector3(0, 0, refdz); // generate frame. FootGuidedControlで外力を計算するときの、ZMP-重心の相対位置に対するオフセット. また、CMPの計算時にDCMに対するオフセット(CMP + l = DCM). 連続的に変化する.
   cnoid::Vector3 sbpOffset = cnoid::Vector3::Zero(); // generate frame. 外力考慮重心と重心のオフセット. genCog = genRobot->centerOfMass() - sbpOffset. actCog = actRobot->centerOfMass() - sbpOffset.
   cnoid::Vector3 actCog; // generate frame. 現在のCOMにsbpOffsetを施したもの actCog = actRobot->centerOfMass() - sbpOffset
+  cnoid::Vector3 doubleSupportZmpOffset = cnoid::Vector3::Zero();
 
   // ImpedanceController
   std::vector<cpp_filters::TwoPointInterpolator<cnoid::Vector6> > icEEOffset; // 要素数と順序はeeNameと同じ.generate frame. endEffector origin. icで計算されるオフセット
@@ -87,6 +91,8 @@ public:
 
   // CmdVelGenerator
   cnoid::Vector3 cmdVel = cnoid::Vector3::Zero(); // X[m/s] Y[m/s] theta[rad/s]. Z軸はgenerate frame鉛直. support leg frame. 不連続に変化する
+
+  double wheelVel = 0;//車輪速度
 
   // FootStepGenerator
   class FootStepNodes {
@@ -128,19 +134,26 @@ public:
   std::vector<cnoid::Position> srcCoords = std::vector<cnoid::Position>(NUM_LEGS,cnoid::Position::Identity()); // 要素数2. rleg: 0. lleg: 1. generate frame. 現在のfootstep開始時のgenCoords
   std::vector<cnoid::Position> dstCoordsOrg = std::vector<cnoid::Position>(NUM_LEGS,cnoid::Position::Identity()); // 要素数2. rleg: 0. lleg: 1. generate frame. 現在のfootstep開始時のdstCoords
   double remainTimeOrg = 0.0; // 現在のfootstep開始時のremainTime
-  enum SwingState_enum{LIFT_PHASE, SWING_PHASE, DOWN_PHASE};
-  std::vector<SwingState_enum> swingState = std::vector<SwingState_enum>(NUM_LEGS,LIFT_PHASE); // 要素数2. rleg: 0. lleg: 0. isSupportPhase = falseの脚は、footstep開始時はLIFT_PHASEで、LIFT_PHASE->SWING_PHASE->DOWN_PHASEと遷移する. 一度DOWN_PHASEになったら次のfootstepが始まるまで別のPHASEになることはない. DOWN_PHASEのときはfootstepNodesList[0]のdstCoordsはgenCoordsよりも高い位置に変更されることはない. isSupportPhase = trueの脚は、swingStateは参照されない(常にLIFT_PHASEとなる).
+  enum SwingState_enum{SWING_PHASE, HEIGHT_FIX_SWING_PHASE, DOWN_PHASE, GROUND_PHASE};
+  std::vector<SwingState_enum> swingState = std::vector<SwingState_enum>(NUM_LEGS,SWING_PHASE);
+  std::vector<bool> isLandingGainPhase = std::vector<bool>(NUM_LEGS,false);
   double elapsedTime = 0.0; // 現在のfootstep開始時からの経過時間
   std::vector<bool> prevSupportPhase = std::vector<bool>{true, true}; // 要素数2. rleg: 0. lleg: 1. 一つ前の周期でSupportPhaseだったかどうか
 
   // LegCoordsGenerator
   std::vector<cpp_filters::TwoPointInterpolatorSE3> genCoords = std::vector<cpp_filters::TwoPointInterpolatorSE3>(NUM_LEGS, cpp_filters::TwoPointInterpolatorSE3(cnoid::Position::Identity(),cnoid::Vector6::Zero(),cnoid::Vector6::Zero(),cpp_filters::HOFFARBIB)); // 要素数2. rleg: 0. lleg: 1. generate frame. 現在の位置
+  cnoid::Vector3 genCoordsOffsetR = cnoid::Vector3::Zero();
+  cnoid::Vector3 genCoordsOffsetL = cnoid::Vector3::Zero();
+  cnoid::Vector3 genCoordsOffsetRDst = cnoid::Vector3::Zero();
+  cnoid::Vector3 genCoordsOffsetLDst = cnoid::Vector3::Zero();
   std::vector<footguidedcontroller::LinearTrajectory<cnoid::Vector3> > refZmpTraj = {footguidedcontroller::LinearTrajectory<cnoid::Vector3>(cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),0.0)}; // 要素数1以上. generate frame. footstepNodesListを単純に線形補間して計算される現在の目標zmp軌道
 
   cnoid::Vector3 genCog; // generate frame. abcで計算された目標COM
   cnoid::Vector3 genCogVel;  // generate frame.  abcで計算された目標COM速度
   cnoid::Vector3 genCogAcc;  // generate frame.  abcで計算された目標COM加速度
   std::vector<cnoid::Position> abcEETargetPose; // 要素数と順序はeeNameと同じ.generate frame. abcで計算された目標位置姿勢
+  double delayTimeOffset = 0.15; // 0以上. 単位[s]. swing期は、(remainTime - delayTimeOffset)後にdstCoordsに到達するようなrectangle軌道を生成し、その軌道にdelayTimeOffset遅れで滑らかに追従するような軌道を生成する. remainTimeがこの値以下になると、DOWNPHASEになる.
+  cnoid::Vector3 maxSwingVel = cnoid::Vector3{1.5, 1.5, 0.5}; //最大速度
 
   // Stabilizer
   cpp_filters::TwoPointInterpolator<cnoid::Vector3> stOffsetRootRpy = cpp_filters::TwoPointInterpolator<cnoid::Vector3>(cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cnoid::Vector3::Zero(),cpp_filters::LINEAR);; // gaitParam.footMidCoords座標系. stで計算された目標位置姿勢オフセット
@@ -158,8 +171,8 @@ public:
   class DebugData {
   public:
     std::vector<cnoid::Vector3> strideLimitationHull = std::vector<cnoid::Vector3>(); // generate frame. overwritableStrideLimitationHullの範囲内の着地位置(自己干渉・IKの考慮が含まれる). Z成分には0を入れる
-    std::vector<std::vector<cnoid::Vector3> > capturableHulls = std::vector<std::vector<cnoid::Vector3> >(); // generate frame. 要素数と順番はcandidatesに対応
-    std::vector<double> cpViewerLog = std::vector<double>(37, 0.0);
+    std::vector<cnoid::Vector3> reachableCaptureRegionHull = std::vector<cnoid::Vector3>();
+    std::vector<double> cpViewerLog = std::vector<double>(50, 0.0);
   };
   DebugData debugData; // デバッグ用のOutPortから出力するためのデータ. AutoStabilizer内の制御処理では使われることは無い. そのため、モード遷移や初期化等の処理にはあまり注意を払わなくて良い
 
@@ -218,6 +231,9 @@ public:
     steppableHeight.clear();
     relLandingHeight = -1e15;
     relLandingNormal = cnoid::Vector3::UnitZ();
+
+    legOdom = cnoid::Position::Identity();
+    legOdomSupportLeg = RLEG;
   }
 
   // 毎周期呼ばれる. 内部の補間器をdtだけ進める

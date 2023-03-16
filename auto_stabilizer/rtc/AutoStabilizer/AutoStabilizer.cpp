@@ -33,6 +33,7 @@ AutoStabilizer::Ports::Ports() :
   m_selfCollisionIn_("selfCollisionIn", m_selfCollision_),
   m_steppableRegionIn_("steppableRegionIn", m_steppableRegion_),
   m_landingHeightIn_("landingHeightIn", m_landingHeight_),
+  m_wheelVelIn_("wheelVelIn", m_wheelVel_),
 
   m_qOut_("q", m_q_),
   m_genTauOut_("genTauOut", m_genTau_),
@@ -40,6 +41,7 @@ AutoStabilizer::Ports::Ports() :
   m_genBaseTformOut_("genBaseTformOut", m_genBaseTform_),
   m_genImuAccOut_("genImuAccOut", m_genImuAcc_),
   m_landingTargetOut_("landingTargetOut", m_landingTarget_),
+  m_legOdomOut_("legOdomOut", m_legOdom_),
 
   m_genBasePosOut_("genBasePosOut", m_genBasePos_),
   m_genBaseRpyOut_("genBaseRpyOut", m_genBaseRpy_),
@@ -58,6 +60,7 @@ AutoStabilizer::Ports::Ports() :
   m_steppableRegionNumLogOut_("steppableRegionNumLogOut", m_steppableRegionNumLog_),
   m_strideLimitationHullOut_("strideLimitationHullOut", m_strideLimitationHull_),
   m_cpViewerLogOut_("cpViewerLogOut", m_cpViewerLog_),
+  m_legDistanceOut_("legDistanceOut", m_legDistance_),
 
   m_AutoStabilizerServicePort_("AutoStabilizerService"),
 
@@ -84,12 +87,14 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
   this->addInPort("selfCollisionIn", this->ports_.m_selfCollisionIn_);
   this->addInPort("steppableRegionIn", this->ports_.m_steppableRegionIn_);
   this->addInPort("landingHeightIn", this->ports_.m_landingHeightIn_);
+  this->addInPort("wheelVelIn", this->ports_.m_wheelVelIn_);
   this->addOutPort("q", this->ports_.m_qOut_);
   this->addOutPort("genTauOut", this->ports_.m_genTauOut_);
   this->addOutPort("genBasePoseOut", this->ports_.m_genBasePoseOut_);
   this->addOutPort("genBaseTformOut", this->ports_.m_genBaseTformOut_);
   this->addOutPort("genImuAccOut", this->ports_.m_genImuAccOut_);
   this->addOutPort("landingTargetOut", this->ports_.m_landingTargetOut_);
+  this->addOutPort("legOdomOut", this->ports_.m_legOdomOut_);
   this->addOutPort("genBasePosOut", this->ports_.m_genBasePosOut_);
   this->addOutPort("genBaseRpyOut", this->ports_.m_genBaseRpyOut_);
   this->addOutPort("genCogOut", this->ports_.m_genCogOut_);
@@ -107,6 +112,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
   this->addOutPort("steppableRegionNumLogOut", this->ports_.m_steppableRegionNumLogOut_);
   this->addOutPort("strideLimitationHullOut", this->ports_.m_strideLimitationHullOut_);
   this->addOutPort("cpViewerLogOut", this->ports_.m_cpViewerLogOut_);
+  this->addOutPort("legDistanceOut", this->ports_.m_legDistanceOut_);
   this->ports_.m_AutoStabilizerServicePort_.registerProvider("service0", "AutoStabilizerService", this->ports_.m_service0_);
   this->addPort(this->ports_.m_AutoStabilizerServicePort_);
   this->ports_.m_RobotHardwareServicePort_.registerConsumer("service0", "RobotHardwareService", this->ports_.m_robotHardwareService0_);
@@ -337,7 +343,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
 }
 
 // static function
-bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam, const AutoStabilizer::ControlMode& mode, AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobotRaw, cnoid::BodyPtr actRobotRaw, std::vector<cnoid::Vector6>& refEEWrenchOrigin, std::vector<cpp_filters::TwoPointInterpolatorSE3>& refEEPoseRaw, std::vector<GaitParam::Collision>& selfCollision, std::vector<std::vector<cnoid::Vector3> >& steppableRegion, std::vector<double>& steppableHeight, double& relLandingHeight, cnoid::Vector3& relLandingNormal){
+bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam, const AutoStabilizer::ControlMode& mode, AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobotRaw, cnoid::BodyPtr actRobotRaw, std::vector<cnoid::Vector6>& refEEWrenchOrigin, std::vector<cpp_filters::TwoPointInterpolatorSE3>& refEEPoseRaw, std::vector<GaitParam::Collision>& selfCollision, std::vector<std::vector<cnoid::Vector3> >& steppableRegion, std::vector<double>& steppableHeight, double& relLandingHeight, cnoid::Vector3& relLandingNormal, double& wheelVel){
   bool qRef_updated = false;
   if(ports.m_qRefIn_.isNew()){
     ports.m_qRefIn_.read();
@@ -557,6 +563,12 @@ bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam
     }
   }
 
+  if(ports.m_wheelVelIn_.isNew()) {
+    ports.m_wheelVelIn_.read();
+    wheelVel = ports.m_wheelVel_.data;
+    std::cout << "auto_stabilizer wheel vel: " << ports.m_wheelVel_.data << std::endl;
+  }
+
   return qRef_updated;
 }
 
@@ -570,7 +582,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
     impedanceController.initImpedanceOutput(gaitParam,
                                             gaitParam.icEEOffset);
     footStepGenerator.initFootStepNodesList(gaitParam,
-                                            gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.dstCoordsOrg, gaitParam.remainTimeOrg, gaitParam.swingState, gaitParam.elapsedTime, gaitParam.prevSupportPhase);
+                                            gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.dstCoordsOrg, gaitParam.remainTimeOrg, gaitParam.swingState, gaitParam.isLandingGainPhase, gaitParam.elapsedTime, gaitParam.prevSupportPhase);
     legCoordsGenerator.initLegCoords(gaitParam,
                                      gaitParam.refZmpTraj, gaitParam.genCoords);
     stabilizer.initStabilizerOutput(gaitParam,
@@ -603,12 +615,12 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
 
   // AutoBalancer
   footStepGenerator.procFootStepNodesList(gaitParam, dt, mode.isSTRunning(),
-                                          gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.dstCoordsOrg, gaitParam.remainTimeOrg, gaitParam.swingState, gaitParam.elapsedTime, gaitParam.prevSupportPhase, gaitParam.relLandingHeight);
+                                          gaitParam.footstepNodesList, gaitParam.srcCoords, gaitParam.dstCoordsOrg, gaitParam.remainTimeOrg, gaitParam.swingState, gaitParam.isLandingGainPhase, gaitParam.elapsedTime, gaitParam.prevSupportPhase, gaitParam.relLandingHeight, gaitParam.wheelVel, gaitParam.doubleSupportZmpOffset, gaitParam.legOdomUpdateFlag);
   footStepGenerator.calcFootSteps(gaitParam, dt, mode.isSTRunning(),
                                   gaitParam.debugData, //for log
-                                  gaitParam.footstepNodesList);
+                                  gaitParam.footstepNodesList, gaitParam.swingState);
   legCoordsGenerator.calcLegCoords(gaitParam, dt, mode.isSTRunning(),
-                                   gaitParam.refZmpTraj, gaitParam.genCoords, gaitParam.swingState);
+                                   gaitParam.refZmpTraj, gaitParam.genCoords, gaitParam.swingState, gaitParam.isLandingGainPhase);
   legCoordsGenerator.calcCOMCoords(gaitParam, dt,
                                    gaitParam.genCog, gaitParam.genCogVel, gaitParam.genCogAcc);
   for(int i=0;i<gaitParam.eeName.size();i++){
@@ -630,6 +642,29 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
   // FullbodyIKSolver
   fullbodyIKSolver.solveFullbodyIK(dt, gaitParam,// input
                                    gaitParam.genRobot); // output
+
+  //legOdomを計算 TODO べた書きをやめる
+  gaitParam.debugData.cpViewerLog[10] = gaitParam.actEEPose[RLEG].translation()[0];
+  gaitParam.debugData.cpViewerLog[11] = gaitParam.actEEPose[RLEG].translation()[1];
+  gaitParam.debugData.cpViewerLog[12] = gaitParam.actEEPose[LLEG].translation()[0];
+  gaitParam.debugData.cpViewerLog[13] = gaitParam.actEEPose[LLEG].translation()[1];
+  gaitParam.debugData.cpViewerLog[14] = gaitParam.genRobot->rootLink()->T().translation()[0];
+  gaitParam.debugData.cpViewerLog[15] = gaitParam.genRobot->rootLink()->T().translation()[1];
+  gaitParam.debugData.cpViewerLog[16] = gaitParam.actRobot->rootLink()->T().translation()[0];
+  gaitParam.debugData.cpViewerLog[17] = gaitParam.actRobot->rootLink()->T().translation()[1];
+  if (gaitParam.legOdomUpdateFlag == false && gaitParam.elapsedTime >= 0.010 && gaitParam.footstepNodesList.size() >= 2 && gaitParam.footstepNodesList[0].isSupportPhase[RLEG] && gaitParam.footstepNodesList[0].isSupportPhase[LLEG]) {//両足支持期開始時  遊脚開始時だとおかしい
+    cnoid::Position rlegPose = mathutil::orientCoordToAxis(gaitParam.actEEPose[RLEG], cnoid::Vector3::UnitZ());
+    cnoid::Position llegPose = mathutil::orientCoordToAxis(gaitParam.actEEPose[LLEG], cnoid::Vector3::UnitZ());
+    if(gaitParam.legOdomSupportLeg == LLEG && gaitParam.footstepNodesList[1].isSupportPhase[RLEG] && !gaitParam.footstepNodesList[1].isSupportPhase[LLEG]) {
+      gaitParam.legOdom = rlegPose.inverse() * llegPose * gaitParam.legOdom;
+      gaitParam.legOdomSupportLeg = RLEG;
+    }
+    if(gaitParam.legOdomSupportLeg == RLEG && !gaitParam.footstepNodesList[1].isSupportPhase[RLEG] && gaitParam.footstepNodesList[1].isSupportPhase[LLEG]) {
+      gaitParam.legOdom = llegPose.inverse() * rlegPose * gaitParam.legOdom;
+      gaitParam.legOdomSupportLeg = LLEG;
+    }
+    gaitParam.legOdomUpdateFlag = true;
+  }
 
   return true;
 }
@@ -818,6 +853,35 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
     ports.m_landingTargetOut_.write();
   }
 
+  //legOdom
+  if(mode.isABCRunning()) {
+    ports.m_legOdom_.tm = ports.m_qRef_.tm;
+    ports.m_legOdom_.data.length(8);
+
+    cnoid::Position rlegPose = mathutil::orientCoordToAxis(gaitParam.actEEPose[RLEG], cnoid::Vector3::UnitZ());
+    cnoid::Position llegPose = mathutil::orientCoordToAxis(gaitParam.actEEPose[LLEG], cnoid::Vector3::UnitZ());
+
+    cnoid::Position tmp_position;
+    if (gaitParam.legOdomSupportLeg == 0) {
+      tmp_position = gaitParam.actEEPose[RLEG].inverse() * rlegPose * gaitParam.legOdom;
+    } else {
+      tmp_position = gaitParam.actEEPose[LLEG].inverse() * llegPose * gaitParam.legOdom;
+    }
+    ports.m_legOdom_.data[0] = tmp_position.translation()[0];
+    ports.m_legOdom_.data[1] = tmp_position.translation()[1];
+    ports.m_legOdom_.data[2] = tmp_position.translation()[2];
+
+    Eigen::Quaterniond tmp(tmp_position.linear());
+    ports.m_legOdom_.data[3] = tmp.x();
+    ports.m_legOdom_.data[4] = tmp.y();
+    ports.m_legOdom_.data[5] = tmp.z();
+    ports.m_legOdom_.data[6] = tmp.w();
+
+    ports.m_legOdom_.data[7] = gaitParam.legOdomSupportLeg;
+
+    ports.m_legOdomOut_.write();
+  }
+
   // actEEPose actEEWrench (for wholebodymasterslave)
   if(mode.isABCRunning()){
     for(int i=0;i<gaitParam.eeName.size();i++){
@@ -900,18 +964,19 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
       ports.m_genCoords_.data[9+i] = gaitParam.genCoords[LLEG].getGoal().translation()[i];
     }
     ports.m_genCoordsOut_.write();
+    ports.m_legDistance_.tm = ports.m_qRef_.tm;
+    cnoid::Position tmprlegPose = mathutil::orientCoordToAxis(gaitParam.actEEPose[RLEG], cnoid::Vector3::UnitZ());
+    cnoid::Position tmpllegPose = mathutil::orientCoordToAxis(gaitParam.actEEPose[LLEG], cnoid::Vector3::UnitZ());
+    ports.m_legDistance_.data.x = (tmprlegPose.inverse() * tmpllegPose).translation()[0];
+    ports.m_legDistance_.data.y = (tmprlegPose.inverse() * tmpllegPose).translation()[1];
+    ports.m_legDistance_.data.z = (tmprlegPose.inverse() * tmpllegPose).translation()[2];
+    ports.m_legDistanceOut_.write();
     {
       ports.m_captureRegion_.tm = ports.m_qRef_.tm;
-      int sum = 0;
-      for (int i=0; i<gaitParam.debugData.capturableHulls.size(); i++) sum+=gaitParam.debugData.capturableHulls[i].size();
-      ports.m_captureRegion_.data.length(sum*2);
-      int index = 0;
-      for (int i=0; i<gaitParam.debugData.capturableHulls.size(); i++) {
-        for (int j=0; j<gaitParam.debugData.capturableHulls[i].size(); j++) {
-          ports.m_captureRegion_.data[index+0] = gaitParam.debugData.capturableHulls[i][j][0];
-          ports.m_captureRegion_.data[index+1] = gaitParam.debugData.capturableHulls[i][j][1];
-          index+=2;
-        }
+      ports.m_captureRegion_.data.length(gaitParam.debugData.reachableCaptureRegionHull.size()*2);
+      for (int i=0; i<gaitParam.debugData.reachableCaptureRegionHull.size(); i++) {
+        ports.m_captureRegion_.data[i*2+0] = gaitParam.debugData.reachableCaptureRegionHull[i][0];
+        ports.m_captureRegion_.data[i*2+1] = gaitParam.debugData.reachableCaptureRegionHull[i][1];
       }
       ports.m_captureRegionOut_.write();
     }
@@ -964,7 +1029,7 @@ RTC::ReturnCode_t AutoStabilizer::onExecute(RTC::UniqueId ec_id){
   std::string instance_name = std::string(this->m_profile.instance_name);
   this->loop_++;
 
-  if(!AutoStabilizer::readInPortData(this->dt_, this->gaitParam_, this->mode_, this->ports_, this->gaitParam_.refRobotRaw, this->gaitParam_.actRobotRaw, this->gaitParam_.refEEWrenchOrigin, this->gaitParam_.refEEPoseRaw, this->gaitParam_.selfCollision, this->gaitParam_.steppableRegion, this->gaitParam_.steppableHeight, this->gaitParam_.relLandingHeight, this->gaitParam_.relLandingNormal)) return RTC::RTC_OK;  // qRef が届かなければ何もしない
+  if(!AutoStabilizer::readInPortData(this->dt_, this->gaitParam_, this->mode_, this->ports_, this->gaitParam_.refRobotRaw, this->gaitParam_.actRobotRaw, this->gaitParam_.refEEWrenchOrigin, this->gaitParam_.refEEPoseRaw, this->gaitParam_.selfCollision, this->gaitParam_.steppableRegion, this->gaitParam_.steppableHeight, this->gaitParam_.relLandingHeight, this->gaitParam_.relLandingNormal, this->gaitParam_.wheelVel)) return RTC::RTC_OK;  // qRef が届かなければ何もしない
 
   this->mode_.update(this->dt_);
   this->gaitParam_.update(this->dt_);
@@ -1445,9 +1510,9 @@ bool AutoStabilizer::setAutoStabilizerParam(const OpenHRP::AutoStabilizerService
   this->footStepGenerator_.touchVel = std::max(i_param.swing_trajectory_touch_vel, 0.001);
   if(!this->mode_.isABCRunning() || this->gaitParam_.isStatic()) this->footStepGenerator_.goalOffset = std::min(i_param.goal_offset, 0.0);
 
-  this->legCoordsGenerator_.delayTimeOffset = std::max(i_param.swing_trajectory_delay_time_offset, 0.0);
+  this->gaitParam_.delayTimeOffset = std::max(i_param.swing_trajectory_delay_time_offset, 0.0);
   this->legCoordsGenerator_.finalDistanceWeight = std::max(i_param.swing_trajectory_final_distance_weight, 0.01);
-  this->legCoordsGenerator_.previewStepNum = std::max(i_param.preview_step_num, 2);
+  this->legCoordsGenerator_.previewStepNum = std::max(i_param.preview_step_num, 1);
   this->legCoordsGenerator_.footGuidedBalanceTime = std::max(i_param.footguided_balance_time, 0.01);
 
   if(i_param.eefm_body_attitude_control_gain.length() == 2 &&
@@ -1658,7 +1723,7 @@ bool AutoStabilizer::getAutoStabilizerParam(OpenHRP::AutoStabilizerService::Auto
   i_param.goal_offset = this->footStepGenerator_.goalOffset;
   i_param.swing_trajectory_touch_vel = this->footStepGenerator_.touchVel;
 
-  i_param.swing_trajectory_delay_time_offset = this->legCoordsGenerator_.delayTimeOffset;
+  i_param.swing_trajectory_delay_time_offset = this->gaitParam_.delayTimeOffset;
   i_param.swing_trajectory_final_distance_weight = this->legCoordsGenerator_.finalDistanceWeight;
   i_param.preview_step_num = this->legCoordsGenerator_.previewStepNum;
   i_param.footguided_balance_time = this->legCoordsGenerator_.footGuidedBalanceTime;

@@ -7,8 +7,13 @@ main:
       - { key: ast_tgtZmpOut, id: [0]}
       - { key: ast_actCogOut, id: [0]}
       - { key: ast_actDcmOut, id: [0]}
+      - { key: ast_actZmpOut, id: [0]}
       - { key: ast_dstLandingPosOut, id: [0]}
       - { key: ast_dstLandingPosOut, id: [3]}
+      - { key: ast_genCoordsOut, id: [0]}
+      - { key: ast_genCoordsOut, id: [3]}
+      - { key: ast_genCoordsOut, id: [6]}
+      - { key: ast_genCoordsOut, id: [9]}
     bottom_label:
 
   cog zmp Y:
@@ -19,18 +24,19 @@ main:
       - { key: ast_tgtZmpOut, id: [1]}
       - { key: ast_actCogOut, id: [1]}
       - { key: ast_actDcmOut, id: [1]}
+      - { key: ast_actZmpOut, id: [1]}
       - { key: ast_dstLandingPosOut, id: [1]}
       - { key: ast_dstLandingPosOut, id: [4]}
     bottom_label:
 
   cog zmp Z:
     legends:
-      - { key: ast_genCogOut, id: [2]}
-      - { key: ast_genDcmOut, id: [2]}
-      - { key: ast_genZmpOut, id: [2]}
-      - { key: ast_tgtZmpOut, id: [2]}
-      - { key: ast_actCogOut, id: [2]}
-      - { key: ast_actDcmOut, id: [2]}
+      #- { key: ast_genCogOut, id: [2]}
+      #- { key: ast_genDcmOut, id: [2]}
+      #- { key: ast_genZmpOut, id: [2]}
+      #- { key: ast_tgtZmpOut, id: [2]}
+      #- { key: ast_actCogOut, id: [2]}
+      #- { key: ast_actDcmOut, id: [2]}
       - { key: ast_dstLandingPosOut, id: [2]}
       - { key: ast_dstLandingPosOut, id: [5]}
       - { key: ast_genCoordsOut, id: [2]}
@@ -39,7 +45,48 @@ main:
       - { key: ast_genCoordsOut, id: [11]}
     bottom_label:
 
+  swing X:
+    legends:
+      - { key: ast_genCoordsOut, id: [0]}
+      - { key: ast_genCoordsOut, id: [3]}
+      - { key: genCoordsVel, id: [0]}
+      - { key: genCoordsVel, id: [3]}
+      - { key: genCoordsAcc, id: [0]}
+      - { key: genCoordsAcc, id: [3]}
+
+  #swing Y:
+  #  legends:
+  #    - { key: ast_genCoordsOut, id: [1]}
+  #    - { key: ast_genCoordsOut, id: [4]}
+  #    - { key: genCoordsVel, id: [1]}
+  #    - { key: genCoordsVel, id: [4]}
+  #    - { key: genCoordsAcc, id: [1]}
+  #    - { key: genCoordsAcc, id: [4]}
+  #  bottom_label:
+
   remain time:
     legends:
       - { key: ast_remainTimeOut, id: [0]}
     bottom_label:
+
+  LR leg distance:
+    legends:
+      - { key: ast_legDistanceOut, id: [0]}
+      - { key: ast_legDistanceOut, id: [1]}
+      - { key: ast_legDistanceOut, id: [2]}
+    bottom_label:
+
+  #leg 80V:
+  #  legends:
+  #    - { key: 80V, id: [0], label: r-hip-y  }
+  #    - { key: 80V, id: [1], label: r-hip-r  }
+  #    - { key: 80V, id: [2], label: r-hip-p  }
+  #    - { key: 80V, id: [3], label: r-knee-p }
+  #    - { key: 80V, id: [4], label: r-ankle-p}
+  #    - { key: 80V, id: [5], label: r-ankle-r}
+  #    - { key: 80V, id: [6], label: l-hip-y  }
+  #    - { key: 80V, id: [7], label: l-hip-r  }
+  #    - { key: 80V, id: [8], label: l-hip-p  }
+  #    - { key: 80V, id: [9], label: l-knee-p }
+  #    - { key: 80V, id: [10], label: l-ankle-p}
+  #    - { key: 80V, id: [11], label: l-ankle-r}
