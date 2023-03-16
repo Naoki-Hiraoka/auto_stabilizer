@@ -151,6 +151,8 @@ protected:
     RTC::OutPort<RTC::TimedPoint3D> m_actCogOut_; // for log
     RTC::TimedPoint3D m_actDcm_; // Generate World frame
     RTC::OutPort<RTC::TimedPoint3D> m_actDcmOut_; // for log
+    RTC::TimedPoint3D m_actZmp_; // Generate World frame
+    RTC::OutPort<RTC::TimedPoint3D> m_actZmpOut_; // for log
     RTC::TimedDoubleSeq m_dstLandingPos_; // Generate World frame
     RTC::OutPort<RTC::TimedDoubleSeq> m_dstLandingPosOut_; // for log
     RTC::TimedDoubleSeq m_remainTime_;

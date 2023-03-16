@@ -49,6 +49,7 @@ AutoStabilizer::Ports::Ports() :
   m_tgtZmpOut_("tgtZmpOut", m_tgtZmp_),
   m_actCogOut_("actCogOut", m_actCog_),
   m_actDcmOut_("actDcmOut", m_actDcm_),
+  m_actZmpOut_("actZmpOut", m_actZmp_),
   m_dstLandingPosOut_("dstLandingPosOut", m_dstLandingPos_),
   m_remainTimeOut_("remainTimeOut", m_remainTime_),
   m_genCoordsOut_("genCoordsOut", m_genCoords_),
@@ -97,6 +98,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
   this->addOutPort("tgtZmpOut", this->ports_.m_tgtZmpOut_);
   this->addOutPort("actCogOut", this->ports_.m_actCogOut_);
   this->addOutPort("actDcmOut", this->ports_.m_actDcmOut_);
+  this->addOutPort("actZmpOut", this->ports_.m_actZmpOut_);
   this->addOutPort("dstLandingPosOut", this->ports_.m_dstLandingPosOut_);
   this->addOutPort("remainTimeOut", this->ports_.m_remainTimeOut_);
   this->addOutPort("genCoordsOut", this->ports_.m_genCoordsOut_);
@@ -581,7 +583,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
 
   // FootOrigin座標系を用いてactRobotRawをgenerate frameに投影しactRobotとする
   actToGenFrameConverter.convertFrame(gaitParam, dt,
-                                      gaitParam.actRobot, gaitParam.actEEPose, gaitParam.actEEWrench, gaitParam.actCogVel);
+                                      gaitParam.actRobot, gaitParam.actEEPose, gaitParam.actEEWrench, gaitParam.actCogVel, gaitParam.actZmp);
 
   // 目標外力に応じてオフセットを計算する
   externalForceHandler.handleExternalForce(gaitParam, mode.isSTRunning(), dt,
@@ -871,6 +873,11 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
     ports.m_actDcm_.data.y = actDcm[1];
     ports.m_actDcm_.data.z = actDcm[2];
     ports.m_actDcmOut_.write();
+    ports.m_actZmp_.tm = ports.m_qRef_.tm;
+    ports.m_actZmp_.data.x = gaitParam.actZmp[0];
+    ports.m_actZmp_.data.y = gaitParam.actZmp[1];
+    ports.m_actZmp_.data.z = gaitParam.actZmp[2];
+    ports.m_actZmpOut_.write();
     ports.m_dstLandingPos_.tm = ports.m_qRef_.tm;
     ports.m_dstLandingPos_.data.length(6);
     ports.m_dstLandingPos_.data[0] = gaitParam.footstepNodesList[0].dstCoords[RLEG].translation()[0];
