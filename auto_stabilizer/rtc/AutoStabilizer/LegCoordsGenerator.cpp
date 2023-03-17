@@ -89,13 +89,6 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
   std::vector<bool> isLandingGainPhase = gaitParam.isLandingGainPhase;
   for(int leg=0;leg<NUM_LEGS;leg++){
     if(gaitParam.footstepNodesList[0].stopCurrentPosition[leg]){ // for early touch down. 今の位置に止める
-      cnoid::Position tmp = genCoords[leg].value();
-      //for(int i=0;i<3;i++){
-      //  double tmpvel = std::max(-gaitParam.maxSwingVel[i], std::min(gaitParam.maxSwingVel[i], (gaitParam.footstepNodesList[0].dstCoords[leg].translation()[i] - genCoords[leg].value().translation()[i]) / (gaitParam.footstepNodesList[0].remainTime + dt)));
-      //  tmp.translation()[i] += tmpvel * dt;
-      //}
-      //tmp.translation() = (genCoords[leg].value().translation() * (gaitParam.footstepNodesList[0].remainTime/*-dt*/) + gaitParam.footstepNodesList[0].dstCoords[leg].translation() * dt) / (gaitParam.footstepNodesList[0].remainTime + dt);
-      //genCoords[leg].reset(tmp);
       genCoords[leg].reset(genCoords[leg].value());
       continue;
     }
@@ -121,10 +114,10 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
       cnoid::Vector6 goalVel = antecedentVel;
 
       //PHASE移行
-      if ((swingState[leg] == GaitParam::SWING_PHASE || swingState[leg] == GaitParam::HEIGHT_FIX_SWING_PHASE) && antecedentCoords.translation()[2] > dstCoords.translation()[2] && gaitParam.footstepNodesList[0].remainTime - gaitParam.delayTimeOffset <= (antecedentCoords.translation()[2] - dstCoords.translation()[2]) / gaitParam.maxSwingVel[2]) {//足下げ始め
+      if ((swingState[leg] == GaitParam::SWING_PHASE || swingState[leg] == GaitParam::HEIGHT_FIX_SWING_PHASE) && gaitParam.footstepNodesList[0].remainTime - gaitParam.delayTimeOffset <= std::abs(antecedentCoords.translation()[2] - dstCoords.translation()[2]) / gaitParam.maxSwingVel[2])) {//足下げ始め
         swingState[leg] = GaitParam::DOWN_PHASE;
       }
-      if (gaitParam.footstepNodesList[0].remainTime <= gaitParam.delayTimeOffset || (swingState[leg] == GaitParam::DOWN_PHASE && antecedentCoords.translation()[2] < dstCoords.translation()[2])) {
+      if (gaitParam.footstepNodesList[0].remainTime <= gaitParam.delayTimeOffset) {
         swingState[leg] = GaitParam::GROUND_PHASE;
       }
 
@@ -134,20 +127,25 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
       }
 
       //Z
-      if (swingState[leg] == GaitParam::GROUND_PHASE || swingState[leg] == GaitParam::DOWN_PHASE) { //着地位置がdst
-        double tmpvel = 0;
+      if (swingState[leg] == GaitParam::GROUND_PHASE) { // dstの高さにmaxSwingVelで向かう. gaitParam.footstepNodesList[0].remainTimeの時刻にdstの高さになるように速度上限の超過を許容. GROUND_PHASEになる前にdstの高さになっているはずなので、実際は動かない
         if (antecedentCoords.translation()[2] > dstCoords.translation()[2]) {
-          tmpvel = std::min(gaitParam.maxSwingVel[2]*1.1, std::max(-gaitParam.maxSwingVel[2]*1.1, -(antecedentCoords.translation()[2] - dstCoords.translation()[2]) / std::max(dt, gaitParam.footstepNodesList[0].remainTime - gaitParam.delayTimeOffset)));
+          goalPos[2] = std::max(dstCoords.translation()[2], antecedentCoords.translation()[2] - dt*gaitParam.maxSwingVel[2]);
+          double tmpvel = -(antecedentCoords.translation()[2] - dstCoords.translation()[2]) / std::max(dt, gaitParam.footstepNodesList[0].remainTime);
+          goalPos[2] = std::min(goalPos[2], antecedentCoords.translation()[2] + dt*tmpvel);
         }
-        goalPos[2] = goalPos[2] + dt*tmpvel;
-      } else { //着地位置がheight
+        if (antecedentCoords.translation()[2] < dstCoords.translation()[2]) {
+          goalPos[2] = std::min(dstCoords.translation()[2], antecedentCoords.translation()[2] + dt*gaitParam.maxSwingVel[2]);
+          double tmpvel = -(antecedentCoords.translation()[2] - dstCoords.translation()[2]) / std::max(dt, gaitParam.footstepNodesList[0].remainTime);
+          goalPos[2] = std::max(goalPos[2], antecedentCoords.translation()[2] + dt*tmpvel);
+        }
+      }else if (swingState[leg] == GaitParam::DOWN_PHASE) { // gaitParam.footstepNodesList[0].remainTime - gaitParam.delayTimeOffsetの時刻にdstの高さになるように動く
+        double tmpvel = -(antecedentCoords.translation()[2] - dstCoords.translation()[2]) / std::max(dt, gaitParam.footstepNodesList[0].remainTime - gaitParam.delayTimeOffset);
+        goalPos[2] = antecedentCoords.translation()[2] + dt*tmpvel;
+      } else { //heightの高さにmaxSwingVelで向かう
         if (antecedentCoords.translation()[2] > height) {
-          goalPos[2] = goalPos[2] - dt*gaitParam.maxSwingVel[2];
+          goalPos[2] = std::max(height, goalPos[2] - dt*gaitParam.maxSwingVel[2]);
         } else if (antecedentCoords.translation()[2] < height) {
-          goalPos[2] = goalPos[2] + dt*gaitParam.maxSwingVel[2];
-        }
-        if (std::abs(antecedentCoords.translation()[2] - height) < dt*gaitParam.maxSwingVel[2]) {
-          goalPos[2] = height;
+          goalPos[2] = std::min(height, goalPos[2] + dt*gaitParam.maxSwingVel[2]);
         }
       }
 
@@ -155,36 +153,49 @@ void LegCoordsGenerator::calcLegCoords(const GaitParam& gaitParam, double dt, bo
       if (swingState[leg] == GaitParam::SWING_PHASE || swingState[leg] == GaitParam::HEIGHT_FIX_SWING_PHASE) {
         goalVel = (cnoid::Vector6() << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0).finished(); // pはgenerate frame. RはgoalCoords frame.
       } else if (swingState[leg] == GaitParam::DOWN_PHASE){
-        //goalVel = (cnoid::Vector6() << 0.0, 0.0, (gaitParam.footstepNodesList[0].remainTime - gaitParam.delayTimeOffset /*-dt*/) * antecedentVel[2] + dt * (-gaitParam.footstepNodesList[0].touchVel[leg]), 0.0, 0.0, 0.0).finished(); // pはgenerate frame. RはgoalCoords frame.
         goalVel = (cnoid::Vector6() << 0.0, 0.0, 0.9 * antecedentVel[2] + 0.1 * (-gaitParam.footstepNodesList[0].touchVel[leg]), 0.0, 0.0, 0.0).finished();
       } else {
         goalVel = (cnoid::Vector6() << 0.0, 0.0, -gaitParam.footstepNodesList[0].touchVel[leg], 0.0, 0.0, 0.0).finished(); // pはgenerate frame. RはgoalCoords frame.
       }
 
       //XY
-      if (swingState[leg] == GaitParam::GROUND_PHASE) {
-        //GROUND_PHASEではXY方向には動かない
-      } else if (swingState[leg] == GaitParam::SWING_PHASE && antecedentCoords.translation()[2] < airHeight) {
-        //SWING_PHASEでairheightを下回っている時はXY方向には動かない
-      } else {
-        if (gaitParam.footstepNodesList[0].remainTime - (downHeight - dstCoords.translation()[2]) / gaitParam.maxSwingVel[2] - gaitParam.delayTimeOffset > 0) { //通常移動
-          cnoid::Vector3 tmpvel = cnoid::Vector3::Zero();
-          for (int j = 0; j < 2; j++) {
-            tmpvel[j] = std::min(gaitParam.maxSwingVel[j], std::max(-gaitParam.maxSwingVel[j], (dstCoords.translation() - antecedentCoords.translation())[j] / (gaitParam.footstepNodesList[0].remainTime - (downHeight - dstCoords.translation()[2]) / gaitParam.maxSwingVel[2] - gaitParam.delayTimeOffset)));
+      if (swingState[leg] == GaitParam::GROUND_PHASE) { // dstのXYにmaxSwingVelで向かう. gaitParam.footstepNodesList[0].remainTimeの時刻にdstのXYになるように速度上限の超過を許容. GROUND_PHASEになる前にdstのXYになっているはずなので、実際は動かない
+        for (int j = 0; j < 2; j++) {
+          if (antecedentCoords.translation()[j] > dstCoords.translation()[j]) {
+            goalPos[j] = std::max(dstCoords.translation()[j], antecedentCoords.translation()[j] - dt*gaitParam.maxSwingVel[j]);
+            double tmpvel = -(antecedentCoords.translation()[j] - dstCoords.translation()[j]) / std::max(dt, gaitParam.footstepNodesList[0].remainTime);
+            goalPos[j] = std::min(goalPos[j], antecedentCoords.translation()[j] + dt*tmpvel);
           }
-          goalPos.head(2) = goalPos.head(2) + dt*tmpvel.head(2);
-        } else {//通常移動後、着地位置修正のみ
-          for (int j = 0; j < 2; j++) {
-            if (antecedentCoords.translation()[j] > dstCoords.translation()[j]) {
-              goalPos[j] = goalPos[j] - dt*gaitParam.maxSwingVel[j];
-            } else if (antecedentCoords.translation()[j] < dstCoords.translation()[j]) {
-              goalPos[j] = goalPos[j] + dt*gaitParam.maxSwingVel[j];
-            }
-            if (std::abs(antecedentCoords.translation()[j] - dstCoords.translation()[j]) < dt*gaitParam.maxSwingVel[j]) {
-              goalPos[j] = dstCoords.translation()[j];
-            }
+          if (antecedentCoords.translation()[j] < dstCoords.translation()[j]) {
+            goalPos[j] = std::min(dstCoords.translation()[j], antecedentCoords.translation()[j] + dt*gaitParam.maxSwingVel[j]);
+            double tmpvel = -(antecedentCoords.translation()[j] - dstCoords.translation()[j]) / std::max(dt, gaitParam.footstepNodesList[0].remainTime);
+            goalPos[j] = std::max(goalPos[j], antecedentCoords.translation()[j] + dt*tmpvel);
           }
         }
+      } else if (swingState[leg] == GaitParam::DOWN_PHASE && antecedentCoords.translation()[2] < downHeight) { // dstのXYにmaxSwingVelで向かう. gaitParam.footstepNodesList[0].remainTime - gaitParam.delayTimeOffsetの時刻にdstのXYになるように速度上限の超過を許容. downHeight以下の高さになる前にdstのXYになっているはずなので、実際は動かない
+        for (int j = 0; j < 2; j++) {
+          if (antecedentCoords.translation()[j] > dstCoords.translation()[j]) {
+            goalPos[j] = std::max(dstCoords.translation()[j], antecedentCoords.translation()[j] - dt*gaitParam.maxSwingVel[j]);
+            double tmpvel = -(antecedentCoords.translation()[j] - dstCoords.translation()[j]) / std::max(dt, gaitParam.footstepNodesList[0].remainTime - gaitParam.delayTimeOffset);
+            goalPos[j] = std::min(goalPos[j], antecedentCoords.translation()[j] + dt*tmpvel);
+          }
+          if (antecedentCoords.translation()[j] < dstCoords.translation()[j]) {
+            goalPos[j] = std::min(dstCoords.translation()[j], antecedentCoords.translation()[j] + dt*gaitParam.maxSwingVel[j]);
+            double tmpvel = -(antecedentCoords.translation()[j] - dstCoords.translation()[j]) / std::max(dt, gaitParam.footstepNodesList[0].remainTime - gaitParam.delayTimeOffset);
+            goalPos[j] = std::max(goalPos[j], antecedentCoords.translation()[j] + dt*tmpvel);
+          }
+        }
+      } else if (swingState[leg] == GaitParam::SWING_PHASE && antecedentCoords.translation()[2] < airHeight) { //SWING_PHASEでairheightを下回っている時はXY方向には動かない
+        ;
+      } else { // 通常移動. downHeightの高さになる時刻にdstのXYになるように動く. maxSwingVel以下の速度で動く.
+        cnoid::Vector2 tmpvel = mathutil::clampMatrix((dstCoords.translation().head<2>() - antecedentCoords.translation().head<2>()) / std::max(dt, gaitParam.footstepNodesList[0].remainTime - (downHeight - dstCoords.translation()[2]) / gaitParam.maxSwingVel[2] - gaitParam.delayTimeOffset),
+                                                      gaitParam.maxSwingVel.nead<2>());
+);
+        
+        for (int j = 0; j < 2; j++) {
+          tmpvel[j] = std::min(gaitParam.maxSwingVel[j], std::max(-gaitParam.maxSwingVel[j], (dstCoords.translation() - antecedentCoords.translation())[j] / (gaitParam.footstepNodesList[0].remainTime - (downHeight - dstCoords.translation()[2]) / gaitParam.maxSwingVel[2] - gaitParam.delayTimeOffset)));
+        }
+        goalPos.head(2) = goalPos.head(2) + dt*tmpvel.head(2);
       }
 
       //補間を行う
