@@ -295,7 +295,7 @@ bool Stabilizer::calcTorque(double dt, const GaitParam& gaitParam, const std::ve
   actRobotTqc->rootLink()->dw() = cnoid::Vector3::Zero();
   // 各関節
   // １つ前の周期の関節角度、関節角速度を保持
-  static std::vector<double> post_dq(actRobotTqc->numJoints()); // 0で初期化
+  static std::vector<double> prev_dq(actRobotTqc->numJoints()); // 0で初期化
   static bool initialize = true;
   for(int i=0;i<actRobotTqc->numJoints();i++){
     actRobotTqc->joint(i)->q() = gaitParam.actRobot->joint(i)->q();
@@ -304,7 +304,7 @@ bool Stabilizer::calcTorque(double dt, const GaitParam& gaitParam, const std::ve
     if (initialize) {
       actRobotTqc->joint(i)->ddq() = 0.0;
     } else {
-      actRobotTqc->joint(i)->ddq() = 0.00005 * (gaitParam.genRobot->joint(i)->dq() - post_dq[i]) / dt;
+      actRobotTqc->joint(i)->ddq() = (gaitParam.genRobot->joint(i)->dq() - prev_dq[i]) / dt;
     }
 
     // actRobotTqc->joint(i)->dq() = gaitParam.actRobot->joint(i)->dq();
@@ -312,7 +312,7 @@ bool Stabilizer::calcTorque(double dt, const GaitParam& gaitParam, const std::ve
     // actRobotTqc->joint(i)->dq() = 0.0;
     // actRobotTqc->joint(i)->ddq() = 0.0;
 
-    post_dq[i] = gaitParam.genRobot->joint(i)->dq();
+    prev_dq[i] = gaitParam.genRobot->joint(i)->dq();
     
     std::cerr << "dq:" << actRobotTqc->joint(i)->dq() << std::endl;
     std::cerr << "ddq:" << actRobotTqc->joint(i)->ddq() << std::endl;
