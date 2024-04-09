@@ -287,17 +287,38 @@ bool Stabilizer::calcWrench(const GaitParam& gaitParam, const cnoid::Vector3& tg
 bool Stabilizer::calcTorque(double dt, const GaitParam& gaitParam, const std::vector<cnoid::Vector6>& tgtEEWrench /* 要素数EndEffector数. generate座標系. EndEffector origin*/,
                             cnoid::BodyPtr& actRobotTqc, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoPGainPercentage, std::vector<cpp_filters::TwoPointInterpolator<double> >& o_stServoDGainPercentage) const{
   // 速度・加速度を考慮しない重力補償
+  // rootlink
   actRobotTqc->rootLink()->T() = gaitParam.actRobot->rootLink()->T();
   actRobotTqc->rootLink()->v() = cnoid::Vector3::Zero();
   actRobotTqc->rootLink()->w() = cnoid::Vector3::Zero();
   actRobotTqc->rootLink()->dv() = cnoid::Vector3(0.0,0.0,gaitParam.g);
   actRobotTqc->rootLink()->dw() = cnoid::Vector3::Zero();
+  // 各関節
+  // １つ前の周期の関節角度、関節角速度を保持
+  static std::vector<double> prev_dq(actRobotTqc->numJoints()); // 0で初期化
+  static bool initialize = true;
   for(int i=0;i<actRobotTqc->numJoints();i++){
     actRobotTqc->joint(i)->q() = gaitParam.actRobot->joint(i)->q();
-    actRobotTqc->joint(i)->dq() = 0.0;
-    actRobotTqc->joint(i)->ddq() = 0.0;
+    actRobotTqc->joint(i)->dq() = gaitParam.actRobot->joint(i)->dq();
+
+    if (initialize) {
+      actRobotTqc->joint(i)->ddq() = 0.0;
+    } else {
+      actRobotTqc->joint(i)->ddq() = (gaitParam.genRobot->joint(i)->dq() - prev_dq[i]) / dt;
+    }
+
+    // actRobotTqc->joint(i)->dq() = gaitParam.actRobot->joint(i)->dq();
+    // actRobotTqc->joint(i)->ddq() = gaitParam.actRobot->joint(i)->ddq();
+    // actRobotTqc->joint(i)->dq() = 0.0;
+    // actRobotTqc->joint(i)->ddq() = 0.0;
+
+    prev_dq[i] = gaitParam.genRobot->joint(i)->dq();
+    
+    std::cerr << "dq:" << actRobotTqc->joint(i)->dq() << std::endl;
+    std::cerr << "ddq:" << actRobotTqc->joint(i)->ddq() << std::endl;
   }
-  actRobotTqc->calcForwardKinematics(true, true);
+  initialize = false;
+  actRobotTqc->calcForwardKinematics(true, true); // 引数は速度と加速度を更新するかどうか
   cnoid::calcInverseDynamics(actRobotTqc->rootLink()); // actRobotTqc->joint()->u()に書き込まれる
 
   // tgtEEWrench

@@ -35,6 +35,11 @@ AutoStabilizer::Ports::Ports() :
   m_landingHeightIn_("landingHeightIn", m_landingHeight_),
 
   m_qOut_("q", m_q_),
+
+  // 追加 ([port-name], ?)
+  m_dqOut_("dq", m_dq_), 
+  m_ddqOut_("ddq", m_ddq_),
+  
   m_genTauOut_("genTauOut", m_genTau_),
   m_genBasePoseOut_("genBasePoseOut", m_genBasePose_),
   m_genBaseTformOut_("genBaseTformOut", m_genBaseTform_),
@@ -84,6 +89,11 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
   this->addInPort("steppableRegionIn", this->ports_.m_steppableRegionIn_);
   this->addInPort("landingHeightIn", this->ports_.m_landingHeightIn_);
   this->addOutPort("q", this->ports_.m_qOut_);
+
+  //追加
+  this->addOutPort("dq", this->ports_.m_dqOut_);
+  this->addOutPort("ddq", this->ports_.m_ddqOut_);
+  
   this->addOutPort("genTauOut", this->ports_.m_genTauOut_);
   this->addOutPort("genBasePoseOut", this->ports_.m_genBasePoseOut_);
   this->addOutPort("genBaseTformOut", this->ports_.m_genBaseTformOut_);
@@ -669,6 +679,41 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
       }
     }
     ports.m_qOut_.write();
+  }
+
+  {
+    // dq
+    ports.m_dq_.tm = ports.m_qRef_.tm;
+    ports.m_dq_.data.length(gaitParam.genRobot->numJoints());
+    for(int i=0;i<gaitParam.genRobot->numJoints();i++){
+      if(mode.now() == AutoStabilizer::ControlMode::MODE_IDLE || !gaitParam.jointControllable[i]){
+        double value = gaitParam.refRobotRaw->joint(i)->dq();
+        if(std::isfinite(value)) ports.m_dq_.data[i] = value;
+        else std::cerr << "m_dq is not finite!" << std::endl;
+      }else if(mode.isSyncToABC() || mode.isSyncToIdle()){
+        double ratio = idleToAbcTransitionInterpolator.value();
+        double value = gaitParam.refRobotRaw->joint(i)->dq() * (1.0 - ratio) + gaitParam.genRobot->joint(i)->dq() * ratio;
+        if(std::isfinite(value)) ports.m_dq_.data[i] = value;
+        else std::cerr << "m_dq is not finite!" << std::endl;
+      }else{
+        double value = gaitParam.genRobot->joint(i)->dq();
+        if(std::isfinite(value)) ports.m_dq_.data[i] = value;
+        else std::cerr << "m_dq is not finite!" << std::endl;
+      }
+    }
+    ports.m_dqOut_.write();
+  }
+  
+  {
+    // ddq
+    ports.m_ddq_.tm = ports.m_qRef_.tm;
+    ports.m_ddq_.data.length(gaitParam.genRobot->numJoints());
+    for(int i=0;i<gaitParam.genRobot->numJoints();i++){
+      double value = gaitParam.actRobotTqc->joint(i)->ddq();
+      if(std::isfinite(value)) ports.m_ddq_.data[i] = value;
+      else std::cerr << "m_ddqRef is not finite!" << std::endl;
+      }
+    ports.m_ddqOut_.write();
   }
 
   {
