@@ -87,6 +87,7 @@ bool FullbodyIKSolver::solveFullbodyIK(double dt, const GaitParam& gaitParam,
     this->comConstraint->B_localp() = gaitParam.genCog + gaitParam.sbpOffset;
     this->comConstraint->maxError() << 10.0*dt, 10.0*dt, 10.0*dt;
     this->comConstraint->precision() << 0.0, 0.0, 0.0; // 強制的にIKをmax loopまで回す
+    // this->comConstraint->weight() << 10.0, 10.0, 0.01;
     this->comConstraint->weight() << 10.0, 10.0, 1.0;
     this->comConstraint->eval_R() = cnoid::Matrix3::Identity();
     ikConstraint2.push_back(this->comConstraint);
