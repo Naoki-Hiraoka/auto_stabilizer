@@ -31,7 +31,7 @@ public:
   }
 
   // start AutoBalancerで呼ばれる
-  bool reset(){
+  void reset(){
     for(int i=0;i<this->isImpedanceMode.size();i++) this->isImpedanceMode[i] = false;
   }
 
