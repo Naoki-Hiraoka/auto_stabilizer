@@ -299,23 +299,20 @@ bool Stabilizer::calcTorque(double dt, const GaitParam& gaitParam, const std::ve
   static bool initialize = true;
   for(int i=0;i<actRobotTqc->numJoints();i++){
     actRobotTqc->joint(i)->q() = gaitParam.actRobot->joint(i)->q();
+    
+    // actRobotTqc->joint(i)->dq() = 0.0;
     actRobotTqc->joint(i)->dq() = gaitParam.actRobot->joint(i)->dq();
-
+    
+    // actRobotTqc->joint(i)->ddq() = 0.0;    
     if (initialize) {
       actRobotTqc->joint(i)->ddq() = 0.0;
     } else {
       actRobotTqc->joint(i)->ddq() = (gaitParam.genRobot->joint(i)->dq() - prev_dq[i]) / dt;
     }
-
-    // actRobotTqc->joint(i)->dq() = gaitParam.actRobot->joint(i)->dq();
-    // actRobotTqc->joint(i)->ddq() = gaitParam.actRobot->joint(i)->ddq();
-    // actRobotTqc->joint(i)->dq() = 0.0;
-    // actRobotTqc->joint(i)->ddq() = 0.0;
-
     prev_dq[i] = gaitParam.genRobot->joint(i)->dq();
     
-    std::cerr << "dq:" << actRobotTqc->joint(i)->dq() << std::endl;
-    std::cerr << "ddq:" << actRobotTqc->joint(i)->ddq() << std::endl;
+    // std::cerr << "dq:" << actRobotTqc->joint(i)->dq() << std::endl;
+    // std::cerr << "ddq:" << actRobotTqc->joint(i)->ddq() << std::endl;
   }
   initialize = false;
   actRobotTqc->calcForwardKinematics(true, true); // 引数は速度と加速度を更新するかどうか
