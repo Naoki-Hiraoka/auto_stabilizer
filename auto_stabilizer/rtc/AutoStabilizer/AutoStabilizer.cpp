@@ -23,6 +23,7 @@ static const char* AutoStabilizer_spec[] = {
 };
 
 AutoStabilizer::Ports::Ports() :
+  // メンバ変数をデータポートに結びつける
   m_qRefIn_("qRef", m_qRef_),
   m_refTauIn_("refTauIn", m_refTau_),
   m_refBasePosIn_("refBasePosIn", m_refBasePos_),
@@ -68,7 +69,7 @@ AutoStabilizer::Ports::Ports() :
   m_RobotHardwareServicePort_("RobotHardwareService"){
 }
 
-AutoStabilizer::AutoStabilizer(RTC::Manager* manager) : RTC::DataFlowComponentBase(manager),
+AutoStabilizer::AutoStabilizer(RTC::Manager* manager) : RTC::DataFlowComponentBase(manager), // 継承クラスのコンストラクタ
   ports_(),
   debugLevel_(0)
 {
@@ -78,6 +79,7 @@ AutoStabilizer::AutoStabilizer(RTC::Manager* manager) : RTC::DataFlowComponentBa
 RTC::ReturnCode_t AutoStabilizer::onInitialize(){
 
   // add ports
+  // ("ポート名", 変数名)
   this->addInPort("qRef", this->ports_.m_qRefIn_);
   this->addInPort("refTauIn", this->ports_.m_refTauIn_);
   this->addInPort("refBasePosIn", this->ports_.m_refBasePosIn_);

@@ -41,15 +41,18 @@
 #include "FullbodyIKSolver.h"
 #include "CmdVelGenerator.h"
 
-class AutoStabilizer : public RTC::DataFlowComponentBase{
+class AutoStabilizer : public RTC::DataFlowComponentBase{ // DataFlowComponentBaseクラスを継承
 public:
+  // コンストラクタ
   AutoStabilizer(RTC::Manager* manager);
+  // オーバーライドするメンバ関数
   virtual RTC::ReturnCode_t onInitialize();
   virtual RTC::ReturnCode_t onFinalize();
   virtual RTC::ReturnCode_t onActivated(RTC::UniqueId ec_id);
   virtual RTC::ReturnCode_t onDeactivated(RTC::UniqueId ec_id);
   virtual RTC::ReturnCode_t onExecute(RTC::UniqueId ec_id);
 
+  // それ以外の追加する関数
   bool goPos(const double& x, const double& y, const double& th);
   bool goVelocity(const double& vx, const double& vy, const double& vth);
   bool goStop();
@@ -81,6 +84,7 @@ protected:
   public:
     Ports();
 
+    // InPortの設定:13
     RTC::TimedDoubleSeq m_qRef_;
     RTC::InPort<RTC::TimedDoubleSeq> m_qRefIn_;
     RTC::TimedDoubleSeq m_refTau_;
@@ -110,6 +114,7 @@ protected:
     auto_stabilizer_msgs::TimedLandingPosition m_landingHeight_; // 着地姿勢. 支持脚を水平にした座標系
     RTC::InPort<auto_stabilizer_msgs::TimedLandingPosition> m_landingHeightIn_;
 
+    // OutPortの設定:10
     RTC::TimedDoubleSeq m_q_;
     RTC::OutPort<RTC::TimedDoubleSeq> m_qOut_;
 
@@ -134,6 +139,7 @@ protected:
     std::vector<RTC::TimedDoubleSeq> m_actEEWrench_; // Generate World frame. EndEffector origin. 要素数及び順番はgaitParam_.eeNameと同じ. ロボットが受ける力
     std::vector<std::unique_ptr<RTC::OutPort<RTC::TimedDoubleSeq> > > m_actEEWrenchOut_;
 
+    //
     AutoStabilizerService_impl m_service0_;
     RTC::CorbaPort m_AutoStabilizerServicePort_;
 
