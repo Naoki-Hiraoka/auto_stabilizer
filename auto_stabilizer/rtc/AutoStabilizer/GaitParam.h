@@ -40,7 +40,12 @@ public:
   // from data port
   cnoid::BodyPtr refRobotRaw; // reference. reference world frame
   std::vector<cnoid::Vector6> refEEWrenchOrigin; // 要素数と順序はeeNameと同じ.FootOrigin frame. EndEffector origin. ロボットが受ける力
-  std::vector<cpp_filters::TwoPointInterpolatorSE3> refEEPoseRaw; // 要素数と順序はeeNameと同じ. reference world frame. EEPoseはjoint angleなどと比べて遅い周期で届くことが多いので、interpolaterで補間する.
+  
+  // fix for basketball_motion_controller
+  // refEEPoseRawを500[hz]で送るため、型を変換 -> refEEPoseと同じ型
+  std::vector<cnoid::Position> refEEPoseRaw; // 要素数と順序はeeNameと同じ. reference world frame.
+  // std::vector<cpp_filters::TwoPointInterpolatorSE3> refEEPoseRaw; // 要素数と順序はeeNameと同じ. reference world frame. EEPoseはjoint angleなどと比べて遅い周期で届くことが多いので、interpolaterで補間する.
+
   cnoid::BodyPtr actRobotRaw; // actual. actual imu world frame
   class Collision {
   public:

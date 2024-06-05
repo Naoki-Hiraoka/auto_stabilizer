@@ -4,6 +4,7 @@
 bool FullbodyIKSolver::solveFullbodyIK(double dt, const GaitParam& gaitParam,
                                        cnoid::BodyPtr& genRobot) const{
   // !jointControllableの関節は指令値をそのまま入れる
+  // jointControllable[i] = false ならその関節はIKで動かさない
   for(size_t i=0;i<genRobot->numJoints();i++){
     if(!gaitParam.jointControllable[i]) genRobot->joint(i)->q() = gaitParam.refRobot->joint(i)->q();
   }
@@ -16,7 +17,7 @@ bool FullbodyIKSolver::solveFullbodyIK(double dt, const GaitParam& gaitParam,
   for(size_t i=0;i<genRobot->numJoints();i++){
     if(gaitParam.jointControllable[i]) {
       variables.push_back(genRobot->joint(i));
-      dqWeight.push_back(this->dqWeight[i].value());
+      dqWeight.push_back(this->dqWeight[i].value()); // 重み
     }
   }
 
@@ -88,7 +89,7 @@ bool FullbodyIKSolver::solveFullbodyIK(double dt, const GaitParam& gaitParam,
     this->comConstraint->maxError() << 10.0*dt, 10.0*dt, 10.0*dt;
     this->comConstraint->precision() << 0.0, 0.0, 0.0; // 強制的にIKをmax loopまで回す
     // this->comConstraint->weight() << 10.0, 10.0, 1.0;
-    this->comConstraint->weight() << 10.0, 10.0, 0.01;
+    this->comConstraint->weight() << 10.0, 10.0, 0.001;
     this->comConstraint->eval_R() = cnoid::Matrix3::Identity();
     ikConstraint2.push_back(this->comConstraint);
   }
@@ -137,6 +138,7 @@ bool FullbodyIKSolver::solveFullbodyIK(double dt, const GaitParam& gaitParam,
   //  この現象を防ぐには、未来の情報を含んだIKを作るか、歩行動作中にIKが解きづらい姿勢を経由しないように着地位置等をリミットするか. 後者を採用
   //  歩行動作ではないゆっくりとした動作であれば、この現象が発生しても問題ない
 
+  // 優先度付き逆運動学に入れる制約(0, 1, 2)
   std::vector<std::vector<std::shared_ptr<IK::IKConstraint> > > constraints{ikConstraint0,ikConstraint1,ikConstraint2};
   for(size_t i=0;i<constraints.size();i++){
     for(size_t j=0;j<constraints[i].size();j++){

@@ -35,6 +35,10 @@ AutoStabilizer::Ports::Ports() :
   m_steppableRegionIn_("steppableRegionIn", m_steppableRegion_),
   m_landingHeightIn_("landingHeightIn", m_landingHeight_),
 
+  // for basketball motion
+  // m_rarm_eePoseRefIn_("rarm_eePoseRef", m_rarm_eePoseRef_);
+  // m_eePoseRefIn_("eePoseRef", m_eePoseRef_);
+
   m_qOut_("q", m_q_),
 
   // 追加 ([port-name], ?)
@@ -90,8 +94,10 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
   this->addInPort("selfCollisionIn", this->ports_.m_selfCollisionIn_);
   this->addInPort("steppableRegionIn", this->ports_.m_steppableRegionIn_);
   this->addInPort("landingHeightIn", this->ports_.m_landingHeightIn_);
+  // for basketball motion
+  this->addInPort("rarm_eePoseRef", this->ports_.m_rarm_eePoseRefIn_);
+  
   this->addOutPort("q", this->ports_.m_qOut_);
-
   //追加
   this->addOutPort("dq", this->ports_.m_dqOut_);
   this->addOutPort("ddq", this->ports_.m_ddqOut_);
@@ -151,7 +157,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
       std::cerr << "\x1b[31m[" << this->m_profile.instance_name << "] " << "rootLink is not FreeJoint [" << fileName << "]" << "\x1b[39m" << std::endl;
       return RTC::RTC_ERROR;
     }
-    this->gaitParam_.init(robot);
+    this->gaitParam_.init(robot); // robot->clone()してrefRobotなどをinitしていく
 
     // generate JointParams
     for(int i=0;i<this->gaitParam_.genRobot->numJoints();i++){
@@ -272,6 +278,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
     }
 
     // 各EndEffectorにつき、ref<name>PoseInというInPortをつくる
+    // refEEPose
     this->ports_.m_refEEPoseIn_.resize(this->gaitParam_.eeName.size());
     this->ports_.m_refEEPose_.resize(this->gaitParam_.eeName.size());
     for(int i=0;i<this->gaitParam_.eeName.size();i++){
@@ -347,7 +354,7 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
 }
 
 // static function
-bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam, const AutoStabilizer::ControlMode& mode, AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobotRaw, cnoid::BodyPtr actRobotRaw, std::vector<cnoid::Vector6>& refEEWrenchOrigin, std::vector<cpp_filters::TwoPointInterpolatorSE3>& refEEPoseRaw, std::vector<GaitParam::Collision>& selfCollision, std::vector<std::vector<cnoid::Vector3> >& steppableRegion, std::vector<double>& steppableHeight, double& relLandingHeight, cnoid::Vector3& relLandingNormal){
+bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam, const AutoStabilizer::ControlMode& mode, AutoStabilizer::Ports& ports, cnoid::BodyPtr refRobotRaw, cnoid::BodyPtr actRobotRaw, std::vector<cnoid::Vector6>& refEEWrenchOrigin, std::vector<cnoid::Position>& refEEPoseRaw, std::vector<GaitParam::Collision>& selfCollision, std::vector<std::vector<cnoid::Vector3> >& steppableRegion, std::vector<double>& steppableHeight, double& relLandingHeight, cnoid::Vector3& relLandingNormal){
   bool qRef_updated = false;
   if(ports.m_qRefIn_.isNew()){
     ports.m_qRefIn_.read();
@@ -401,23 +408,26 @@ bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam
     }
   }
 
+  // refEEPose
+  // fix: ここで補間されてしまっているので一旦消す
   for(int i=0;i<ports.m_refEEPoseIn_.size();i++){
     if(ports.m_refEEPoseIn_[i]->isNew()){
       ports.m_refEEPoseIn_[i]->read();
-      if(std::isfinite(ports.m_refEEPose_[i].data.position.x) && std::isfinite(ports.m_refEEPose_[i].data.position.y) && std::isfinite(ports.m_refEEPose_[i].data.position.z) &&
-         std::isfinite(ports.m_refEEPose_[i].data.orientation.r) && std::isfinite(ports.m_refEEPose_[i].data.orientation.p) && std::isfinite(ports.m_refEEPose_[i].data.orientation.y)){
-        cnoid::Position pose;
-        pose.translation()[0] = ports.m_refEEPose_[i].data.position.x;
-        pose.translation()[1] = ports.m_refEEPose_[i].data.position.y;
-        pose.translation()[2] = ports.m_refEEPose_[i].data.position.z;
-        pose.linear() = cnoid::rotFromRpy(ports.m_refEEPose_[i].data.orientation.r, ports.m_refEEPose_[i].data.orientation.p, ports.m_refEEPose_[i].data.orientation.y);
-        refEEPoseRaw[i].setGoal(pose, 0.3); // 0.3秒で補間
-        ports.refEEPoseLastUpdateTime_ = ports.m_qRef_.tm;
-      } else {
-        std::cerr << "m_refEEPose is not finite!" << std::endl;
-      }
+      // if(std::isfinite(ports.m_refEEPose_[i].data.position.x) && std::isfinite(ports.m_refEEPose_[i].data.position.y) && std::isfinite(ports.m_refEEPose_[i].data.position.z) &&
+      //    std::isfinite(ports.m_refEEPose_[i].data.orientation.r) && std::isfinite(ports.m_refEEPose_[i].data.orientation.p) && std::isfinite(ports.m_refEEPose_[i].data.orientation.y)){
+      //   cnoid::Position pose;
+      //   pose.translation()[0] = ports.m_refEEPose_[i].data.position.x;
+      //   pose.translation()[1] = ports.m_refEEPose_[i].data.position.y;
+      //   pose.translation()[2] = ports.m_refEEPose_[i].data.position.z;
+      //   pose.linear() = cnoid::rotFromRpy(ports.m_refEEPose_[i].data.orientation.r, ports.m_refEEPose_[i].data.orientation.p, ports.m_refEEPose_[i].data.orientation.y);
+      //   refEEPoseRaw[i].setGoal(pose, 0.3); // 0.3秒で補間
+      //   ports.refEEPoseLastUpdateTime_ = ports.m_qRef_.tm;
+      // } else {
+      //   std::cerr << "m_refEEPose is not finite!" << std::endl;
+      // }
     }
-    refEEPoseRaw[i].interpolate(dt);
+    // refEEPoseRaw[i].interpolate(dt);
+    refEEPoseRaw[i] = m_refEEPoseIn_[i];
   }
 
   if(ports.m_qActIn_.isNew()){
@@ -600,6 +610,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
                                            gaitParam.omega, gaitParam.l, gaitParam.sbpOffset, gaitParam.actCog);
 
   // Impedance Controller
+  // defaultではfalse
   impedanceController.calcImpedanceControl(dt, gaitParam,
                                            gaitParam.icEEOffset, gaitParam.icEETargetPose);
 
@@ -621,10 +632,13 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
                                    gaitParam.refZmpTraj, gaitParam.genCoords, gaitParam.swingState);
   legCoordsGenerator.calcCOMCoords(gaitParam, dt,
                                    gaitParam.genCog, gaitParam.genCogVel, gaitParam.genCogAcc);
-  for(int i=0;i<gaitParam.eeName.size();i++){
+
+  // 足先はabcEETargetPoseを使い、手先はicEETargetPoseを使っている?
+  for(int i=0;i<gaitParam.eeName.size();i++){ // gaitParam.eeName.size() = 4
     if(i<NUM_LEGS) gaitParam.abcEETargetPose[i] = gaitParam.genCoords[i].value();
     else gaitParam.abcEETargetPose[i] = gaitParam.icEETargetPose[i];
   }
+  
 
   // Stabilizer
   if(mode.isSyncToStopSTInit()){ // stopST直後の初回
@@ -638,6 +652,7 @@ bool AutoStabilizer::execAutoStabilizer(const AutoStabilizer::ControlMode& mode,
                             gaitParam.actRobotTqc, gaitParam.stOffsetRootRpy, gaitParam.stTargetRootPose, gaitParam.stTargetZmp, gaitParam.stEETargetWrench, gaitParam.stServoPGainPercentage, gaitParam.stServoDGainPercentage);
 
   // FullbodyIKSolver
+  // genRobotの値が更新されると考えて良い
   fullbodyIKSolver.solveFullbodyIK(dt, gaitParam,// input
                                    gaitParam.genRobot); // output
 
@@ -689,16 +704,16 @@ bool AutoStabilizer::writeOutPortData(AutoStabilizer::Ports& ports, const AutoSt
     ports.m_dq_.data.length(gaitParam.genRobot->numJoints());
     for(int i=0;i<gaitParam.genRobot->numJoints();i++){
       if(mode.now() == AutoStabilizer::ControlMode::MODE_IDLE || !gaitParam.jointControllable[i]){
-        double value = gaitParam.refRobotRaw->joint(i)->dq();
+        double value = gaitParam.refRobotRaw->joint(i)->dq(); // jointControllable = falseのときここでrefの値で上書く
         if(std::isfinite(value)) ports.m_dq_.data[i] = value;
         else std::cerr << "m_dq is not finite!" << std::endl;
       }else if(mode.isSyncToABC() || mode.isSyncToIdle()){
-        double ratio = idleToAbcTransitionInterpolator.value();
+        double ratio = idleToAbcTransitionInterpolator.value(); // 間に合っていないときの補間??
         double value = gaitParam.refRobotRaw->joint(i)->dq() * (1.0 - ratio) + gaitParam.genRobot->joint(i)->dq() * ratio;
         if(std::isfinite(value)) ports.m_dq_.data[i] = value;
         else std::cerr << "m_dq is not finite!" << std::endl;
       }else{
-        double value = gaitParam.genRobot->joint(i)->dq();
+        double value = gaitParam.genRobot->joint(i)->dq(); // 通常はgenRobotの値を与える
         if(std::isfinite(value)) ports.m_dq_.data[i] = value;
         else std::cerr << "m_dq is not finite!" << std::endl;
       }

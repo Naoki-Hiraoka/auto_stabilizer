@@ -74,6 +74,7 @@ bool RefToGenFrameConverter::convertFrame(const GaitParam& gaitParam, double dt,
                            refRobot, refEEPoseFK, refdz);
 
   // refEEPoseRawのrefFootMidCoordsを求めて変換する
+  // todo: 直接refEEPoseRawを流すやつを作る
   std::vector<cnoid::Position> refEEPoseWithOutFK(gaitParam.eeName.size());
   this->convertRefEEPoseRaw(gaitParam, genFootMidCoords,
                             refEEPoseWithOutFK);
