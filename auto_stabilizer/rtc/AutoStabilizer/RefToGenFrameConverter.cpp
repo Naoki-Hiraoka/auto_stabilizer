@@ -176,11 +176,13 @@ void RefToGenFrameConverter::convertRefRobotRaw(const GaitParam& gaitParam, cons
 
 // refEEPoseRawを変換する.
 void RefToGenFrameConverter::convertRefEEPoseRaw(const GaitParam& gaitParam, const cnoid::Position& genFootMidCoords, std::vector<cnoid::Position>& refEEPoseWithOutFK) const{
-  cnoid::Position refFootMidCoords = this->calcRefFootMidCoords(gaitParam.refEEPoseRaw[RLEG].value(), gaitParam.refEEPoseRaw[LLEG].value(), gaitParam);
+  // cnoid::Position refFootMidCoords = this->calcRefFootMidCoords(gaitParam.refEEPoseRaw[RLEG].value(), gaitParam.refEEPoseRaw[LLEG].value(), gaitParam);
+  cnoid::Position refFootMidCoords = this->calcRefFootMidCoords(gaitParam.refEEPoseRaw[RLEG], gaitParam.refEEPoseRaw[LLEG], gaitParam);
   refFootMidCoords = mathutil::orientCoordToAxis(refFootMidCoords, cnoid::Vector3::UnitZ()); // 足裏を水平になるように傾け直さずに、もとの傾きをそのまま使うことに相当
   cnoid::Position transform = genFootMidCoords * refFootMidCoords.inverse();
   for(int i=0;i<gaitParam.eeName.size();i++){
-    refEEPoseWithOutFK[i] = transform * gaitParam.refEEPoseRaw[i].value();
+    // refEEPoseWithOutFK[i] = transform * gaitParam.refEEPoseRaw[i].value();
+    refEEPoseWithOutFK[i] = transform * gaitParam.refEEPoseRaw[i];
   }
 }
 

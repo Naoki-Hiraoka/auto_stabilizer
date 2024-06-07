@@ -44,7 +44,6 @@ public:
   // fix for basketball_motion_controller
   // refEEPoseRawを500[hz]で送るため、型を変換 -> refEEPoseと同じ型
   std::vector<cnoid::Position> refEEPoseRaw; // 要素数と順序はeeNameと同じ. reference world frame.
-  // std::vector<cpp_filters::TwoPointInterpolatorSE3> refEEPoseRaw; // 要素数と順序はeeNameと同じ. reference world frame. EEPoseはjoint angleなどと比べて遅い周期で届くことが多いので、interpolaterで補間する.
 
   cnoid::BodyPtr actRobotRaw; // actual. actual imu world frame
   class Collision {
@@ -198,7 +197,10 @@ public:
     eeParentLink.push_back(parentLink_);
     eeLocalT.push_back(localT_);
     refEEWrenchOrigin.push_back(cnoid::Vector6::Zero());
-    refEEPoseRaw.push_back(cpp_filters::TwoPointInterpolatorSE3(cnoid::Position::Identity(), cnoid::Vector6::Zero(),cnoid::Vector6::Zero(), cpp_filters::HOFFARBIB));
+
+    // fix
+    refEEPoseRaw.push_back(cnoid::Position::Identity());
+    
     refEEPose.push_back(cnoid::Position::Identity());
     refEEWrench.push_back(cnoid::Vector6::Zero());
     actEEPose.push_back(cnoid::Position::Identity());
