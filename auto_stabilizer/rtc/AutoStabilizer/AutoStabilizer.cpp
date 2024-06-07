@@ -35,10 +35,6 @@ AutoStabilizer::Ports::Ports() :
   m_steppableRegionIn_("steppableRegionIn", m_steppableRegion_),
   m_landingHeightIn_("landingHeightIn", m_landingHeight_),
 
-  // for basketball motion
-  // m_rarm_eePoseRefIn_("rarm_eePoseRef", m_rarm_eePoseRef_);
-  // m_eePoseRefIn_("eePoseRef", m_eePoseRef_);
-
   m_qOut_("q", m_q_),
 
   // 追加 ([port-name], ?)
@@ -94,8 +90,6 @@ RTC::ReturnCode_t AutoStabilizer::onInitialize(){
   this->addInPort("selfCollisionIn", this->ports_.m_selfCollisionIn_);
   this->addInPort("steppableRegionIn", this->ports_.m_steppableRegionIn_);
   this->addInPort("landingHeightIn", this->ports_.m_landingHeightIn_);
-  // for basketball motion
-  this->addInPort("rarm_eePoseRef", this->ports_.m_rarm_eePoseRefIn_);
   
   this->addOutPort("q", this->ports_.m_qOut_);
   //追加
@@ -413,21 +407,31 @@ bool AutoStabilizer::readInPortData(const double& dt, const GaitParam& gaitParam
   for(int i=0;i<ports.m_refEEPoseIn_.size();i++){
     if(ports.m_refEEPoseIn_[i]->isNew()){
       ports.m_refEEPoseIn_[i]->read();
-      // if(std::isfinite(ports.m_refEEPose_[i].data.position.x) && std::isfinite(ports.m_refEEPose_[i].data.position.y) && std::isfinite(ports.m_refEEPose_[i].data.position.z) &&
-      //    std::isfinite(ports.m_refEEPose_[i].data.orientation.r) && std::isfinite(ports.m_refEEPose_[i].data.orientation.p) && std::isfinite(ports.m_refEEPose_[i].data.orientation.y)){
-      //   cnoid::Position pose;
-      //   pose.translation()[0] = ports.m_refEEPose_[i].data.position.x;
-      //   pose.translation()[1] = ports.m_refEEPose_[i].data.position.y;
-      //   pose.translation()[2] = ports.m_refEEPose_[i].data.position.z;
-      //   pose.linear() = cnoid::rotFromRpy(ports.m_refEEPose_[i].data.orientation.r, ports.m_refEEPose_[i].data.orientation.p, ports.m_refEEPose_[i].data.orientation.y);
-      //   refEEPoseRaw[i].setGoal(pose, 0.3); // 0.3秒で補間
-      //   ports.refEEPoseLastUpdateTime_ = ports.m_qRef_.tm;
-      // } else {
-      //   std::cerr << "m_refEEPose is not finite!" << std::endl;
-      // }
+      if(std::isfinite(ports.m_refEEPose_[i].data.position.x) && std::isfinite(ports.m_refEEPose_[i].data.position.y) && std::isfinite(ports.m_refEEPose_[i].data.position.z)
+	 && std::isfinite(ports.m_refEEPose_[i].data.orientation.r) && std::isfinite(ports.m_refEEPose_[i].data.orientation.p) && std::isfinite(ports.m_refEEPose_[i].data.orientation.y)){
+	cnoid::Position pose;
+        pose.translation()[0] = ports.m_refEEPose_[i].data.position.x;
+        pose.translation()[1] = ports.m_refEEPose_[i].data.position.y;
+        pose.translation()[2] = ports.m_refEEPose_[i].data.position.z;
+        pose.linear() = cnoid::rotFromRpy(ports.m_refEEPose_[i].data.orientation.r, ports.m_refEEPose_[i].data.orientation.p, ports.m_refEEPose_[i].data.orientation.y);
+        // refEEPoseRaw[i].setGoal(pose, 0.3); // 0.3秒で補間
+	refEEPoseRaw[i] = pose; // ここで代入
+        ports.refEEPoseLastUpdateTime_ = ports.m_qRef_.tm;
+
+	// std::cout << "[ast] read ok" << std::endl;
+	// std::cout << "[EEPose]" << std::endl;
+	// std::cout << "position.x: " << ports.m_refEEPose_[2].data.position.x << std::endl;
+	// std::cout << "position.y: " << ports.m_refEEPose_[2].data.position.y << std::endl;
+	// std::cout << "porision.z: " << ports.m_refEEPose_[2].data.position.z << std::endl;
+	// std::cout << "orientation.r: " << ports.m_refEEPose_[2].data.orientation.r << std::endl;
+	// std::cout << "orientation.p: " << ports.m_refEEPose_[2].data.orientation.p << std::endl;
+	// std::cout << "orientation.y: " << ports.m_refEEPose_[2].data.orientation.y << std::endl;
+      } else {
+        std::cerr << "m_refEEPose is not finite!" << std::endl;
+      }
     }
+    
     // refEEPoseRaw[i].interpolate(dt);
-    refEEPoseRaw[i] = m_refEEPoseIn_[i];
   }
 
   if(ports.m_qActIn_.isNew()){
