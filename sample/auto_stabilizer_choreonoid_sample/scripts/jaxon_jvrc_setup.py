@@ -26,7 +26,7 @@ class JAXON_RED_HrpsysConfigurator(ChoreonoidHrpsysConfigurator):
             ['rmfo', "RemoveForceSensorLinkOffset"],
             ['es', "EmergencyStopper"],
             ['ast', "AutoStabilizer"],
-            ['co', "CollisionDetector"],
+            #['co', "CollisionDetector"],
             ['hes', "EmergencyStopper"],
             ['el', "SoftErrorLimiter"],
             ['log', "DataLogger"]
