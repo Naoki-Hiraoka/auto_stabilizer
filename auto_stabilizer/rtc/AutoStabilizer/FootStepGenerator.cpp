@@ -243,7 +243,7 @@ bool FootStepGenerator::procFootStepNodesList(const GaitParam& gaitParam, const 
   elapsedTime += dt;
   for(int i=0;i<NUM_LEGS;i++) prevSupportPhase[i] = footstepNodesList[0].isSupportPhase[i];
 
-  if(footstepNodesList[0].remainTime <= 0.0 && footstepNodesList.size() > 1){ // 次のfootstepNodesListのindexに移る.
+  if(footstepNodesList[0].remainTime <= 1e-10 && footstepNodesList.size() > 1){ // 次のfootstepNodesListのindexに移る. 数値誤差に対応するための微小時間
     if(this->isModifyFootSteps && this->isStableGoStopMode && useActState){
       // footstepNodesList[0]で着地位置修正を行っていたら、footstepNodesListがemergencyStepNumのサイズになるまで歩くnodeが末尾に入る.
       this->checkStableGoStop(footstepNodesList, gaitParam);
